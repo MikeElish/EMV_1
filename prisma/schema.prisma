@@ -1,0 +1,169 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  PROCESSING
+  SHIPPED
+  DONE
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  WAITING_FOR_CAPTURE
+  SUCCEEDED
+  CANCELED
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  sku         String      @unique
+  name        String
+  slug        String      @unique
+  description String?
+  price       Int
+  stock       Int         @default(0)
+  images      String[]
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  group       String?
+  brand       String?
+  attributes  Json?
+  isActive    Boolean     @default(true)
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  // Bumped to now() on creation and whenever stock increases -- drives the
+  // "Новое поступление" section independently of createdAt/updatedAt.
+  newArrivalAt DateTime   @default(now())
+
+  searchLogs  SearchLog[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([newArrivalAt])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  deliveryNote  String?
+  status        OrderStatus @default(NEW)
+  totalAmount   Int
+  items         OrderItem[]
+  payment       Payment?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([status])
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product @relation(fields: [productId], references: [id])
+  nameSnapshot  String
+  priceSnapshot Int
+  quantity      Int
+
+  @@index([orderId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String        @unique
+  order           Order         @relation(fields: [orderId], references: [id])
+  yookassaId      String        @unique
+  status          PaymentStatus @default(PENDING)
+  confirmationUrl String?
+  rawPayload      Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+enum DriverApplicationStatus {
+  NEW
+  CONTACTED
+}
+
+model DriverApplication {
+  id                       String                  @id @default(cuid())
+  name                     String
+  phone                    String
+  drivingExperienceYears   Int?
+  previousDriverExperience Boolean
+  status                   DriverApplicationStatus @default(NEW)
+  createdAt                DateTime                @default(now())
+
+  @@index([status])
+}
+
+model SearchLog {
+  id          String           @id @default(cuid())
+  productId   String?
+  product     Product?         @relation(fields: [productId], references: [id])
+  brand       String
+  sku         String
+  name        String?
+  inSystem    Boolean
+  totalCount  Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  dailyCounts SearchLogDaily[]
+
+  @@unique([brand, sku])
+  @@index([productId])
+  @@index([inSystem])
+}
+
+model SearchLogDaily {
+  id          String    @id @default(cuid())
+  searchLogId String
+  searchLog   SearchLog @relation(fields: [searchLogId], references: [id], onDelete: Cascade)
+  date        DateTime
+  count       Int       @default(0)
+
+  @@unique([searchLogId, date])
+  @@index([searchLogId])
+}
+
+// Short-lived handoff between the bulk-search upload action and the results
+// page -- stores only the raw input rows so stock is always re-resolved live
+// against the current product table rather than a stale snapshot.
+model BulkSearchRequest {
+  id        String   @id @default(cuid())
+  rows      Json
+  createdAt DateTime @default(now())
+}

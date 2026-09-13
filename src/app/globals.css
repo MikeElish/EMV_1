@@ -1,0 +1,536 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Manual light/dark switch for the "Магазин запчастей" section only --
+   scoped to the #shop-root wrapper so it overrides the OS-driven :root
+   theme for every page under /shop, independent of the rest of the site. */
+[data-shop-theme="light"] {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+[data-shop-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* Native scrollbars default to an opaque track on Windows/Edge. This keeps
+   the thumb (so scrolling stays discoverable) but drops the track's
+   background so it blends into whatever the scroll area sits on. */
+.scroll-transparent {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.5) transparent;
+}
+.scroll-transparent::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+.scroll-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-transparent::-webkit-scrollbar-thumb {
+  background-color: rgba(128, 128, 128, 0.5);
+  border-radius: 9999px;
+}
+
+/* Header search bar while a file is being dragged over the page: a slow
+   pulsing glow on the border, distinguishing it as the one interactive
+   drop target while the rest of the page is dimmed. */
+.search-bar-drop-pulse {
+  animation: search-bar-drop-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes search-bar-drop-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0);
+  }
+}
+
+/* lottie-web bakes stroke color into the SVG path's attribute; force it to
+   follow the theme color instead of the animation's hardcoded black. */
+.lottie-logo-intro path {
+  stroke: currentColor !important;
+}
+
+/* "Таксопарк" button: the yellow/black taxi-checker pattern is a static
+   "painted wall" covering the whole button. On hover, a soft circular mask
+   (the "flashlight beam") sweeps left to right on a loop, revealing the
+   pattern only where it passes -- the pattern itself never moves, only the
+   light does. A diagonal highlight/shadow layer (blended per-tile) gives
+   each square a raised, embossed look instead of flat color. A separate
+   glow layer rides along on top to sell the light source itself. */
+.taxi-checker-fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background-color: #f5c518;
+  background-image:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.65) 0%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(0, 0, 0, 0) 65%,
+      rgba(0, 0, 0, 0.55) 100%
+    ),
+    linear-gradient(45deg, #111 25%, transparent 25%),
+    linear-gradient(-45deg, #111 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #111 75%),
+    linear-gradient(-45deg, transparent 75%, #111 75%);
+  background-blend-mode: overlay, normal, normal, normal, normal;
+  background-size:
+    24px 24px,
+    24px 24px,
+    24px 24px,
+    24px 24px,
+    24px 24px;
+  background-position:
+    0 0,
+    0 0,
+    0 12px,
+    12px -12px,
+    -12px 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100px 220%;
+  mask-size: 100px 220%;
+  -webkit-mask-image: radial-gradient(
+    circle,
+    black 0%,
+    black 38%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(circle, black 0%, black 38%, transparent 70%);
+  -webkit-mask-position: -100px center;
+  mask-position: -100px center;
+}
+
+.taxi-checker-btn:hover .taxi-checker-fill,
+.taxi-checker-btn:focus-visible .taxi-checker-fill {
+  opacity: 1;
+  animation: flashlight-reveal-sweep 1.6s linear infinite;
+}
+
+@keyframes flashlight-reveal-sweep {
+  from {
+    -webkit-mask-position: -100px center;
+    mask-position: -100px center;
+  }
+  to {
+    -webkit-mask-position: calc(100% + 100px) center;
+    mask-position: calc(100% + 100px) center;
+  }
+}
+
+/* The moving "beam" itself: a small warm glow riding along the same path,
+   screen-blended so it brightens whatever it passes over instead of
+   painting a flat color. */
+.taxi-checker-glow {
+  position: absolute;
+  inset: 0 auto 0 -70px;
+  width: 70px;
+  opacity: 0;
+  background: radial-gradient(
+    circle,
+    rgba(255, 247, 214, 0.9) 0%,
+    rgba(255, 224, 130, 0.4) 45%,
+    rgba(255, 224, 130, 0) 75%
+  );
+  mix-blend-mode: screen;
+  filter: blur(2px);
+}
+
+.taxi-checker-btn:hover .taxi-checker-glow,
+.taxi-checker-btn:focus-visible .taxi-checker-glow {
+  opacity: 1;
+  animation: flashlight-glow-sweep 1.6s linear infinite;
+}
+
+@keyframes flashlight-glow-sweep {
+  from {
+    left: -70px;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* "Магазин запчастей" button: same static-pattern / moving-flashlight
+   technique, but with a black/orange hazard-stripe pattern (nod to
+   heavy-machinery markings). Same diagonal highlight/shadow blend as the
+   taxi fill, so the pattern reads as raised, corrugated tape rather than a
+   flat print. */
+.shop-hazard-fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background-image:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.65) 0%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(0, 0, 0, 0) 65%,
+      rgba(0, 0, 0, 0.55) 100%
+    ),
+    repeating-linear-gradient(
+      45deg,
+      #111 0,
+      #111 12px,
+      #f97316 12px,
+      #f97316 24px
+    );
+  background-blend-mode: overlay, normal;
+  background-size:
+    24px 24px,
+    auto;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100px 220%;
+  mask-size: 100px 220%;
+  -webkit-mask-image: radial-gradient(
+    circle,
+    black 0%,
+    black 38%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(circle, black 0%, black 38%, transparent 70%);
+  -webkit-mask-position: -100px center;
+  mask-position: -100px center;
+}
+
+.shop-hazard-btn:hover .shop-hazard-fill,
+.shop-hazard-btn:focus-visible .shop-hazard-fill {
+  opacity: 1;
+  animation: flashlight-reveal-sweep 1.6s linear infinite;
+}
+
+.shop-hazard-glow {
+  position: absolute;
+  inset: 0 auto 0 -70px;
+  width: 70px;
+  opacity: 0;
+  background: radial-gradient(
+    circle,
+    rgba(255, 240, 224, 0.9) 0%,
+    rgba(249, 145, 60, 0.4) 45%,
+    rgba(249, 145, 60, 0) 75%
+  );
+  mix-blend-mode: screen;
+  filter: blur(2px);
+}
+
+.shop-hazard-btn:hover .shop-hazard-glow,
+.shop-hazard-btn:focus-visible .shop-hazard-glow {
+  opacity: 1;
+  animation: flashlight-glow-sweep 1.6s linear infinite;
+}
+
+/* Background city scene on the splash page: a static skyline over a
+   two-lane road with small vehicle icons looping across, in flat/vector
+   style (no video). Density/mix of vehicles per lane is controlled by the
+   `emphasis` prop on CityScene, not by these styles. */
+:root {
+  --city-sky-top: #bfe3f5;
+  --city-sky-bottom: #eef7fb;
+  --city-building: #94a3b8;
+  --city-road: #3f3f46;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --city-sky-top: #0b1220;
+    --city-sky-bottom: #1a2333;
+    --city-building: #29344a;
+    --city-road: #18181b;
+  }
+}
+
+.city-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.city-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--city-sky-top),
+    var(--city-sky-bottom)
+  );
+}
+
+.city-skyline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22%;
+  height: 30%;
+  display: flex;
+  align-items: flex-end;
+  gap: 2%;
+  padding: 0 4%;
+}
+
+.city-building {
+  flex: 1 1 0;
+  background: var(--city-building);
+  opacity: 0.6;
+  border-radius: 2px 2px 0 0;
+}
+
+.city-road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  background: var(--city-road);
+}
+
+.city-lane {
+  position: relative;
+  height: 50%;
+  border-bottom: 2px dashed rgba(255, 255, 255, 0.25);
+}
+
+.city-lane--left {
+  border-bottom: none;
+}
+
+.city-vehicle {
+  position: absolute;
+  top: 50%;
+  width: clamp(36px, 6vw, 56px);
+  height: clamp(16px, 2.6vw, 24px);
+  animation-name: city-drive-right;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.city-vehicle--right {
+  transform: translateY(-50%);
+  animation-name: city-drive-right;
+}
+
+.city-vehicle--left {
+  transform: translateY(-50%) scaleX(-1);
+  animation-name: city-drive-left;
+}
+
+@keyframes city-drive-right {
+  from {
+    left: -10%;
+  }
+  to {
+    left: 110%;
+  }
+}
+
+@keyframes city-drive-left {
+  from {
+    left: 110%;
+  }
+  to {
+    left: -10%;
+  }
+}
+
+/* Tariff carousel cards ("Тарифы"): each colored variant gets a diagonal
+   highlight/shadow blend on top of its base color for a raised, glossy
+   look instead of a flat fill. */
+.tariff-card-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(0, 0, 0, 0) 65%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+  background-blend-mode: overlay;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.tariff-card-fill--econom {
+  background-color: #f5c518;
+}
+.tariff-card-fill--comfort {
+  background-color: #f2f2f3;
+}
+.tariff-card-fill--business {
+  background-color: #1c1c1e;
+}
+.tariff-card-fill--minivan {
+  background-color: #bfe3f5;
+}
+.tariff-card-fill--intercity {
+  background-color: #9aa0a6;
+}
+.tariff-card-fill--yandexgo {
+  background-color: #ffe600;
+}
+.tariff-card-fill--white {
+  background-color: #ffffff;
+}
+
+.tariff-text--econom,
+.tariff-text--comfort,
+.tariff-text--minivan,
+.tariff-text--intercity {
+  color: #1a1a1a;
+}
+.tariff-text--business {
+  color: #f0d9a8;
+}
+
+/* Shimmering "Заказать" button inside the expanded tariff card. */
+.tariff-order-btn {
+  background-image: linear-gradient(
+    110deg,
+    #f5c518 0%,
+    #fff6d0 22%,
+    #f5c518 44%,
+    #b88a2e 55%,
+    #f5c518 66%,
+    #fff6d0 88%,
+    #f5c518 100%
+  );
+  background-size: 250% 100%;
+  animation: tariff-shimmer 3.2s linear infinite;
+  color: #1a1a1a;
+}
+
+@keyframes tariff-shimmer {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: -250% 0;
+  }
+}
+
+/* Taxi hero accent line: rendered in a period cursive script, tilted
+   counter-clockwise, and revealed left-to-right on mount as if a quill
+   were writing it (clip-path sweep + a travelling nib mark). */
+.taxi-handwrite-wrap {
+  position: relative;
+  display: inline-block;
+  transform: rotate(-18deg);
+}
+
+.taxi-handwrite-text {
+  display: inline-block;
+  white-space: nowrap;
+  color: #f0d9a8;
+  animation: taxi-handwrite-clip 2.6s ease-in-out forwards;
+}
+
+.taxi-handwrite-pen {
+  position: absolute;
+  top: 10%;
+  bottom: 24%;
+  width: 3px;
+  border-radius: 2px;
+  background: #f0d9a8;
+  box-shadow: 0 0 6px rgba(240, 217, 168, 0.8);
+  animation: taxi-handwrite-pen 2.6s ease-in-out forwards;
+}
+
+@keyframes taxi-handwrite-clip {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  8% {
+    clip-path: inset(0 88% 0 0);
+  }
+  20% {
+    clip-path: inset(0 74% 0 0);
+  }
+  35%,
+  38% {
+    clip-path: inset(0 55% 0 0);
+  }
+  55% {
+    clip-path: inset(0 30% 0 0);
+  }
+  70% {
+    clip-path: inset(0 16% 0 0);
+  }
+  85% {
+    clip-path: inset(0 6% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes taxi-handwrite-pen {
+  0% {
+    left: 0%;
+    opacity: 1;
+  }
+  8% {
+    left: 12%;
+  }
+  20% {
+    left: 26%;
+  }
+  35%,
+  38% {
+    left: 45%;
+  }
+  55% {
+    left: 70%;
+  }
+  70% {
+    left: 84%;
+  }
+  85% {
+    left: 94%;
+  }
+  95% {
+    left: 100%;
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
