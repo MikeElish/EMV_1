@@ -102,8 +102,8 @@ export default function SplashPage() {
           <span className="relative">Таксопарк</span>
         </Link>
         <Link
-          href="/shop"
-          onClick={(e) => handleNavigate(e, "/shop")}
+          href="/p"
+          onClick={(e) => handleNavigate(e, "/p")}
           className={`shop-hazard-btn relative isolate w-[44%] overflow-hidden rounded-lg border border-white/40 px-6 py-4 text-center font-medium text-white transition-transform duration-[450ms] sm:w-56 md:w-64 ${
             leaving ? "translate-x-[160%] opacity-0" : "translate-x-0"
           }`}
