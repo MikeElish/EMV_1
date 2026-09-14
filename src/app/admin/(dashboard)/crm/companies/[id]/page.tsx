@@ -11,10 +11,17 @@ export default async function EditCompanyPage({
   const company = await prisma.company.findUnique({ where: { id } });
   if (!company) notFound();
 
+  const managers = await prisma.user.findMany({
+    where: { role: { not: "CUSTOMER" } },
+    select: { id: true, lastName: true, firstName: true, login: true, role: true },
+    orderBy: { createdAt: "asc" },
+  });
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Компания: {company.name}</h1>
       <CompanyForm
+        managers={managers}
         initial={{
           name: company.name,
           inn: company.inn ?? undefined,
@@ -22,6 +29,7 @@ export default async function EditCompanyPage({
           address: company.address ?? undefined,
           contract: company.contract ?? undefined,
           type: company.type ?? undefined,
+          managerId: company.managerId ?? undefined,
         }}
         onSubmit={(input) => updateCompany(id, input)}
       />

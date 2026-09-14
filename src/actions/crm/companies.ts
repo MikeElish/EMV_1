@@ -16,6 +16,7 @@ function toCompanyData(data: CompanyInput) {
     address: data.address || null,
     contract: data.contract || null,
     type: data.type || null,
+    managerId: data.managerId || null,
   };
 }
 

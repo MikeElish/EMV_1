@@ -130,7 +130,8 @@ model User {
   phone        String?
   role         Role
   companyId    String?
-  company      Company? @relation(fields: [companyId], references: [id])
+  company      Company? @relation("CompanyUsers", fields: [companyId], references: [id])
+  managedCompanies Company[] @relation("CompanyManager")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -146,9 +147,13 @@ model Company {
   address   String?
   contract  String?
   type      String?
-  users     User[]
+  users     User[]   @relation("CompanyUsers")
+  managerId String?
+  manager   User?    @relation("CompanyManager", fields: [managerId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([managerId])
 }
 
 enum DriverApplicationStatus {

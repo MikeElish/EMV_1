@@ -44,6 +44,7 @@ export const companySchema = z.object({
   address: z.string().trim().optional(),
   contract: z.string().trim().optional(),
   type: z.string().trim().optional(),
+  managerId: z.string().trim().optional(),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
 

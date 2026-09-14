@@ -2,13 +2,18 @@
 
 import { useState, type FormEvent } from "react";
 import type { CompanyInput } from "@/lib/validators/crm";
-import { COMPANY_TYPE_SUGGESTIONS } from "@/lib/validators/crm";
+import { COMPANY_TYPE_SUGGESTIONS, ROLE_LABELS } from "@/lib/validators/crm";
 import type { ActionResult } from "@/actions/crm/companies";
+import type { Role } from "@prisma/client";
+
+type Manager = { id: string; lastName: string | null; firstName: string | null; login: string; role: Role };
 
 export function CompanyForm({
+  managers,
   initial,
   onSubmit,
 }: {
+  managers: Manager[];
   initial?: Partial<CompanyInput>;
   onSubmit: (input: CompanyInput) => Promise<ActionResult>;
 }) {
@@ -28,6 +33,7 @@ export function CompanyForm({
       address: String(formData.get("address") ?? "") || undefined,
       contract: String(formData.get("contract") ?? "") || undefined,
       type: String(formData.get("type") ?? "") || undefined,
+      managerId: String(formData.get("managerId") ?? "") || undefined,
     });
 
     setSubmitting(false);
@@ -119,6 +125,28 @@ export function CompanyForm({
             ))}
           </datalist>
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="managerId" className="text-sm text-foreground/60">
+          Закреплённый менеджер
+        </label>
+        <select
+          id="managerId"
+          name="managerId"
+          defaultValue={initial?.managerId ?? ""}
+          className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+        >
+          <option value="">— не назначен —</option>
+          {managers.map((m) => {
+            const fullName = [m.lastName, m.firstName].filter(Boolean).join(" ") || m.login;
+            return (
+              <option key={m.id} value={m.id}>
+                {fullName} — {ROLE_LABELS[m.role]}
+              </option>
+            );
+          })}
+        </select>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
