@@ -1,6 +1,6 @@
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { Role } from "@prisma/client";
 
 const SESSION_COOKIE = "emv_admin_session";
@@ -46,10 +46,17 @@ export async function decryptSession(token: string | undefined) {
 export async function createAdminSession(userId: string, role: Role, login: string) {
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
   const token = await encryptSession({ userId, role, login, expiresAt: expiresAt.toISOString() });
+  // A "Secure" cookie is silently dropped by the browser over plain HTTP,
+  // so this can't just key off NODE_ENV -- it has to reflect the scheme the
+  // request actually arrived over (Nginx sets x-forwarded-proto). That way
+  // login keeps working before SSL is set up, and tightens itself
+  // automatically once the site moves to HTTPS.
+  const headersList = await headers();
+  const isHttps = headersList.get("x-forwarded-proto") === "https";
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttps,
     sameSite: "lax",
     expires: expiresAt,
     path: "/",
