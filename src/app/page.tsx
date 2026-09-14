@@ -4,6 +4,7 @@ import { useState, type CSSProperties, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogoIntro } from "@/components/LogoIntro";
+import { CrmEntryButton } from "@/components/CrmEntryButton";
 
 const EXIT_DURATION_MS = 450;
 const REVEAL_DURATION_MS = 500;
@@ -62,6 +63,13 @@ export default function SplashPage() {
         playsInline
       />
       <div className="absolute inset-0 z-0 bg-black/45" />
+
+      <div
+        className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6"
+        style={{ opacity: leaving ? 0 : 1, transition: `opacity ${EXIT_DURATION_MS}ms ease` }}
+      >
+        <CrmEntryButton variant="dark" />
+      </div>
 
       <button
         type="button"

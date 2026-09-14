@@ -67,7 +67,7 @@ export function SetupForm() {
         disabled={submitting}
         className="w-full rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {submitting ? "Создаём..." : "Создать администратора"}
+        {submitting ? "Создаём..." : "Создать владельца"}
       </button>
     </form>
   );

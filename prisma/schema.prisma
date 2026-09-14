@@ -106,11 +106,49 @@ model Payment {
   updatedAt       DateTime      @updatedAt
 }
 
-model AdminUser {
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  SENIOR_MANAGER
+  CHIEF_MANAGER
+  SUPPLIER
+  MECHANIC
+  DISPATCHER
+  CUSTOMER
+  DRIVER
+}
+
+model User {
   id           String   @id @default(cuid())
-  email        String   @unique
+  lastName     String?
+  firstName    String?
+  patronymic   String?
+  login        String   @unique
   passwordHash String
+  email        String?  @unique
+  phone        String?
+  role         Role
+  companyId    String?
+  company      Company? @relation(fields: [companyId], references: [id])
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([role])
+  @@index([companyId])
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  inn       String?
+  ogrn      String?
+  address   String?
+  contract  String?
+  type      String?
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum DriverApplicationStatus {

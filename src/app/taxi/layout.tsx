@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { CrmEntryButton } from "@/components/CrmEntryButton";
 import { taxiContent } from "@/content/taxi";
 
 const navLinks = [
@@ -62,16 +63,19 @@ export default function TaxiLayout({ children }: LayoutProps<"/taxi">) {
               </Link>
             ))}
           </nav>
-          <a
-            href={`tel:${taxiContent.contacts.phoneHref}`}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 ${
-              isVideoPage
-                ? "bg-white text-black"
-                : "bg-foreground text-background"
-            }`}
-          >
-            {taxiContent.contacts.phone}
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href={`tel:${taxiContent.contacts.phoneHref}`}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 ${
+                isVideoPage
+                  ? "bg-white text-black"
+                  : "bg-foreground text-background"
+              }`}
+            >
+              {taxiContent.contacts.phone}
+            </a>
+            <CrmEntryButton variant={isVideoPage ? "dark" : "light"} />
+          </div>
         </div>
       </header>
 
