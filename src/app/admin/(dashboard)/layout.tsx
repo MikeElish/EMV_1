@@ -6,7 +6,6 @@ const NAV_LINKS = [
   { href: "/admin", label: "Дашборд" },
   { href: "/admin/products", label: "Товары" },
   { href: "/admin/categories", label: "Категории" },
-  { href: "/admin/orders", label: "Заказы" },
   { href: "/admin/driver-applications", label: "Заявки водителей" },
   { href: "/admin/search", label: "Поиск" },
   { href: "/admin/crm/users", label: "CRM" },

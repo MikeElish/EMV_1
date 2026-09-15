@@ -8,12 +8,17 @@ generator client {
 }
 
 enum OrderStatus {
-  NEW
-  PAID
-  PROCESSING
-  SHIPPED
-  DONE
+  AWAITING_PAYMENT
+  IN_PROGRESS
+  SHIPPED_AWAITING_PAYMENT
   CANCELLED
+  DONE
+}
+
+enum OrderDocumentCategory {
+  INVOICE
+  UPD
+  WAYBILL
 }
 
 enum PaymentStatus {
@@ -65,20 +70,38 @@ model Product {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  orderNumber   String      @unique
+  id            String          @id @default(cuid())
+  orderNumber   String          @unique
   customerName  String
   customerPhone String
   customerEmail String?
   deliveryNote  String?
-  status        OrderStatus @default(NEW)
+  status        OrderStatus     @default(AWAITING_PAYMENT)
+  paid          Boolean         @default(false)
+  deliveryDate  DateTime?
   totalAmount   Int
+  userId        String?
+  user          User?           @relation(fields: [userId], references: [id])
   items         OrderItem[]
+  documents     OrderDocument[]
   payment       Payment?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([status])
+  @@index([userId])
+}
+
+model OrderDocument {
+  id         String                 @id @default(cuid())
+  orderId    String
+  order      Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  category   OrderDocumentCategory
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime               @default(now())
+
+  @@index([orderId, category])
 }
 
 model OrderItem {
@@ -132,6 +155,7 @@ model User {
   companyId    String?
   company      Company? @relation("CompanyUsers", fields: [companyId], references: [id])
   managedCompanies Company[] @relation("CompanyManager")
+  orders       Order[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

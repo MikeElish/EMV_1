@@ -27,7 +27,13 @@ export function CrmLoginForm() {
       return;
     }
 
-    router.push(result.role === "OWNER" ? "/admin" : "/crm/cabinet");
+    router.push(
+      result.role === "OWNER"
+        ? "/admin"
+        : result.role === "CUSTOMER"
+          ? "/shop"
+          : "/crm/cabinet"
+    );
     router.refresh();
   }
 

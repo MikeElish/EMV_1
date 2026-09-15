@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getCrmBadge, type CrmBadgeInfo } from "@/actions/crm/session-badge";
 
-const LOGGED_OUT: CrmBadgeInfo = { loggedIn: false, label: null };
+const LOGGED_OUT: CrmBadgeInfo = { loggedIn: false, label: null, role: null };
 
 export function CrmEntryButton({ variant }: { variant: "light" | "dark" }) {
   const [badge, setBadge] = useState<CrmBadgeInfo>(LOGGED_OUT);

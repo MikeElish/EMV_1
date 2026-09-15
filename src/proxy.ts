@@ -23,8 +23,13 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/crm")) {
-    if (pathname === "/crm/cabinet" && !session?.userId) {
-      return NextResponse.redirect(new URL("/crm", request.url));
+    if (pathname === "/crm/cabinet") {
+      if (!session?.userId) {
+        return NextResponse.redirect(new URL("/crm", request.url));
+      }
+      if (session.role === "CUSTOMER") {
+        return NextResponse.redirect(new URL("/shop", request.url));
+      }
     }
     return NextResponse.next();
   }

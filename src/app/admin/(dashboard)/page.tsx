@@ -9,7 +9,7 @@ export default async function AdminDashboardPage() {
     totalCategories,
     newDriverApplications,
   ] = await Promise.all([
-    prisma.order.count({ where: { status: "NEW" } }),
+    prisma.order.count({ where: { status: "AWAITING_PAYMENT" } }),
     prisma.product.count({ where: { isActive: true } }),
     prisma.product.findMany({
       where: { isActive: true, stock: { lte: 2 } },
@@ -26,7 +26,7 @@ export default async function AdminDashboardPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Link
-          href="/admin/orders"
+          href="/admin/crm/orders"
           className="rounded-lg border border-foreground/10 p-4 transition-colors hover:border-foreground/30"
         >
           <p className="text-sm text-foreground/50">Новые заказы</p>

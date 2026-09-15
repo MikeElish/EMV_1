@@ -7,7 +7,13 @@ import { CrmLoginForm } from "@/components/crm/CrmLoginForm";
 export default async function CrmLoginPage() {
   const session = await getAdminSession();
   if (session?.userId) {
-    redirect(session.role === "OWNER" ? "/admin" : "/crm/cabinet");
+    redirect(
+      session.role === "OWNER"
+        ? "/admin"
+        : session.role === "CUSTOMER"
+          ? "/shop"
+          : "/crm/cabinet"
+    );
   }
 
   return (

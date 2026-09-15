@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validators/checkout";
+import { getAdminSession } from "@/lib/session";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -43,6 +44,12 @@ export async function createOrder(
 
   const orderNumber = await generateOrderNumber();
 
+  // Guest checkout stays the default -- if the shopper happens to be logged
+  // in as a Покупатель at the moment of checkout, the order is silently
+  // linked to their account so it shows up under "Мои заказы".
+  const session = await getAdminSession();
+  const userId = session?.role === "CUSTOMER" ? session.userId : null;
+
   const order = await prisma.order.create({
     data: {
       orderNumber,
@@ -51,6 +58,7 @@ export async function createOrder(
       customerEmail,
       deliveryNote,
       totalAmount,
+      userId,
       items: { create: orderItemsData },
     },
   });
