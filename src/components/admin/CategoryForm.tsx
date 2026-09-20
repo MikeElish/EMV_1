@@ -7,9 +7,11 @@ import type { ActionResult } from "@/actions/admin/categories";
 export function CategoryForm({
   initial,
   onSubmit,
+  onSuccess,
 }: {
   initial?: CategoryInput;
   onSubmit: (input: CategoryInput) => Promise<ActionResult>;
+  onSuccess?: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +22,7 @@ export function CategoryForm({
     setSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    // on success, onSubmit redirects server-side and this call never resolves
+    // on create, onSubmit redirects server-side and this call never resolves
     const result = await onSubmit({
       name: String(formData.get("name") ?? ""),
       slug: String(formData.get("slug") ?? ""),
@@ -29,7 +31,9 @@ export function CategoryForm({
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
+      return;
     }
+    onSuccess?.();
   }
 
   return (

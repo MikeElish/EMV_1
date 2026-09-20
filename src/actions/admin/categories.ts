@@ -50,7 +50,7 @@ export async function updateCategory(
   await prisma.category.update({ where: { id }, data: parsed.data });
   revalidatePath("/admin/crm/categories");
   revalidatePath("/shop");
-  redirect("/admin/crm/categories");
+  return { ok: true };
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
