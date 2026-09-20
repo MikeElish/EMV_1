@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { utils, write } from "xlsx";
 import type { SearchLog, SearchLogDaily } from "@prisma/client";
+import { TableSearchInput } from "@/components/admin/TableSearchInput";
 
 type LogWithDaily = SearchLog & { dailyCounts: SearchLogDaily[] };
 
@@ -34,7 +35,16 @@ export function SearchLogTable({
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const exportHref = buildExportHref(logs);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return logs;
+    return logs.filter((log) =>
+      [log.brand, log.name, log.sku].filter(Boolean).join(" ").toLowerCase().includes(query)
+    );
+  }, [logs, search]);
 
   return (
     <div>
@@ -55,13 +65,16 @@ export function SearchLogTable({
           ))}
         </select>
 
-        <a
-          href={exportHref}
-          download="poisk.xlsx"
-          className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
-        >
-          Выгрузить
-        </a>
+        <div className="flex items-center gap-3">
+          <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск по названию, артикулу..." />
+          <a
+            href={exportHref}
+            download="poisk.xlsx"
+            className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Выгрузить
+          </a>
+        </div>
       </div>
 
       <table className="mt-6 w-full text-sm">
@@ -75,7 +88,7 @@ export function SearchLogTable({
           </tr>
         </thead>
         <tbody>
-          {logs.map((log) => {
+          {filtered.map((log) => {
             const isOpen = openId === log.id;
             return (
               <Fragment key={log.id}>
@@ -112,7 +125,7 @@ export function SearchLogTable({
         </tbody>
       </table>
 
-      {logs.length === 0 && <p className="mt-6 text-foreground/60">Ничего не найдено.</p>}
+      {filtered.length === 0 && <p className="mt-6 text-foreground/60">Ничего не найдено.</p>}
     </div>
   );
 }

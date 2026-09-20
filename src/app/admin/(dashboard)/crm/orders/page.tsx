@@ -8,11 +8,8 @@ export default async function CrmOrdersPage() {
   });
 
   return (
-    <div>
-      <h1 className="text-lg font-semibold">Заказы</h1>
-      <div className="mt-4 overflow-x-auto">
-        <OrdersTable orders={orders} />
-      </div>
+    <div className="overflow-x-auto">
+      <OrdersTable orders={orders} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Role } from "@prisma/client";
 import { ROLE_LABELS } from "@/lib/validators/crm";
 import type { UserInput } from "@/lib/validators/crm";
@@ -9,6 +10,7 @@ import { updateUser, deleteUser } from "@/actions/crm/users";
 import { UserForm } from "@/components/admin/UserForm";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
+import { TableSearchInput } from "@/components/admin/TableSearchInput";
 
 type Row = {
   id: string;
@@ -28,10 +30,28 @@ type Company = { id: string; name: string };
 export function UsersTable({ users, companies }: { users: Row[]; companies: Company[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Row | null>(null);
+  const [search, setSearch] = useState("");
 
-  if (users.length === 0) {
-    return <p className="text-sm text-foreground/40">Пользователей пока нет.</p>;
-  }
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return users;
+    return users.filter((user) =>
+      [
+        user.lastName,
+        user.firstName,
+        user.patronymic,
+        user.login,
+        user.email,
+        user.phone,
+        user.company?.name,
+        ROLE_LABELS[user.role],
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [users, search]);
 
   function close() {
     setSelected(null);
@@ -40,7 +60,26 @@ export function UsersTable({ users, companies }: { users: Row[]; companies: Comp
 
   return (
     <>
-      <table className="w-full text-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/crm/users/new"
+            aria-label="Добавить пользователя"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-green-600 text-lg font-bold leading-none text-white transition-opacity hover:opacity-90"
+          >
+            +
+          </Link>
+          <h1 className="text-lg font-semibold">Пользователи</h1>
+        </div>
+        <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск по пользователям..." />
+      </div>
+
+      {users.length === 0 ? (
+        <p className="mt-4 text-sm text-foreground/40">Пользователей пока нет.</p>
+      ) : filtered.length === 0 ? (
+        <p className="mt-4 text-sm text-foreground/40">Ничего не найдено.</p>
+      ) : (
+      <table className="mt-4 w-full text-sm">
         <thead>
           <tr className="border-b border-foreground/10 text-left text-foreground/50">
             <th className="py-2 pr-4">Фамилия</th>
@@ -55,7 +94,7 @@ export function UsersTable({ users, companies }: { users: Row[]; companies: Comp
           </tr>
         </thead>
         <tbody>
-          {users.map((user) => (
+          {filtered.map((user) => (
             <tr
               key={user.id}
               onClick={() => setSelected(user)}
@@ -74,6 +113,7 @@ export function UsersTable({ users, companies }: { users: Row[]; companies: Comp
           ))}
         </tbody>
       </table>
+      )}
 
       {selected && (
         <Modal onClose={() => setSelected(null)} maxWidthClassName="max-w-2xl">
