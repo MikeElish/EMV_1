@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import type { ProductInput } from "@/lib/validators/product";
 import type { ActionResult } from "@/actions/admin/products";
+import { rublesToKopecksRoundedUp } from "@/lib/money";
 import { ProductImagesField } from "@/components/admin/ProductImagesField";
 
 type Category = { id: string; name: string };
@@ -38,7 +39,7 @@ export function ProductForm({
 
     const formData = new FormData(event.currentTarget);
     const priceRub = String(formData.get("priceRub") ?? "0").replace(",", ".");
-    const price = Math.round(parseFloat(priceRub || "0") * 100);
+    const price = rublesToKopecksRoundedUp(parseFloat(priceRub || "0"));
 
     const input: ProductInput = {
       sku: String(formData.get("sku") ?? ""),

@@ -20,3 +20,14 @@ export function formatRub(minorUnits: number): string {
 export function formatRubPrecise(minorUnits: number): string {
   return preciseFormatter.format(minorUnits / 100);
 }
+
+/**
+ * Converts a ruble amount (as typed by an admin, or read from an import
+ * sheet) to kopecks, always rounding up rather than to the nearest kopeck.
+ * The tiny epsilon subtraction guards against float multiplication
+ * artifacts (e.g. 1.1 * 100 === 110.00000000000001), which would otherwise
+ * round up an extra kopeck for perfectly round prices.
+ */
+export function rublesToKopecksRoundedUp(rubles: number): number {
+  return Math.ceil(rubles * 100 - 1e-9);
+}

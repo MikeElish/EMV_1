@@ -14,6 +14,7 @@ import {
   type ImportAnalysis,
 } from "@/lib/validators/csv";
 import { buildProductSlug } from "@/lib/slug";
+import { rublesToKopecksRoundedUp } from "@/lib/money";
 import { normalizeBrand } from "@/lib/normalize-brand";
 import { applyWatermark } from "@/lib/watermark";
 import { uploadWatermarkedImage } from "@/lib/image-storage";
@@ -213,7 +214,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
       name: row.name,
       slug: buildProductSlug(row.brand, row.sku),
       description: row.description || null,
-      price: Math.round(row.price * 100),
+      price: rublesToKopecksRoundedUp(row.price),
       stock: row.stock,
       categoryId: category.id,
       brand: row.brand || null,
