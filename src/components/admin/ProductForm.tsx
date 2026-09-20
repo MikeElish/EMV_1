@@ -48,7 +48,6 @@ export function ProductForm({
       price: Number.isFinite(price) ? price : 0,
       stock: Number(formData.get("stock") ?? 0),
       categoryId: String(formData.get("categoryId") ?? ""),
-      group: String(formData.get("group") ?? "") || undefined,
       brand: String(formData.get("brand") ?? "") || undefined,
       machineType: String(formData.get("machineType") ?? "") || undefined,
       compatibleWith: splitList(String(formData.get("compatibleWith") ?? "")),
@@ -172,7 +171,7 @@ export function ProductForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="brand" className="text-sm text-foreground/60">
             Бренд
@@ -181,17 +180,6 @@ export function ProductForm({
             id="brand"
             name="brand"
             defaultValue={initial?.brand}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          />
-        </div>
-        <div>
-          <label htmlFor="group" className="text-sm text-foreground/60">
-            Группа товаров
-          </label>
-          <input
-            id="group"
-            name="group"
-            defaultValue={initial?.group}
             className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
           />
         </div>

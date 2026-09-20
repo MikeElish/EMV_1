@@ -51,7 +51,6 @@ model Product {
   images      String[]
   categoryId  String
   category    Category    @relation(fields: [categoryId], references: [id])
-  group       String?
   brand       String?
   attributes  Json?
   isActive    Boolean     @default(true)

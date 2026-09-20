@@ -31,7 +31,6 @@ export default async function EditProductPage({
           priceRub: (product.price / 100).toString(),
           stock: product.stock,
           categoryId: product.categoryId,
-          group: product.group ?? undefined,
           brand: product.brand ?? undefined,
           machineType: attributes?.machineType,
           compatibleWithText: attributes?.compatibleWith?.join(", "),

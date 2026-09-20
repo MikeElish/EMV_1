@@ -25,7 +25,6 @@ function toProductData(data: ProductInput) {
     price: data.price,
     stock: data.stock,
     categoryId: data.categoryId,
-    group: data.group,
     brand: data.brand,
     images: data.images,
     isActive: data.isActive,

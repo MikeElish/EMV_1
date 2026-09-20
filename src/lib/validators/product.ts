@@ -13,7 +13,6 @@ export const productSchema = z.object({
   price: z.number().int().min(0, "Цена не может быть отрицательной"),
   stock: z.number().int().min(0),
   categoryId: z.string().min(1, "Выберите категорию"),
-  group: z.string().trim().max(120).optional(),
   brand: z.string().trim().max(80).optional(),
   machineType: z.string().trim().max(80).optional(),
   compatibleWith: z.array(z.string().trim().min(1)).default([]),
