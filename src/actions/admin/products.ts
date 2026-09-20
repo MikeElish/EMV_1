@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { productSchema, type ProductInput } from "@/lib/validators/product";
+import { buildProductSlug } from "@/lib/slug";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -20,7 +21,7 @@ function toProductData(data: ProductInput) {
   return {
     sku: data.sku,
     name: data.name,
-    slug: data.slug,
+    slug: buildProductSlug(data.brand, data.sku),
     description: data.description,
     price: data.price,
     stock: data.stock,
@@ -40,11 +41,12 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   }
 
+  const slug = buildProductSlug(parsed.data.brand, parsed.data.sku);
   const existing = await prisma.product.findFirst({
-    where: { OR: [{ sku: parsed.data.sku }, { slug: parsed.data.slug }] },
+    where: { OR: [{ sku: parsed.data.sku }, { slug }] },
   });
   if (existing) {
-    return { ok: false, error: "Товар с таким артикулом или slug уже существует" };
+    return { ok: false, error: "Товар с таким артикулом уже существует" };
   }
 
   await prisma.product.create({ data: toProductData(parsed.data) });
@@ -65,14 +67,15 @@ export async function updateProduct(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   }
 
+  const slug = buildProductSlug(parsed.data.brand, parsed.data.sku);
   const conflict = await prisma.product.findFirst({
     where: {
-      OR: [{ sku: parsed.data.sku }, { slug: parsed.data.slug }],
+      OR: [{ sku: parsed.data.sku }, { slug }],
       NOT: { id },
     },
   });
   if (conflict) {
-    return { ok: false, error: "Товар с таким артикулом или slug уже существует" };
+    return { ok: false, error: "Товар с таким артикулом уже существует" };
   }
 
   const current = await prisma.product.findUnique({ where: { id }, select: { stock: true } });

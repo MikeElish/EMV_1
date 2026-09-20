@@ -26,7 +26,6 @@ export default async function EditProductPage({
         initial={{
           sku: product.sku,
           name: product.name,
-          slug: product.slug,
           description: product.description ?? undefined,
           priceRub: (product.price / 100).toString(),
           stock: product.stock,

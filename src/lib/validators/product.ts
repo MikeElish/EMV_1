@@ -3,12 +3,6 @@ import { z } from "zod";
 export const productSchema = z.object({
   sku: z.string().trim().min(1, "Укажите артикул").max(64),
   name: z.string().trim().min(2, "Минимум 2 символа").max(200),
-  slug: z
-    .string()
-    .trim()
-    .min(2, "Минимум 2 символа")
-    .max(200)
-    .regex(/^[a-z0-9-]+$/, "Только латиница, цифры и дефис"),
   description: z.string().trim().max(2000).optional(),
   price: z.number().int().min(0, "Цена не может быть отрицательной"),
   stock: z.number().int().min(0),

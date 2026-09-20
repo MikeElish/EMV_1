@@ -13,7 +13,7 @@ import {
   type DuplicateGroup,
   type ImportAnalysis,
 } from "@/lib/validators/csv";
-import { slugifySku } from "@/lib/slug";
+import { buildProductSlug } from "@/lib/slug";
 import { normalizeBrand } from "@/lib/normalize-brand";
 import { applyWatermark } from "@/lib/watermark";
 import { uploadWatermarkedImage } from "@/lib/image-storage";
@@ -211,7 +211,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
 
     const data = {
       name: row.name,
-      slug: slugifySku(row.sku),
+      slug: buildProductSlug(row.brand, row.sku),
       description: row.description || null,
       price: Math.round(row.price * 100),
       stock: row.stock,

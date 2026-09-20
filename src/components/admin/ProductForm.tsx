@@ -43,7 +43,6 @@ export function ProductForm({
     const input: ProductInput = {
       sku: String(formData.get("sku") ?? ""),
       name: String(formData.get("name") ?? ""),
-      slug: String(formData.get("slug") ?? ""),
       description: String(formData.get("description") ?? "") || undefined,
       price: Number.isFinite(price) ? price : 0,
       stock: Number(formData.get("stock") ?? 0),
@@ -66,32 +65,17 @@ export function ProductForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 max-w-xl space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="sku" className="text-sm text-foreground/60">
-            Артикул (SKU)
-          </label>
-          <input
-            id="sku"
-            name="sku"
-            required
-            defaultValue={initial?.sku}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          />
-        </div>
-        <div>
-          <label htmlFor="slug" className="text-sm text-foreground/60">
-            Slug (для URL)
-          </label>
-          <input
-            id="slug"
-            name="slug"
-            required
-            pattern="[a-z0-9-]+"
-            defaultValue={initial?.slug}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          />
-        </div>
+      <div>
+        <label htmlFor="sku" className="text-sm text-foreground/60">
+          Артикул (SKU)
+        </label>
+        <input
+          id="sku"
+          name="sku"
+          required
+          defaultValue={initial?.sku}
+          className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+        />
       </div>
 
       <div>
