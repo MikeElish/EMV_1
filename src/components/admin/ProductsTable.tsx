@@ -51,6 +51,7 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Товары</h1>
         <div className="flex items-center gap-3">
+          <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск по товарам..." />
           <Link
             href="/admin/crm/products/import"
             className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium"
@@ -63,7 +64,6 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
           >
             Добавить товар
           </Link>
-          <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск по товарам..." />
           <a
             href={exportHref}
             download="tovary.xlsx"
