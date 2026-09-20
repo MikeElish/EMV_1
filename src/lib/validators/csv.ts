@@ -10,7 +10,6 @@ export const IMPORT_COLUMN_ORDER = [
   "stock",
   "price",
   "categorySlug",
-  "group",
   "machineType",
   "compatibleWith",
   "description",
@@ -27,7 +26,6 @@ export const IMPORT_COLUMN_LABELS: Record<
   stock: "Количество в наличии",
   price: "Цена товара",
   categorySlug: "Категория товара",
-  group: "Группа товаров",
   machineType: "Тип машины",
   compatibleWith: "Модель машины",
   description: "Описание",
@@ -42,8 +40,10 @@ export const csvRowSchema = z.object({
   // importable and is simply shown storefront-side as "Под заказ".
   stock: z.coerce.number().int().min(0, "Количество должно быть целым числом ≥ 0"),
   price: z.coerce.number().min(0, "Цена должна быть числом ≥ 0"),
+  // Matched against either the category's name or its slug (see
+  // resolveImportCategory in actions/admin/import.ts) -- so Cyrillic names
+  // like "Гидравлика" work here, not just the Latin slug.
   categorySlug: z.string().trim().min(1, "Категория товара обязательна"),
-  group: z.string().trim().optional(),
   machineType: z.string().trim().optional(),
   compatibleWith: z.string().trim().optional(),
   description: z.string().trim().optional(),
@@ -84,8 +84,7 @@ export const CSV_TEMPLATE_EXAMPLE = [
   "EMV-1001",
   "3",
   "45000",
-  "gidravlika",
-  "Гидроцилиндры",
+  "Гидравлика",
   "Экскаватор",
   "CAT 320|CAT 325",
   "Оригинальная запчасть",

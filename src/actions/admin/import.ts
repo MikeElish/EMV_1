@@ -54,6 +54,21 @@ async function resolveImportImages(urls: string[]): Promise<string[]> {
   return resolved;
 }
 
+/**
+ * Import sheets are filled in by hand, and admins naturally write the
+ * category's human-readable Cyrillic name (e.g. "Гидравлика") rather than
+ * its Latin slug ("gidravlika") -- so a row matches a category by either,
+ * case- and whitespace-insensitively.
+ */
+function buildCategoryLookup(categories: { id: string; name: string; slug: string }[]) {
+  const byKey = new Map<string, { id: string; name: string; slug: string }>();
+  for (const category of categories) {
+    byKey.set(category.slug.trim().toLowerCase(), category);
+    byKey.set(category.name.trim().toLowerCase(), category);
+  }
+  return (value: string) => byKey.get(value.trim().toLowerCase());
+}
+
 function rowArrayToRecord(row: unknown[]): Record<string, string> {
   const record: Record<string, string> = {};
   IMPORT_COLUMN_ORDER.forEach((key, index) => {
@@ -101,7 +116,7 @@ export async function analyzeImportFile(formData: FormData): Promise<ImportAnaly
   const dataRows = rows.slice(1);
 
   const categories = await prisma.category.findMany();
-  const categoryBySlug = new Map(categories.map((c) => [c.slug, c]));
+  const resolveCategory = buildCategoryLookup(categories);
 
   const errors: { row: number; message: string }[] = [];
   const validRows: Omit<AnalyzedRow, "currentStock">[] = [];
@@ -118,11 +133,11 @@ export async function analyzeImportFile(formData: FormData): Promise<ImportAnaly
       continue;
     }
 
-    const category = categoryBySlug.get(parsed.data.categorySlug);
+    const category = resolveCategory(parsed.data.categorySlug);
     if (!category) {
       errors.push({
         row: rowNumber,
-        message: `Категория '${parsed.data.categorySlug}' не найдена (укажите slug существующей категории)`,
+        message: `Категория '${parsed.data.categorySlug}' не найдена (укажите название или slug существующей категории)`,
       });
       continue;
     }
@@ -201,7 +216,6 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
       price: Math.round(row.price * 100),
       stock: row.stock,
       categoryId: category.id,
-      group: row.group || null,
       brand: row.brand || null,
       images: await resolveImportImages(splitList(row.images)),
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
