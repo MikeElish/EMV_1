@@ -12,11 +12,13 @@ export function UserForm({
   initial,
   isOwner,
   onSubmit,
+  onSuccess,
 }: {
   companies: Company[];
   initial?: Partial<UserInput>;
   isOwner?: boolean;
   onSubmit: (input: UserInput) => Promise<ActionResult>;
+  onSuccess?: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +43,9 @@ export function UserForm({
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
+      return;
     }
+    onSuccess?.();
   }
 
   return (

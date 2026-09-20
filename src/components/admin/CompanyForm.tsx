@@ -12,10 +12,12 @@ export function CompanyForm({
   managers,
   initial,
   onSubmit,
+  onSuccess,
 }: {
   managers: Manager[];
   initial?: Partial<CompanyInput>;
   onSubmit: (input: CompanyInput) => Promise<ActionResult>;
+  onSuccess?: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +41,9 @@ export function CompanyForm({
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
+      return;
     }
+    onSuccess?.();
   }
 
   return (

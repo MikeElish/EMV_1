@@ -43,7 +43,7 @@ export async function updateCompany(id: string, input: CompanyInput): Promise<Ac
 
   await prisma.company.update({ where: { id }, data: toCompanyData(parsed.data) });
   revalidatePath("/admin/crm/companies");
-  redirect("/admin/crm/companies");
+  return { ok: true };
 }
 
 export async function deleteCompany(id: string): Promise<ActionResult> {

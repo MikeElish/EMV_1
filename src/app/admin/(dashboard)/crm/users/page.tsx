@@ -6,20 +6,24 @@ export default async function CrmUsersPage() {
   // passwordHash is deliberately not selected -- it would otherwise leak
   // into the page's RSC payload just by being passed as a client-component
   // prop, even though the table itself never renders it.
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      lastName: true,
-      firstName: true,
-      patronymic: true,
-      login: true,
-      email: true,
-      phone: true,
-      role: true,
-      company: { select: { name: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [users, companies] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        lastName: true,
+        firstName: true,
+        patronymic: true,
+        login: true,
+        email: true,
+        phone: true,
+        role: true,
+        companyId: true,
+        company: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.company.findMany({ orderBy: { name: "asc" } }),
+  ]);
 
   return (
     <div>
@@ -35,7 +39,7 @@ export default async function CrmUsersPage() {
       </div>
 
       <div className="mt-4 overflow-x-auto">
-        <UsersTable users={users} />
+        <UsersTable users={users} companies={companies} />
       </div>
     </div>
   );

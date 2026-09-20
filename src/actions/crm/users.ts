@@ -131,7 +131,7 @@ export async function updateUser(id: string, input: UserInput): Promise<ActionRe
   }
 
   revalidatePath("/admin/crm/users");
-  redirect("/admin/crm/users");
+  return { ok: true };
 }
 
 export async function deleteUser(id: string): Promise<ActionResult> {
