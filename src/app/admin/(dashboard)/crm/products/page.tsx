@@ -17,13 +17,13 @@ export default async function AdminProductsPage() {
         <h1 className="text-2xl font-bold">Товары</h1>
         <div className="flex gap-3">
           <Link
-            href="/admin/products/import"
+            href="/admin/crm/products/import"
             className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium"
           >
             Импорт CSV/Excel
           </Link>
           <Link
-            href="/admin/products/new"
+            href="/admin/crm/products/new"
             className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
           >
             Добавить товар
@@ -60,7 +60,7 @@ export default async function AdminProductsPage() {
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-4">
                   <Link
-                    href={`/admin/products/${product.id}/edit`}
+                    href={`/admin/crm/products/${product.id}/edit`}
                     className="hover:underline"
                   >
                     Изменить

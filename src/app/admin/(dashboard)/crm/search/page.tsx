@@ -3,7 +3,7 @@ import { SearchLogTable } from "@/components/admin/SearchLogTable";
 
 export default async function AdminSearchPage({
   searchParams,
-}: PageProps<"/admin/search">) {
+}: PageProps<"/admin/crm/search">) {
   const query = await searchParams;
   const brand = typeof query.brand === "string" && query.brand ? query.brand : undefined;
 

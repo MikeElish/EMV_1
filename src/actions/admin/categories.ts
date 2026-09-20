@@ -24,9 +24,9 @@ export async function createCategory(input: CategoryInput): Promise<ActionResult
   }
 
   await prisma.category.create({ data: parsed.data });
-  revalidatePath("/admin/categories");
+  revalidatePath("/admin/crm/categories");
   revalidatePath("/shop");
-  redirect("/admin/categories");
+  redirect("/admin/crm/categories");
 }
 
 export async function updateCategory(
@@ -48,9 +48,9 @@ export async function updateCategory(
   }
 
   await prisma.category.update({ where: { id }, data: parsed.data });
-  revalidatePath("/admin/categories");
+  revalidatePath("/admin/crm/categories");
   revalidatePath("/shop");
-  redirect("/admin/categories");
+  redirect("/admin/crm/categories");
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
@@ -65,7 +65,7 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
   }
 
   await prisma.category.delete({ where: { id } });
-  revalidatePath("/admin/categories");
+  revalidatePath("/admin/crm/categories");
   revalidatePath("/shop");
   return { ok: true };
 }

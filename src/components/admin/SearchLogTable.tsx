@@ -43,7 +43,7 @@ export function SearchLogTable({
           value={selectedBrand}
           onChange={(e) => {
             const value = e.target.value;
-            router.push(value ? `/admin/search?brand=${encodeURIComponent(value)}` : "/admin/search");
+            router.push(value ? `/admin/crm/search?brand=${encodeURIComponent(value)}` : "/admin/crm/search");
           }}
           className="rounded-md border border-foreground/20 bg-transparent px-3 py-2 text-sm"
         >

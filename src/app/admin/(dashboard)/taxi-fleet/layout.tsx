@@ -4,15 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/admin/crm/users", label: "Пользователи" },
-  { href: "/admin/crm/companies", label: "Компании" },
-  { href: "/admin/crm/orders", label: "Заказы" },
-  { href: "/admin/crm/products", label: "Товары" },
-  { href: "/admin/crm/categories", label: "Категории" },
-  { href: "/admin/crm/search", label: "Поиск" },
+  { href: "/admin/taxi-fleet/driver-applications", label: "Заявки водителей" },
+  { href: "/admin/taxi-fleet/tech", label: "Техника" },
 ];
 
-export default function CrmLayout({ children }: { children: React.ReactNode }) {
+export default function TaxiFleetLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (

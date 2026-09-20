@@ -7,7 +7,7 @@ type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
 export default async function EditProductPage({
   params,
-}: PageProps<"/admin/products/[id]/edit">) {
+}: PageProps<"/admin/crm/products/[id]/edit">) {
   const { id } = await params;
   const [product, categories] = await Promise.all([
     prisma.product.findUnique({ where: { id } }),

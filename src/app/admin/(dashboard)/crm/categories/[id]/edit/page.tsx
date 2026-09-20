@@ -5,7 +5,7 @@ import { CategoryForm } from "@/components/admin/CategoryForm";
 
 export default async function EditCategoryPage({
   params,
-}: PageProps<"/admin/categories/[id]/edit">) {
+}: PageProps<"/admin/crm/categories/[id]/edit">) {
   const { id } = await params;
   const category = await prisma.category.findUnique({ where: { id } });
   if (!category) notFound();

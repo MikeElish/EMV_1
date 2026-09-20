@@ -33,21 +33,21 @@ export default async function AdminDashboardPage() {
           <p className="mt-1 text-3xl font-bold">{newOrders}</p>
         </Link>
         <Link
-          href="/admin/products"
+          href="/admin/crm/products"
           className="rounded-lg border border-foreground/10 p-4 transition-colors hover:border-foreground/30"
         >
           <p className="text-sm text-foreground/50">Активных товаров</p>
           <p className="mt-1 text-3xl font-bold">{totalProducts}</p>
         </Link>
         <Link
-          href="/admin/categories"
+          href="/admin/crm/categories"
           className="rounded-lg border border-foreground/10 p-4 transition-colors hover:border-foreground/30"
         >
           <p className="text-sm text-foreground/50">Категорий</p>
           <p className="mt-1 text-3xl font-bold">{totalCategories}</p>
         </Link>
         <Link
-          href="/admin/driver-applications"
+          href="/admin/taxi-fleet/driver-applications"
           className="rounded-lg border border-foreground/10 p-4 transition-colors hover:border-foreground/30"
         >
           <p className="text-sm text-foreground/50">Новые заявки водителей</p>
@@ -69,7 +69,7 @@ export default async function AdminDashboardPage() {
                 className="flex items-center justify-between px-4 py-3 text-sm"
               >
                 <Link
-                  href={`/admin/products/${product.id}/edit`}
+                  href={`/admin/crm/products/${product.id}/edit`}
                   className="hover:underline"
                 >
                   {product.name}

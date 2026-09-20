@@ -15,6 +15,6 @@ export async function markDriverApplicationContacted(
     where: { id },
     data: { status: contacted ? "CONTACTED" : "NEW" },
   });
-  revalidatePath("/admin/driver-applications");
+  revalidatePath("/admin/taxi-fleet/driver-applications");
   return { ok: true };
 }

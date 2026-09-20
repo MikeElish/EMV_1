@@ -14,7 +14,7 @@ export default async function AdminCategoriesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Категории</h1>
         <Link
-          href="/admin/categories/new"
+          href="/admin/crm/categories/new"
           className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
         >
           Добавить категорию
@@ -39,7 +39,7 @@ export default async function AdminCategoriesPage() {
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-4">
                   <Link
-                    href={`/admin/categories/${category.id}/edit`}
+                    href={`/admin/crm/categories/${category.id}/edit`}
                     className="hover:underline"
                   >
                     Изменить
