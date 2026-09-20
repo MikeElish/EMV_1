@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { useOutsideClose } from "@/lib/use-outside-close";
 
 export function SuggestField({
@@ -39,9 +39,16 @@ export function SuggestField({
     setOpen(true);
   }
 
-  const panelStyle =
-    panelPositioning === "fixed" && fixedPos
-      ? { position: "fixed" as const, top: fixedPos.top, left: fixedPos.left, width: fixedPos.width }
+  // "fixed" must take the panel out of flow immediately, even before it has
+  // ever been opened -- otherwise, before fixedPos is first computed, the
+  // panel renders unpositioned (static) and inflates its parent (e.g. a
+  // table <th>) by up to max-h-64, since overflow/opacity alone don't
+  // remove an element from normal document flow.
+  const panelStyle: CSSProperties | undefined =
+    panelPositioning === "fixed"
+      ? fixedPos
+        ? { position: "fixed", top: fixedPos.top, left: fixedPos.left, width: fixedPos.width }
+        : { position: "fixed", top: 0, left: 0, visibility: "hidden" }
       : undefined;
 
   return (
