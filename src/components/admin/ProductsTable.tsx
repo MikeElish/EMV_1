@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { utils, write } from "xlsx";
 import type { Product, Category } from "@prisma/client";
 import { formatRub } from "@/lib/money";
 import { deleteProduct } from "@/actions/admin/products";
@@ -11,8 +12,27 @@ import { TableSearchInput } from "@/components/admin/TableSearchInput";
 
 type ProductRow = Product & { category: Category };
 
+function buildExportHref(products: ProductRow[]) {
+  const header = ["Товар", "Артикул", "Категория", "Группа", "Цена", "Остаток", "Активен"];
+  const body = products.map((product) => [
+    product.name,
+    product.sku,
+    product.category.name,
+    product.group ?? "",
+    formatRub(product.price),
+    product.stock,
+    product.isActive ? "Да" : "Нет",
+  ]);
+  const worksheet = utils.aoa_to_sheet([header, ...body]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, worksheet, "Товары");
+  const base64 = write(workbook, { type: "base64", bookType: "xlsx" });
+  return `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+}
+
 export function ProductsTable({ products }: { products: ProductRow[] }) {
   const [search, setSearch] = useState("");
+  const exportHref = buildExportHref(products);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -44,6 +64,13 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
             Добавить товар
           </Link>
           <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск по товарам..." />
+          <a
+            href={exportHref}
+            download="tovary.xlsx"
+            className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Выгрузить
+          </a>
         </div>
       </div>
 
