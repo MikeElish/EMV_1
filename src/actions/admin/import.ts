@@ -251,6 +251,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
 
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");
+  revalidatePath("/shop/cart");
 
   return { ok: errors.length === 0, created, updated, errors };
 }

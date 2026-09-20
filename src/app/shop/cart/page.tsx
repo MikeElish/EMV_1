@@ -1,92 +1,29 @@
-"use client";
+import { prisma } from "@/lib/prisma";
+import { CartPageClient } from "@/components/shop/CartPageClient";
+import type { RotatorDirection } from "@/components/shop/NewArrivalsRotator";
 
-import Link from "next/link";
-import { useCart } from "@/components/shop/CartProvider";
-import { formatRub } from "@/lib/money";
+export default async function CartPage() {
+  // Same pools/labels as the shop homepage's "Готовы предложить" rotator,
+  // shown here too so the cart isn't a dead end while the customer decides.
+  const allActiveProducts = await prisma.product.findMany({
+    where: { isActive: true },
+  });
 
-export default function CartPage() {
-  const { items, setQuantity, removeItem, totalAmount } = useCart();
-
-  if (items.length === 0) {
-    return (
-      <section className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <h1 className="text-2xl font-bold">Корзина пуста</h1>
-        <Link
-          href="/shop"
-          className="mt-6 inline-block text-sm underline underline-offset-4"
-        >
-          Перейти в каталог
-        </Link>
-      </section>
-    );
-  }
-
-  return (
-    <section className="mx-auto max-w-3xl px-6 py-16">
-      <h1 className="text-2xl font-bold">Корзина</h1>
-
-      <ul className="mt-8 divide-y divide-foreground/10">
-        {items.map((item) => (
-          <li key={item.productId} className="flex items-center gap-4 py-4">
-            <div className="flex-1">
-              <Link
-                href={`/shop/product/${item.slug}`}
-                className="font-medium hover:underline"
-              >
-                {item.name}
-              </Link>
-              <p className="text-sm text-foreground/50">
-                {formatRub(item.price)} · арт. {item.sku}
-              </p>
-            </div>
-
-            <div className="flex items-center rounded-md border border-foreground/20">
-              <button
-                type="button"
-                onClick={() => setQuantity(item.productId, item.quantity - 1)}
-                className="px-3 py-1 text-foreground/60 hover:text-foreground"
-                aria-label="Уменьшить количество"
-              >
-                −
-              </button>
-              <span className="w-8 text-center text-sm">{item.quantity}</span>
-              <button
-                type="button"
-                onClick={() => setQuantity(item.productId, item.quantity + 1)}
-                className="px-3 py-1 text-foreground/60 hover:text-foreground"
-                aria-label="Увеличить количество"
-              >
-                +
-              </button>
-            </div>
-
-            <p className="w-24 text-right font-medium">
-              {formatRub(item.price * item.quantity)}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => removeItem(item.productId)}
-              className="text-foreground/40 hover:text-foreground"
-              aria-label="Удалить товар"
-            >
-              ✕
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-8 flex items-center justify-between border-t border-foreground/10 pt-6">
-        <span className="text-lg font-semibold">Итого</span>
-        <span className="text-lg font-semibold">{formatRub(totalAmount)}</span>
-      </div>
-
-      <Link
-        href="/shop/checkout"
-        className="mt-6 block w-full rounded-md bg-foreground px-6 py-3 text-center font-medium text-background transition-opacity hover:opacity-90"
-      >
-        Оформить заказ
-      </Link>
-    </section>
+  const inStockPool = allActiveProducts.filter((p) => p.stock > 0);
+  const readyToOfferPool = allActiveProducts.filter((p) => p.stock <= 0);
+  const lastUploadAt = allActiveProducts.reduce<Date | null>(
+    (max, p) => (!max || p.newArrivalAt > max ? p.newArrivalAt : max),
+    null
   );
+  const newArrivalsPool = lastUploadAt
+    ? inStockPool.filter((p) => p.newArrivalAt.getTime() === lastUploadAt.getTime())
+    : [];
+
+  const directions: RotatorDirection[] = [
+    { key: "inStock", label: "В наличии", items: inStockPool },
+    { key: "readyToOffer", label: "Готовы предложить", items: readyToOfferPool },
+    { key: "newArrivals", label: "Новое поступление", items: newArrivalsPool },
+  ];
+
+  return <CartPageClient directions={directions} />;
 }

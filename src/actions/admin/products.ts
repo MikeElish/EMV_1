@@ -53,6 +53,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
 
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");
+  revalidatePath("/shop/cart");
   redirect("/admin/crm/products");
 }
 
@@ -91,6 +92,7 @@ export async function updateProduct(
 
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");
+  revalidatePath("/shop/cart");
   redirect("/admin/crm/products");
 }
 
@@ -102,6 +104,7 @@ export async function toggleProductActive(
   await prisma.product.update({ where: { id }, data: { isActive } });
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");
+  revalidatePath("/shop/cart");
   return { ok: true };
 }
 
@@ -119,5 +122,6 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   await prisma.product.delete({ where: { id } });
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");
+  revalidatePath("/shop/cart");
   return { ok: true };
 }
