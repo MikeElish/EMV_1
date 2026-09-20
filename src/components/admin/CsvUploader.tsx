@@ -58,7 +58,12 @@ export function CsvUploader() {
     return rows.filter((r) => r.currentStock !== null && r.currentStock > r.stock);
   }
 
-  function proceedToStockCheck(rows: AnalyzedRow[]) {
+  // errors is threaded explicitly through this chain (rather than read back
+  // from the parseErrors state) because the no-duplicates/no-stock-review
+  // path calls straight through to commit() within the same handleSubmit
+  // tick as setParseErrors(), before React re-renders -- reading the state
+  // there would see its stale pre-update value.
+  function proceedToStockCheck(rows: AnalyzedRow[], errors: { row: number; message: string }[]) {
     const decreases = stockDecreaseRows(rows);
     if (decreases.length > 0) {
       setStockRows(decreases);
@@ -68,15 +73,15 @@ export function CsvUploader() {
       setStockDialog(null);
       setStage("stockReview");
     } else {
-      void commit(rows);
+      void commit(rows, errors);
     }
   }
 
-  async function commit(rows: AnalyzedRow[]) {
+  async function commit(rows: AnalyzedRow[], errors: { row: number; message: string }[]) {
     setSubmitting(true);
     const summary = await commitImportRows(rows);
     setSubmitting(false);
-    setResult({ ...summary, errors: [...parseErrors, ...summary.errors] });
+    setResult({ ...summary, errors: [...errors, ...summary.errors] });
     setStage("idle");
     setDuplicateGroups([]);
     setSingleRowsPending([]);
@@ -109,7 +114,7 @@ export function CsvUploader() {
       setDupDialog(null);
       setStage("duplicates");
     } else {
-      proceedToStockCheck(analysis.singleRows);
+      proceedToStockCheck(analysis.singleRows, analysis.errors);
     }
   }
 
@@ -142,7 +147,7 @@ export function CsvUploader() {
     const finalRows = [...singleRowsPending, ...chosen];
     setDuplicateGroups([]);
     setSingleRowsPending([]);
-    proceedToStockCheck(finalRows);
+    proceedToStockCheck(finalRows, parseErrors);
   }
 
   function handleStockAccept() {
@@ -157,7 +162,7 @@ export function CsvUploader() {
       stockRows.filter((r) => stockDecision[r.rowNumber] === "reject").map((r) => r.rowNumber)
     );
     const finalRows = allFinalRows.filter((r) => !rejected.has(r.rowNumber));
-    void commit(finalRows);
+    void commit(finalRows, parseErrors);
   }
 
   function setStockRowDecision(rowNumber: number, decision: "accept" | "reject") {

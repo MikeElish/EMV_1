@@ -15,7 +15,7 @@ import {
 } from "@/lib/validators/csv";
 import { buildProductSlug } from "@/lib/slug";
 import { rublesToKopecksRoundedUp } from "@/lib/money";
-import { normalizeBrand } from "@/lib/normalize-brand";
+import { findCanonicalBrand } from "@/lib/normalize-brand";
 import { applyWatermark } from "@/lib/watermark";
 import { uploadWatermarkedImage } from "@/lib/image-storage";
 
@@ -143,9 +143,18 @@ export async function analyzeImportFile(formData: FormData): Promise<ImportAnaly
       continue;
     }
 
+    const brand = findCanonicalBrand(parsed.data.brand);
+    if (!brand) {
+      errors.push({
+        row: rowNumber,
+        message: `Бренд '${parsed.data.brand}' не найден в системе (укажите бренд из списка)`,
+      });
+      continue;
+    }
+
     validRows.push({
       ...parsed.data,
-      brand: normalizeBrand(parsed.data.brand),
+      brand,
       rowNumber,
       categoryId: category.id,
     });
