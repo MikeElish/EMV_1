@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
-import { CrmEntryButton } from "@/components/CrmEntryButton";
+import { CustomerAccountMenu } from "@/components/shop/CustomerAccountMenu";
 import { CartIcon } from "@/components/shop/CartIcon";
 import { ThemeToggle } from "@/components/shop/ThemeToggle";
 import { HeaderSearchBar } from "@/components/shop/HeaderSearchBar";
@@ -63,7 +63,7 @@ export function ShopHeader() {
             Мои заказы
           </Link>
         )}
-        <CrmEntryButton variant={isHome ? "dark" : "light"} />
+        <CustomerAccountMenu variant={isHome ? "dark" : "light"} />
       </div>
     </header>
   );

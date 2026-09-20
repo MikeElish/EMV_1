@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/components/shop/CartProvider";
 import { createOrder } from "@/actions/shop/checkout";
+import { getMyProfile } from "@/actions/shop/settings";
 import { formatRub, formatRubPrecise } from "@/lib/money";
 import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
-
-type DeliveryMethod = "address" | "terminal" | "pickup";
-
-const DELIVERY_LABELS: Record<DeliveryMethod, string> = {
-  address: "До адреса",
-  terminal: "До терминала",
-  pickup: "Самовывоз",
-};
-const DELIVERY_OPTIONS = Object.keys(DELIVERY_LABELS) as DeliveryMethod[];
+import { SuggestField } from "@/components/SuggestField";
+import {
+  DeliveryMethodSelect,
+  DELIVERY_LABELS,
+  type DeliveryMethod,
+} from "@/components/shop/DeliveryMethodSelect";
 
 // Remembers delivery + contact info from the shopper's last completed order
 // on this browser, so the next checkout starts pre-filled instead of blank.
@@ -32,6 +30,14 @@ type SavedCheckoutInfo = {
   customerName: string;
   phoneDigits: string;
   customerEmail: string;
+};
+
+// Maps the account's stored Prisma DeliveryMethod enum (uppercase) to this
+// page's own lowercase string union.
+const DELIVERY_METHOD_FROM_ACCOUNT: Record<string, DeliveryMethod> = {
+  ADDRESS: "address",
+  TERMINAL: "terminal",
+  PICKUP: "pickup",
 };
 
 // Phone mask: typing 0-6 or 9 starts/extends the significant number; typing
@@ -55,155 +61,6 @@ function formatRuPhone(digits: string): string {
   return out;
 }
 
-function useOutsideClose(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onClose]);
-  return ref;
-}
-
-function DeliveryMethodSelect({
-  value,
-  onChange,
-}: {
-  value: DeliveryMethod | null;
-  onChange: (v: DeliveryMethod) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useOutsideClose(open, () => setOpen(false));
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className="flex w-48 items-center justify-between gap-1.5 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-foreground/50"
-      >
-        <span className={value ? "" : "text-foreground/40"}>
-          {value ? DELIVERY_LABELS[value] : "Выберите способ"}
-        </span>
-        <span className="text-foreground/40">▾</span>
-      </button>
-
-      <div
-        role="listbox"
-        className={`scroll-transparent absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-md border border-foreground/10 bg-transparent shadow-lg backdrop-blur-sm transition-all duration-150 ${
-          open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-1 opacity-0"
-        }`}
-      >
-        {DELIVERY_OPTIONS.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            role="option"
-            aria-selected={value === opt}
-            onClick={() => {
-              onChange(opt);
-              setOpen(false);
-            }}
-            className={`block w-full px-3 py-2 text-left text-sm hover:bg-foreground/10 ${
-              value === opt ? "font-semibold" : ""
-            }`}
-          >
-            {DELIVERY_LABELS[opt]}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SuggestField({
-  value,
-  onChange,
-  allOptions,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  allOptions: string[];
-  placeholder: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useOutsideClose(open, () => setOpen(false));
-
-  const options = useMemo(() => {
-    const q = value.trim().toLowerCase();
-    if (!q) return allOptions;
-    return allOptions.filter((c) => c.toLowerCase().includes(q));
-  }, [value, allOptions]);
-
-  return (
-    <div ref={ref} className="relative flex-1">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && options.length > 0) {
-            e.preventDefault();
-            onChange(options[0]);
-            setOpen(false);
-          } else if (e.key === "Escape") {
-            setOpen(false);
-          }
-        }}
-        placeholder={placeholder}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className="w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-      />
-      <div
-        role="listbox"
-        className={`scroll-transparent absolute left-0 top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-foreground/10 bg-transparent shadow-lg backdrop-blur-sm transition-all duration-150 ${
-          open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-1 opacity-0"
-        }`}
-      >
-        {options.length === 0 ? (
-          <p className="px-3 py-2 text-sm text-foreground/40">Не найдено</p>
-        ) : (
-          options.map((c) => (
-            <button
-              key={c}
-              type="button"
-              role="option"
-              aria-selected={value === c}
-              onClick={() => {
-                onChange(c);
-                setOpen(false);
-              }}
-              className={`block w-full px-3 py-2 text-left text-sm hover:bg-foreground/10 ${
-                value === c ? "font-semibold" : ""
-              }`}
-            >
-              {c}
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, totalAmount, clear } = useCart();
@@ -225,25 +82,51 @@ export default function CheckoutPage() {
   const ndsAmount = Math.round(totalAmount * 0.22);
 
   useEffect(() => {
+    let cancelled = false;
+
+    let saved: Partial<SavedCheckoutInfo> = {};
     try {
       const raw = localStorage.getItem(CHECKOUT_INFO_KEY);
-      if (!raw) return;
-      const saved: Partial<SavedCheckoutInfo> = JSON.parse(raw);
+      if (raw) saved = JSON.parse(raw);
+    } catch {
+      // ignore malformed/unavailable storage
+    }
+
+    if (saved.customerName) setCustomerName(saved.customerName);
+    if (saved.phoneDigits) {
+      setPhoneDigits(saved.phoneDigits);
+      setPhoneTouched(true);
+    }
+    if (saved.customerEmail) setCustomerEmail(saved.customerEmail);
+
+    // A signed-in customer's saved delivery defaults (from "Настройки") take
+    // priority over this browser's last-order memory; fall back to the
+    // latter only when the account has no defaults saved.
+    getMyProfile().then((profile) => {
+      if (cancelled) return;
+      const accountMethod = profile?.deliveryMethod
+        ? DELIVERY_METHOD_FROM_ACCOUNT[profile.deliveryMethod]
+        : null;
+      if (accountMethod) {
+        setDeliveryMethod(accountMethod);
+        setSettlement(profile?.settlement ?? "");
+        setStreet(profile?.street ?? "");
+        setHouse(profile?.house ?? "");
+        setApartment(profile?.apartment ?? "");
+        setTerminal(profile?.terminal ?? "");
+        return;
+      }
       if (saved.deliveryMethod) setDeliveryMethod(saved.deliveryMethod);
       if (saved.settlement) setSettlement(saved.settlement);
       if (saved.street) setStreet(saved.street);
       if (saved.house) setHouse(saved.house);
       if (saved.apartment) setApartment(saved.apartment);
       if (saved.terminal) setTerminal(saved.terminal);
-      if (saved.customerName) setCustomerName(saved.customerName);
-      if (saved.phoneDigits) {
-        setPhoneDigits(saved.phoneDigits);
-        setPhoneTouched(true);
-      }
-      if (saved.customerEmail) setCustomerEmail(saved.customerEmail);
-    } catch {
-      // ignore malformed/unavailable storage
-    }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {

@@ -21,6 +21,12 @@ enum OrderDocumentCategory {
   WAYBILL
 }
 
+enum DeliveryMethod {
+  ADDRESS
+  TERMINAL
+  PICKUP
+}
+
 enum PaymentStatus {
   PENDING
   WAITING_FOR_CAPTURE
@@ -112,6 +118,7 @@ model OrderItem {
   nameSnapshot  String
   priceSnapshot Int
   quantity      Int
+  cancelled     Boolean @default(false)
 
   @@index([orderId])
 }
@@ -155,6 +162,14 @@ model User {
   company      Company? @relation("CompanyUsers", fields: [companyId], references: [id])
   managedCompanies Company[] @relation("CompanyManager")
   orders       Order[]
+  // Saved from the customer's own "Настройки" card and pre-filled into new
+  // checkouts -- independent of the checkout page's own localStorage memory.
+  defaultDeliveryMethod DeliveryMethod?
+  defaultSettlement     String?
+  defaultStreet         String?
+  defaultHouse          String?
+  defaultApartment      String?
+  defaultTerminal       String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
