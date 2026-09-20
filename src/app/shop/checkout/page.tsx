@@ -315,6 +315,8 @@ export default function CheckoutPage() {
     }
 
     clear();
+    // Order numbers contain a literal "/" (ДДММГГ/N); /shop/order/[...orderNumber]
+    // is a catch-all route so this naturally lands as two segments.
     router.push(`/shop/order/${result.orderNumber}`);
   }
 

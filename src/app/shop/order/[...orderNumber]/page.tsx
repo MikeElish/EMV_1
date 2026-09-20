@@ -2,20 +2,15 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatRub } from "@/lib/money";
-
-const STATUS_LABEL: Record<string, string> = {
-  NEW: "Принят, ожидает подтверждения менеджером",
-  PAID: "Оплачен",
-  PROCESSING: "В обработке",
-  SHIPPED: "Отправлен",
-  DONE: "Выполнен",
-  CANCELLED: "Отменён",
-};
+import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 
 export default async function OrderConfirmationPage({
   params,
-}: PageProps<"/shop/order/[orderNumber]">) {
-  const { orderNumber } = await params;
+}: PageProps<"/shop/order/[...orderNumber]">) {
+  // Order numbers contain a literal "/" (ДДММГГ/N), so this route is a
+  // catch-all: the segments are rejoined into the exact orderNumber string.
+  const { orderNumber: segments } = await params;
+  const orderNumber = segments.join("/");
 
   const order = await prisma.order.findUnique({
     where: { orderNumber },
@@ -31,7 +26,7 @@ export default async function OrderConfirmationPage({
         Номер заказа: <span className="font-medium">{order.orderNumber}</span>
       </p>
       <p className="mt-1 text-foreground/70">
-        Статус: {STATUS_LABEL[order.status] ?? order.status}
+        Статус: {ORDER_STATUS_LABELS[order.status] ?? order.status}
       </p>
 
       <div className="mt-8 rounded-lg border border-foreground/10 p-4 text-sm">

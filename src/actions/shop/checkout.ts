@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validators/checkout";
 import { getAdminSession } from "@/lib/session";
+import { formatOrderNumber, getMoscowDayRangeUtc } from "@/lib/order-number";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -67,6 +68,10 @@ export async function createOrder(
 }
 
 async function generateOrderNumber(): Promise<string> {
-  const count = await prisma.order.count();
-  return `EMV-${String(count + 1).padStart(5, "0")}`;
+  const now = new Date();
+  const { start, end } = getMoscowDayRangeUtc(now);
+  const countToday = await prisma.order.count({
+    where: { createdAt: { gte: start, lt: end } },
+  });
+  return formatOrderNumber(now, countToday + 1);
 }
