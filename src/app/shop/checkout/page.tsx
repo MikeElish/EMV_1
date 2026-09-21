@@ -6,10 +6,12 @@ import Link from "next/link";
 import { useCart } from "@/components/shop/CartProvider";
 import { createOrder } from "@/actions/shop/checkout";
 import { getMyProfile } from "@/actions/shop/settings";
+import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
 import { formatRub, formatRubPrecise } from "@/lib/money";
 import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
 import { SuggestField } from "@/components/SuggestField";
+import { Modal } from "@/components/Modal";
 import {
   DeliveryMethodSelect,
   DELIVERY_LABELS,
@@ -78,6 +80,18 @@ export default function CheckoutPage() {
   const [phoneDigits, setPhoneDigits] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
+  const [consent, setConsent] = useState(false);
+
+  // Whether this browser is already signed in as a CRM Покупатель -- while
+  // that's unknown (fetch still in flight) it's treated as false, so the
+  // button briefly reads "Зарегистрироваться и заказать" before flipping.
+  const [isCustomer, setIsCustomer] = useState(false);
+
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const ndsAmount = Math.round(totalAmount * 0.22);
 
@@ -104,6 +118,7 @@ export default function CheckoutPage() {
     // latter only when the account has no defaults saved.
     getMyProfile().then((profile) => {
       if (cancelled) return;
+      setIsCustomer(profile !== null);
       const accountMethod = profile?.deliveryMethod
         ? DELIVERY_METHOD_FROM_ACCOUNT[profile.deliveryMethod]
         : null;
@@ -140,20 +155,8 @@ export default function CheckoutPage() {
     setPhoneDigits(digitsFromPhoneInput(raw));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
-    if (!deliveryMethod) {
-      setError("Выберите способ доставки");
-      return;
-    }
-    if (phoneDigits.length !== 10) {
-      setError("Введите номер телефона полностью");
-      return;
-    }
-
-    const deliveryNoteLines = [`Способ доставки: ${DELIVERY_LABELS[deliveryMethod]}`];
+  async function submitOrder() {
+    const deliveryNoteLines = [`Способ доставки: ${DELIVERY_LABELS[deliveryMethod!]}`];
     if (deliveryMethod === "address") {
       if (settlement.trim()) deliveryNoteLines.push(`Населённый пункт: ${settlement.trim()}`);
       if (street.trim()) deliveryNoteLines.push(`Улица: ${street.trim()}`);
@@ -201,6 +204,56 @@ export default function CheckoutPage() {
     // Order numbers contain a literal "/" (ДДММГГ/N); /shop/order/[...orderNumber]
     // is a catch-all route so this naturally lands as two segments.
     router.push(`/shop/order/${result.orderNumber}`);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    if (!deliveryMethod) {
+      setError("Выберите способ доставки");
+      return;
+    }
+    if (phoneDigits.length !== 10) {
+      setError("Введите номер телефона полностью");
+      return;
+    }
+    if (!isCustomer && !consent) {
+      setError("Необходимо согласие на обработку персональных данных");
+      return;
+    }
+
+    if (!isCustomer) {
+      // Not signed in yet -- the password modal handles registering or
+      // logging the shopper in before the order itself is created.
+      setSubmitting(true);
+      const { exists } = await checkCustomerEmailExists(customerEmail);
+      setSubmitting(false);
+      setEmailExists(exists);
+      setPassword("");
+      setAuthError(null);
+      setPasswordModalOpen(true);
+      return;
+    }
+
+    await submitOrder();
+  }
+
+  async function handlePasswordConfirm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError(null);
+    setAuthSubmitting(true);
+    const authResult = await registerOrLoginCustomer({ email: customerEmail, password });
+    setAuthSubmitting(false);
+
+    if (!authResult.ok) {
+      setAuthError(authResult.error);
+      return;
+    }
+
+    setPasswordModalOpen(false);
+    setIsCustomer(true);
+    await submitOrder();
   }
 
   if (items.length === 0) {
@@ -374,6 +427,18 @@ export default function CheckoutPage() {
                   className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
                 />
               </div>
+
+              {!isCustomer && (
+                <label className="flex items-start gap-2 text-sm text-foreground/70">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  Согласие на обработку персональных данных
+                </label>
+              )}
             </div>
           </div>
 
@@ -384,7 +449,11 @@ export default function CheckoutPage() {
             disabled={submitting}
             className="mt-6 w-full rounded-md bg-foreground px-6 py-3 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {submitting ? "Оформляем..." : "Подтвердить заказ"}
+            {submitting
+              ? "Оформляем..."
+              : isCustomer
+                ? "Подтвердить заказ"
+                : "Зарегистрироваться и заказать"}
           </button>
           <p className="mt-3 text-center text-xs text-foreground/40">
             Онлайн-оплата появится на следующем этапе — пока заказ передаётся
@@ -392,6 +461,34 @@ export default function CheckoutPage() {
           </p>
         </form>
       </div>
+
+      {passwordModalOpen && (
+        <Modal onClose={() => setPasswordModalOpen(false)} maxWidthClassName="max-w-sm">
+          <h2 className="text-lg font-bold">
+            {emailExists ? "Введите пароль" : "Новый пароль"}
+          </h2>
+          <p className="mt-1 text-sm text-foreground/60">{customerEmail}</p>
+          <form onSubmit={handlePasswordConfirm} className="mt-4 space-y-4">
+            <input
+              type="password"
+              autoFocus
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+            />
+            {authError && <p className="text-sm text-red-600">{authError}</p>}
+            <button
+              type="submit"
+              disabled={authSubmitting}
+              className="w-full rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {authSubmitting ? "..." : "Продолжить"}
+            </button>
+          </form>
+        </Modal>
+      )}
     </section>
   );
 }
