@@ -3,9 +3,19 @@
 import { useMemo, useState } from "react";
 import { formatRub } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
+import { getPaymentDisplayStatus } from "@/lib/validators/payment-status";
 import { OrderActionMenu, type LatestDocs } from "@/components/shop/OrderActionMenu";
+import { OrderStatusBadge } from "@/components/shop/OrderStatusBadge";
+import { PaymentStatusBadge } from "@/components/shop/PaymentStatusBadge";
 import { SuggestField } from "@/components/SuggestField";
 import type { Order, OrderItem, OrderStatus } from "@prisma/client";
+
+function paymentStatusText(order: Pick<Order, "paid" | "plannedPaymentDate">): string {
+  const status = getPaymentDisplayStatus(order);
+  if (status.kind === "paid") return "Оплачено";
+  if (status.kind === "unpaid") return "Не оплачено";
+  return `План оплаты ${status.date.toLocaleDateString("ru-RU")}`;
+}
 
 type OrderWithExtras = Order & {
   items: (OrderItem & { product: { sku: string } | null })[];
@@ -27,7 +37,11 @@ const COLUMNS: {
   { key: "sku", label: "Артикул", accessor: (r) => r.item.product?.sku ?? "—" },
   { key: "quantity", label: "Количество", accessor: (r) => String(r.item.quantity) },
   { key: "price", label: "Цена", accessor: (r) => formatRub(r.item.priceSnapshot) },
-  { key: "total", label: "Всего", accessor: (r) => formatRub(r.order.totalAmount) },
+  {
+    key: "total",
+    label: "Всего",
+    accessor: (r) => formatRub(r.item.priceSnapshot * r.item.quantity),
+  },
   {
     key: "status",
     label: "Статус",
@@ -40,7 +54,7 @@ const COLUMNS: {
     accessor: (r) =>
       r.order.deliveryDate ? new Date(r.order.deliveryDate).toLocaleDateString("ru-RU") : "—",
   },
-  { key: "paid", label: "Оплата", accessor: (r) => (r.order.paid ? "Оплачено" : "Не оплачено") },
+  { key: "paid", label: "Оплата", accessor: (r) => paymentStatusText(r.order) },
 ];
 
 export function CustomerOrdersTable({ orders }: { orders: OrderWithExtras[] }) {
@@ -118,16 +132,18 @@ export function CustomerOrdersTable({ orders }: { orders: OrderWithExtras[] }) {
               <td className="py-2 pr-4">{item.product?.sku ?? "—"}</td>
               <td className="py-2 pr-4">{item.quantity}</td>
               <td className="py-2 pr-4">{formatRub(item.priceSnapshot)}</td>
-              <td className="py-2 pr-4">{formatRub(order.totalAmount)}</td>
+              <td className="py-2 pr-4">{formatRub(item.priceSnapshot * item.quantity)}</td>
               <td className="py-2 pr-4">
-                {item.cancelled ? "Отменено" : ORDER_STATUS_LABELS[order.status as OrderStatus]}
+                <OrderStatusBadge status={order.status as OrderStatus} cancelled={item.cancelled} />
               </td>
               <td className="py-2 pr-4">
                 {order.deliveryDate
                   ? new Date(order.deliveryDate).toLocaleDateString("ru-RU")
                   : "—"}
               </td>
-              <td className="py-2 pr-4">{order.paid ? "Оплачено" : "Не оплачено"}</td>
+              <td className="py-2 pr-4">
+                <PaymentStatusBadge paid={order.paid} plannedPaymentDate={order.plannedPaymentDate} />
+              </td>
               <td className="py-2 pr-4">
                 <OrderActionMenu
                   orderId={order.id}

@@ -23,7 +23,31 @@ export async function updateOrderStatus(
     return { ok: false, error: "Некорректный статус" };
   }
 
-  await prisma.order.update({ where: { id }, data: { status } });
+  const data: { status: OrderStatus; shippedAt?: Date; plannedPaymentDate?: Date } = { status };
+
+  if (status === "SHIPPED_AWAITING_PAYMENT") {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      select: {
+        shippedAt: true,
+        user: { select: { company: { select: { paymentType: true, paymentDeferralDays: true } } } },
+      },
+    });
+
+    // Only stamped the first time the order is shipped -- re-entering this
+    // status later (e.g. after a correction) doesn't push the date forward.
+    const shippedAt = order?.shippedAt ?? new Date();
+    data.shippedAt = shippedAt;
+
+    const company = order?.user?.company;
+    if (company?.paymentType === "DEFERRED" && company.paymentDeferralDays) {
+      const planned = new Date(shippedAt);
+      planned.setDate(planned.getDate() + company.paymentDeferralDays);
+      data.plannedPaymentDate = planned;
+    }
+  }
+
+  await prisma.order.update({ where: { id }, data });
   revalidatePath("/admin/crm/orders");
   return { ok: true };
 }

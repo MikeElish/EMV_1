@@ -72,6 +72,50 @@ body {
   }
 }
 
+/* Order status badges ("Мои заказы"): a smoothly pulsing border/glow on
+   statuses that still need attention (awaiting payment, in progress,
+   shipped-awaiting-payment) -- same box-shadow-pulse technique as
+   .search-bar-drop-pulse above, one color per status. Terminal statuses
+   (cancelled, done) render with a static border instead, no class needed. */
+.status-blink-yellow {
+  animation: status-blink-yellow 1.6s ease-in-out infinite;
+}
+@keyframes status-blink-yellow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0);
+  }
+}
+
+.status-blink-green {
+  animation: status-blink-green 1.6s ease-in-out infinite;
+}
+@keyframes status-blink-green {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0);
+  }
+}
+
+.status-blink-blue {
+  animation: status-blink-blue 1.6s ease-in-out infinite;
+}
+@keyframes status-blink-blue {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0);
+  }
+}
+
 /* lottie-web bakes stroke color into the SVG path's attribute; force it to
    follow the theme color instead of the animation's hardcoded black. */
 .lottie-logo-intro path {

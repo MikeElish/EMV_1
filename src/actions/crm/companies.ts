@@ -5,8 +5,14 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { companySchema, type CompanyInput } from "@/lib/validators/crm";
+import {
+  uploadCompanyDocumentFile,
+  deleteCompanyDocumentFile,
+} from "@/lib/company-document-storage";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 function toCompanyData(data: CompanyInput) {
   return {
@@ -14,9 +20,12 @@ function toCompanyData(data: CompanyInput) {
     inn: data.inn || null,
     ogrn: data.ogrn || null,
     address: data.address || null,
-    contract: data.contract || null,
+    hasContract: data.hasContract,
+    contract: data.hasContract ? data.contract || null : null,
     type: data.type || null,
     managerId: data.managerId || null,
+    paymentType: data.paymentType,
+    paymentDeferralDays: data.paymentType === "DEFERRED" ? data.paymentDeferralDays : null,
   };
 }
 
@@ -55,6 +64,51 @@ export async function deleteCompany(id: string): Promise<ActionResult> {
   }
 
   await prisma.company.delete({ where: { id } });
+  revalidatePath("/admin/crm/companies");
+  return { ok: true };
+}
+
+export async function listCompanyDocuments(companyId: string) {
+  await verifyAdminSession();
+  return prisma.companyDocument.findMany({
+    where: { companyId },
+    orderBy: { uploadedAt: "desc" },
+  });
+}
+
+export async function uploadCompanyDocument(formData: FormData): Promise<ActionResult> {
+  await verifyAdminSession();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  const file = formData.get("file");
+
+  if (!companyId) return { ok: false, error: "Не указана компания" };
+  if (!(file instanceof File)) {
+    return { ok: false, error: "Файл не выбран" };
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return { ok: false, error: "Файл слишком большой (максимум 20 МБ)" };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileUrl = await uploadCompanyDocumentFile(companyId, buffer, file.name);
+
+  await prisma.companyDocument.create({
+    data: { companyId, fileName: file.name, fileUrl },
+  });
+
+  revalidatePath("/admin/crm/companies");
+  return { ok: true };
+}
+
+export async function deleteCompanyDocument(id: string): Promise<ActionResult> {
+  await verifyAdminSession();
+
+  const doc = await prisma.companyDocument.findUnique({ where: { id } });
+  if (!doc) return { ok: false, error: "Файл не найден" };
+
+  await deleteCompanyDocumentFile(doc.fileUrl);
+  await prisma.companyDocument.delete({ where: { id } });
   revalidatePath("/admin/crm/companies");
   return { ok: true };
 }

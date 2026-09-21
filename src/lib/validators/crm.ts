@@ -37,15 +37,29 @@ export const userSchema = z.object({
 });
 export type UserInput = z.infer<typeof userSchema>;
 
-export const companySchema = z.object({
-  name: z.string().trim().min(2, "Минимум 2 символа"),
-  inn: z.string().trim().optional(),
-  ogrn: z.string().trim().optional(),
-  address: z.string().trim().optional(),
-  contract: z.string().trim().optional(),
-  type: z.string().trim().optional(),
-  managerId: z.string().trim().optional(),
-});
+export const COMPANY_PAYMENT_TYPES = ["PREPAYMENT", "DEFERRED"] as const;
+export const COMPANY_PAYMENT_TYPE_LABELS: Record<(typeof COMPANY_PAYMENT_TYPES)[number], string> = {
+  PREPAYMENT: "Предоплата",
+  DEFERRED: "Отсрочка платежа",
+};
+
+export const companySchema = z
+  .object({
+    name: z.string().trim().min(2, "Минимум 2 символа"),
+    inn: z.string().trim().optional(),
+    ogrn: z.string().trim().optional(),
+    address: z.string().trim().optional(),
+    hasContract: z.boolean().default(false),
+    contract: z.string().trim().optional(),
+    type: z.string().trim().optional(),
+    managerId: z.string().trim().optional(),
+    paymentType: z.enum(COMPANY_PAYMENT_TYPES).default("PREPAYMENT"),
+    paymentDeferralDays: z.coerce.number().int().positive().optional(),
+  })
+  .refine((data) => data.paymentType !== "DEFERRED" || !!data.paymentDeferralDays, {
+    message: "Укажите количество дней отсрочки",
+    path: ["paymentDeferralDays"],
+  });
 export type CompanyInput = z.infer<typeof companySchema>;
 
 export const COMPANY_TYPE_SUGGESTIONS = ["Клиент", "Поставщик", "Перевозчик"];

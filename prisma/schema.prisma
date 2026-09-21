@@ -47,27 +47,27 @@ model Category {
 }
 
 model Product {
-  id          String      @id @default(cuid())
-  sku         String      @unique
-  name        String
-  slug        String      @unique
-  description String?
-  price       Int
-  stock       Int         @default(0)
-  images      String[]
-  categoryId  String
-  category    Category    @relation(fields: [categoryId], references: [id])
-  brand       String?
-  attributes  Json?
-  isActive    Boolean     @default(true)
-  orderItems  OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  sku          String      @unique
+  name         String
+  slug         String      @unique
+  description  String?
+  price        Int
+  stock        Int         @default(0)
+  images       String[]
+  categoryId   String
+  category     Category    @relation(fields: [categoryId], references: [id])
+  brand        String?
+  attributes   Json?
+  isActive     Boolean     @default(true)
+  orderItems   OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
   // Bumped to now() on creation and whenever stock increases -- drives the
   // "Новое поступление" section independently of createdAt/updatedAt.
-  newArrivalAt DateTime   @default(now())
+  newArrivalAt DateTime    @default(now())
 
-  searchLogs  SearchLog[]
+  searchLogs SearchLog[]
 
   @@index([categoryId])
   @@index([isActive])
@@ -75,36 +75,44 @@ model Product {
 }
 
 model Order {
-  id            String          @id @default(cuid())
-  orderNumber   String          @unique
-  customerName  String
-  customerPhone String
-  customerEmail String?
-  deliveryNote  String?
-  status        OrderStatus     @default(AWAITING_PAYMENT)
-  paid          Boolean         @default(false)
-  deliveryDate  DateTime?
-  totalAmount   Int
-  userId        String?
-  user          User?           @relation(fields: [userId], references: [id])
-  items         OrderItem[]
-  documents     OrderDocument[]
-  payment       Payment?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id                 String          @id @default(cuid())
+  orderNumber        String          @unique
+  customerName       String
+  customerPhone      String
+  customerEmail      String?
+  deliveryNote       String?
+  status             OrderStatus     @default(AWAITING_PAYMENT)
+  paid               Boolean         @default(false)
+  deliveryDate       DateTime?
+  // Set once, automatically, the first time the order enters
+  // SHIPPED_AWAITING_PAYMENT -- distinct from deliveryDate, which staff set
+  // by hand as a planned delivery date.
+  shippedAt          DateTime?
+  // shippedAt + the customer's company paymentDeferralDays, computed at the
+  // same moment shippedAt is set, only when that company's paymentType is
+  // DEFERRED. Null for prepayment/no-company orders (plain paid/unpaid).
+  plannedPaymentDate DateTime?
+  totalAmount        Int
+  userId             String?
+  user               User?           @relation(fields: [userId], references: [id])
+  items              OrderItem[]
+  documents          OrderDocument[]
+  payment            Payment?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   @@index([status])
   @@index([userId])
 }
 
 model OrderDocument {
-  id         String                 @id @default(cuid())
+  id         String                @id @default(cuid())
   orderId    String
-  order      Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order      Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
   category   OrderDocumentCategory
   fileName   String
   fileUrl    String
-  uploadedAt DateTime               @default(now())
+  uploadedAt DateTime              @default(now())
 
   @@index([orderId, category])
 }
@@ -149,19 +157,19 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  lastName     String?
-  firstName    String?
-  patronymic   String?
-  login        String   @unique
-  passwordHash String
-  email        String?  @unique
-  phone        String?
-  role         Role
-  companyId    String?
-  company      Company? @relation("CompanyUsers", fields: [companyId], references: [id])
-  managedCompanies Company[] @relation("CompanyManager")
-  orders       Order[]
+  id                    String          @id @default(cuid())
+  lastName              String?
+  firstName             String?
+  patronymic            String?
+  login                 String          @unique
+  passwordHash          String
+  email                 String?         @unique
+  phone                 String?
+  role                  Role
+  companyId             String?
+  company               Company?        @relation("CompanyUsers", fields: [companyId], references: [id])
+  managedCompanies      Company[]       @relation("CompanyManager")
+  orders                Order[]
   // Saved from the customer's own "Настройки" card and pre-filled into new
   // checkouts -- independent of the checkout page's own localStorage memory.
   defaultDeliveryMethod DeliveryMethod?
@@ -170,28 +178,51 @@ model User {
   defaultHouse          String?
   defaultApartment      String?
   defaultTerminal       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
   @@index([role])
   @@index([companyId])
 }
 
 model Company {
-  id        String   @id @default(cuid())
-  name      String
-  inn       String?
-  ogrn      String?
-  address   String?
-  contract  String?
-  type      String?
-  users     User[]   @relation("CompanyUsers")
-  managerId String?
-  manager   User?    @relation("CompanyManager", fields: [managerId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String             @id @default(cuid())
+  name                String
+  inn                 String?
+  ogrn                String?
+  address             String?
+  contract            String?
+  type                String?
+  users               User[]             @relation("CompanyUsers")
+  managerId           String?
+  manager             User?              @relation("CompanyManager", fields: [managerId], references: [id])
+  // "Договор" checkbox -- the contract number field is only editable while
+  // this is checked.
+  hasContract         Boolean            @default(false)
+  paymentType         CompanyPaymentType @default(PREPAYMENT)
+  // Only meaningful when paymentType is DEFERRED.
+  paymentDeferralDays Int?
+  documents           CompanyDocument[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@index([managerId])
+}
+
+model CompanyDocument {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+enum CompanyPaymentType {
+  PREPAYMENT
+  DEFERRED
 }
 
 enum DriverApplicationStatus {
