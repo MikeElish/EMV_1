@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { href: "/admin", label: "Дашборд" },
   { href: "/admin/crm/users", label: "CRM" },
   { href: "/admin/taxi-fleet/driver-applications", label: "Таксопарк" },
+  { href: "/admin/reports", label: "Отчёты" },
 ];
 
 export default async function AdminDashboardLayout({
