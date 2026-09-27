@@ -3,22 +3,31 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { utils, write } from "xlsx";
-import type { Product, Category } from "@prisma/client";
+import type { Product, Category, ProductPricing } from "@prisma/client";
 import { formatRub } from "@/lib/money";
 import { deleteProduct } from "@/actions/admin/products";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { ActiveToggle } from "@/components/admin/ActiveToggle";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 
-type ProductRow = Product & { category: Category };
+type ProductRow = Product & {
+  category: Category;
+  pricing: (ProductPricing & { supplier: { name: string } | null }) | null;
+};
+
+const priceOrDash = (kopecks: number | undefined) => (kopecks === undefined ? "—" : formatRub(kopecks));
 
 function buildExportHref(products: ProductRow[]) {
-  const header = ["Товар", "Артикул", "Категория", "Цена", "Остаток", "Активен"];
+  const header = ["Товар", "Артикул", "Категория", "Поставщик", "Закупка", "Розница", "Опт", "Дилер", "Остаток", "Активен"];
   const body = products.map((product) => [
     product.name,
     product.sku,
     product.category.name,
+    product.pricing?.supplier?.name ?? "",
+    priceOrDash(product.pricing?.purchasePrice),
+    priceOrDash(product.pricing?.retailPrice),
     formatRub(product.price),
+    priceOrDash(product.pricing?.dealerPrice),
     product.stock,
     product.isActive ? "Да" : "Нет",
   ]);
@@ -83,7 +92,11 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
             <tr className="border-b border-foreground/10 text-left text-foreground/50">
               <th className="py-2">Товар</th>
               <th className="py-2">Категория</th>
-              <th className="py-2">Цена</th>
+              <th className="py-2 pr-3">Поставщик</th>
+              <th className="py-2 pr-3">Закупка</th>
+              <th className="py-2 pr-3">Розница</th>
+              <th className="py-2 pr-3">Опт</th>
+              <th className="py-2 pr-3">Дилер</th>
               <th className="py-2">Остаток</th>
               <th className="py-2">Активен</th>
               <th className="py-2" />
@@ -97,7 +110,11 @@ export function ProductsTable({ products }: { products: ProductRow[] }) {
                   <div className="text-xs text-foreground/40">{product.sku}</div>
                 </td>
                 <td className="py-2 text-foreground/60">{product.category.name}</td>
-                <td className="py-2">{formatRub(product.price)}</td>
+                <td className="py-2 pr-3 text-foreground/60">{product.pricing?.supplier?.name ?? "—"}</td>
+                <td className="py-2 pr-3">{priceOrDash(product.pricing?.purchasePrice)}</td>
+                <td className="py-2 pr-3">{priceOrDash(product.pricing?.retailPrice)}</td>
+                <td className="py-2 pr-3 font-medium">{formatRub(product.price)}</td>
+                <td className="py-2 pr-3">{priceOrDash(product.pricing?.dealerPrice)}</td>
                 <td className="py-2">{product.stock}</td>
                 <td className="py-2">
                   <ActiveToggle productId={product.id} isActive={product.isActive} />

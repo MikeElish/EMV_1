@@ -8,7 +8,11 @@ export const IMPORT_COLUMN_ORDER = [
   "name",
   "sku",
   "stock",
-  "price",
+  "purchasePrice",
+  "retailPrice",
+  "wholesalePrice",
+  "dealerPrice",
+  "supplier",
   "categorySlug",
   "machineType",
   "compatibleWith",
@@ -24,13 +28,22 @@ export const IMPORT_COLUMN_LABELS: Record<
   name: "Наименование товара",
   sku: "Артикул товара",
   stock: "Количество в наличии",
-  price: "Цена товара",
+  purchasePrice: "Цена закупки",
+  retailPrice: "Цена розничная",
+  wholesalePrice: "Цена оптовая",
+  dealerPrice: "Цена дилерская",
+  supplier: "Поставщик (ИНН или название)",
   categorySlug: "Категория товара",
   machineType: "Тип машины",
   compatibleWith: "Модель машины",
   description: "Описание",
   images: "Картинка",
 };
+
+const optionalPrice = z.preprocess(
+  (v) => (v === "" || v == null ? undefined : v),
+  z.coerce.number().min(0, "Цена должна быть числом ≥ 0").optional()
+);
 
 export const csvRowSchema = z.object({
   brand: z.string().trim().min(1, "Бренд обязателен"),
@@ -39,7 +52,13 @@ export const csvRowSchema = z.object({
   // Empty or "0" means the product has no stock on hand -- it stays
   // importable and is simply shown storefront-side as "Под заказ".
   stock: z.coerce.number().int().min(0, "Количество должно быть целым числом ≥ 0"),
-  price: z.coerce.number().min(0, "Цена должна быть числом ≥ 0"),
+  purchasePrice: z.coerce.number().positive("Цена закупки обязательна и должна быть > 0"),
+  // Empty means "calculate from the base markup in Настройки → Цены".
+  retailPrice: optionalPrice,
+  wholesalePrice: optionalPrice,
+  dealerPrice: optionalPrice,
+  // Matched against a company with the role "Поставщик" by INN or by name.
+  supplier: z.string().trim().min(1, "Поставщик обязателен"),
   // Matched against either the category's name or its slug (see
   // resolveImportCategory in actions/admin/import.ts) -- so Cyrillic names
   // like "Гидравлика" work here, not just the Latin slug.
@@ -59,6 +78,7 @@ export type CsvRow = z.infer<typeof csvRowSchema>;
 export type AnalyzedRow = CsvRow & {
   rowNumber: number;
   categoryId: string;
+  supplierId: string;
   /** Stock already in the system for this SKU, or null if it's a new product. */
   currentStock: number | null;
 };
@@ -83,7 +103,11 @@ export const CSV_TEMPLATE_EXAMPLE = [
   "Гидроцилиндр стрелы",
   "EMV-1001",
   "3",
-  "45000",
+  "37500",
+  "",
+  "",
+  "",
+  "7700000000",
   "Гидравлика",
   "Экскаватор",
   "CAT 320|CAT 325",

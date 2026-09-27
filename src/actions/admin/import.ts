@@ -17,6 +17,8 @@ import { buildProductSlug } from "@/lib/slug";
 import { rublesToKopecksRoundedUp } from "@/lib/money";
 import { findCanonicalBrand } from "@/lib/normalize-brand";
 import { applyWatermark } from "@/lib/watermark";
+import { applyMarkup } from "@/lib/pricing";
+import { getMarkups, getSuppliers } from "@/lib/price-settings";
 import { uploadWatermarkedImage } from "@/lib/image-storage";
 
 export type ImportSummary = {
@@ -70,6 +72,15 @@ function buildCategoryLookup(categories: { id: string; name: string; slug: strin
   return (value: string) => byKey.get(value.trim().toLowerCase());
 }
 
+function buildSupplierLookup(suppliers: { id: string; name: string; inn: string | null }[]) {
+  const byKey = new Map<string, string>();
+  for (const supplier of suppliers) {
+    byKey.set(supplier.name.trim().toLowerCase(), supplier.id);
+    if (supplier.inn) byKey.set(supplier.inn.trim(), supplier.id);
+  }
+  return (value: string) => byKey.get(value.trim()) ?? byKey.get(value.trim().toLowerCase());
+}
+
 function rowArrayToRecord(row: unknown[]): Record<string, string> {
   const record: Record<string, string> = {};
   IMPORT_COLUMN_ORDER.forEach((key, index) => {
@@ -116,8 +127,9 @@ export async function analyzeImportFile(formData: FormData): Promise<ImportAnaly
   // columns are matched by position, not by header text.
   const dataRows = rows.slice(1);
 
-  const categories = await prisma.category.findMany();
+  const [categories, suppliers] = await Promise.all([prisma.category.findMany(), getSuppliers()]);
   const resolveCategory = buildCategoryLookup(categories);
+  const resolveSupplier = buildSupplierLookup(suppliers);
 
   const errors: { row: number; message: string }[] = [];
   const validRows: Omit<AnalyzedRow, "currentStock">[] = [];
@@ -152,11 +164,21 @@ export async function analyzeImportFile(formData: FormData): Promise<ImportAnaly
       continue;
     }
 
+    const supplierId = resolveSupplier(parsed.data.supplier);
+    if (!supplierId) {
+      errors.push({
+        row: rowNumber,
+        message: `Поставщик '${parsed.data.supplier}' не найден (нужна компания с ролью «Поставщик» — укажите её ИНН или название)`,
+      });
+      continue;
+    }
+
     validRows.push({
       ...parsed.data,
       brand,
       rowNumber,
       categoryId: category.id,
+      supplierId,
     });
   }
 
@@ -205,6 +227,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
   // can later be recognized as "the last upload" (e.g. by the homepage's
   // "Новое поступление" rotator) via an exact newArrivalAt match.
   const importedAt = new Date();
+  const markups = await getMarkups();
 
   for (const row of rows) {
     const category = await prisma.category.findUnique({ where: { id: row.categoryId } });
@@ -219,11 +242,21 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
       ...(compatibleWith.length > 0 ? { compatibleWith } : {}),
     };
 
+    const purchasePrice = rublesToKopecksRoundedUp(row.purchasePrice);
+    const saleOrMarkup = (rub: number | undefined, markup: number) =>
+      rub === undefined ? applyMarkup(purchasePrice, markup) : rublesToKopecksRoundedUp(rub);
+    const pricing = {
+      purchasePrice,
+      retailPrice: saleOrMarkup(row.retailPrice, markups.retailMarkup),
+      dealerPrice: saleOrMarkup(row.dealerPrice, markups.dealerMarkup),
+      supplierId: row.supplierId,
+    };
+
     const data = {
       name: row.name,
       slug: buildProductSlug(row.brand, row.sku),
       description: row.description || null,
-      price: rublesToKopecksRoundedUp(row.price),
+      price: saleOrMarkup(row.wholesalePrice, markups.wholesaleMarkup),
       stock: row.stock,
       categoryId: category.id,
       brand: row.brand || null,
@@ -237,11 +270,17 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
         const restocked = row.stock > existing.stock;
         await prisma.product.update({
           where: { sku: row.sku },
-          data: { ...data, ...(restocked ? { newArrivalAt: importedAt } : {}) },
+          data: {
+            ...data,
+            ...(restocked ? { newArrivalAt: importedAt } : {}),
+            pricing: { upsert: { create: pricing, update: pricing } },
+          },
         });
         updated++;
       } else {
-        await prisma.product.create({ data: { sku: row.sku, newArrivalAt: importedAt, ...data } });
+        await prisma.product.create({
+          data: { sku: row.sku, newArrivalAt: importedAt, ...data, pricing: { create: pricing } },
+        });
         created++;
       }
     } catch (e) {

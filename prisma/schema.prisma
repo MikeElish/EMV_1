@@ -68,10 +68,36 @@ model Product {
   newArrivalAt DateTime    @default(now())
 
   searchLogs SearchLog[]
+  pricing    ProductPricing?
 
   @@index([categoryId])
   @@index([isActive])
   @@index([newArrivalAt])
+}
+
+// Internal prices live apart from Product on purpose: storefront pages pass
+// whole Product rows to client components, so anything on Product ends up in
+// every visitor's page source. Product.price is the wholesale price -- the
+// one shown on the site.
+model ProductPricing {
+  productId     String   @id
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchasePrice Int
+  retailPrice   Int
+  dealerPrice   Int
+  supplierId    String?
+  supplier      Company? @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+}
+
+// Singleton (id is always 1): default markups over the purchase price,
+// in percent, applied to new and imported products.
+model PriceSettings {
+  id              Int   @id @default(1)
+  retailMarkup    Float @default(30)
+  wholesaleMarkup Float @default(20)
+  dealerMarkup    Float @default(15)
 }
 
 model Order {
@@ -224,6 +250,7 @@ model Company {
   // Only meaningful when paymentType is DEFERRED.
   paymentDeferralDays Int?
   documents           CompanyDocument[]
+  suppliedProducts    ProductPricing[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 

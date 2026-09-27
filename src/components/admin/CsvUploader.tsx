@@ -214,7 +214,7 @@ export function CsvUploader() {
                   <th className="py-2 pr-4">Наименование товара</th>
                   <th className="py-2 pr-4">Артикул товара</th>
                   <th className="py-2 pr-4">Количество в наличии</th>
-                  <th className="py-2 pr-4">Цена товара</th>
+                  <th className="py-2 pr-4">Цена закупки</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,7 +243,7 @@ export function CsvUploader() {
                         <td className="py-2 pr-4">{row.name}</td>
                         <td className="py-2 pr-4">{row.sku}</td>
                         <td className="py-2 pr-4">{row.stock}</td>
-                        <td className="py-2 pr-4">{row.price} ₽</td>
+                        <td className="py-2 pr-4">{row.purchasePrice} ₽</td>
                       </tr>
                     );
                   })
@@ -290,7 +290,7 @@ export function CsvUploader() {
                   <th className="py-2 pr-4">Наименование товара</th>
                   <th className="py-2 pr-4">Артикул товара</th>
                   <th className="py-2 pr-4">Количество в наличии</th>
-                  <th className="py-2 pr-4">Цена товара</th>
+                  <th className="py-2 pr-4">Цена закупки</th>
                   <th className="py-2 pr-4">Решение</th>
                 </tr>
               </thead>
@@ -310,7 +310,7 @@ export function CsvUploader() {
                         {" → "}
                         <span className="text-red-600">{row.stock}</span>
                       </td>
-                      <td className="py-2 pr-4">{row.price} ₽</td>
+                      <td className="py-2 pr-4">{row.purchasePrice} ₽</td>
                       <td className="py-2 pr-4">
                         <select
                           value={stockDecision[row.rowNumber] ?? ""}

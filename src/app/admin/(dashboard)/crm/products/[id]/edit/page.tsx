@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateProduct } from "@/actions/admin/products";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { getMarkups, getSuppliers } from "@/lib/price-settings";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
@@ -9,9 +10,11 @@ export default async function EditProductPage({
   params,
 }: PageProps<"/admin/crm/products/[id]/edit">) {
   const { id } = await params;
-  const [product, categories] = await Promise.all([
-    prisma.product.findUnique({ where: { id } }),
+  const [product, categories, suppliers, markups] = await Promise.all([
+    prisma.product.findUnique({ where: { id }, include: { pricing: true } }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
+    getSuppliers(),
+    getMarkups(),
   ]);
 
   if (!product) notFound();
@@ -23,11 +26,12 @@ export default async function EditProductPage({
       <h1 className="text-2xl font-bold">Изменить товар</h1>
       <ProductForm
         categories={categories}
+        suppliers={suppliers}
+        markups={markups}
         initial={{
           sku: product.sku,
           name: product.name,
           description: product.description ?? undefined,
-          priceRub: (product.price / 100).toString(),
           stock: product.stock,
           categoryId: product.categoryId,
           brand: product.brand ?? undefined,
@@ -36,7 +40,16 @@ export default async function EditProductPage({
           images: product.images,
           isActive: product.isActive,
         }}
-        onSubmit={(input) => updateProduct(id, input)}
+        initialPricing={
+          product.pricing ? {
+            supplierId: product.pricing.supplierId,
+            purchase: product.pricing.purchasePrice,
+            retail: product.pricing.retailPrice,
+            wholesale: product.price,
+            dealer: product.pricing.dealerPrice,
+          } : undefined
+        }
+        onSubmit={updateProduct.bind(null, id)}
       />
     </div>
   );

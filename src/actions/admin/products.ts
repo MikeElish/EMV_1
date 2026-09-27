@@ -33,12 +33,28 @@ function toProductData(data: ProductInput) {
   };
 }
 
+function toPricingData(data: ProductInput) {
+  return {
+    purchasePrice: data.purchasePrice,
+    retailPrice: data.retailPrice,
+    dealerPrice: data.dealerPrice,
+    supplierId: data.supplierId || null,
+  };
+}
+
 export async function createProduct(input: ProductInput): Promise<ActionResult> {
   await verifyAdminSession();
 
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
+  }
+
+  if (!parsed.data.supplierId) {
+    return { ok: false, error: "Укажите поставщика (вкладка «Цены»)" };
+  }
+  if (parsed.data.purchasePrice <= 0) {
+    return { ok: false, error: "Укажите закупочную цену (вкладка «Цены»)" };
   }
 
   const slug = buildProductSlug(parsed.data.brand, parsed.data.sku);
@@ -49,7 +65,9 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
     return { ok: false, error: "Товар с таким артикулом уже существует" };
   }
 
-  await prisma.product.create({ data: toProductData(parsed.data) });
+  await prisma.product.create({
+    data: { ...toProductData(parsed.data), pricing: { create: toPricingData(parsed.data) } },
+  });
 
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");
@@ -87,6 +105,9 @@ export async function updateProduct(
     data: {
       ...toProductData(parsed.data),
       ...(restocked ? { newArrivalAt: new Date() } : {}),
+      pricing: {
+        upsert: { create: toPricingData(parsed.data), update: toPricingData(parsed.data) },
+      },
     },
   });
 
