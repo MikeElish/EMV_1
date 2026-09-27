@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Form from "next/form";
 import { utils, write } from "xlsx";
 import { BRANDS } from "@/content/brands";
 import { bulkSearchProducts } from "@/actions/shop/bulk-search";
@@ -146,7 +147,7 @@ export function HeaderSearchBar({ isHome }: { isHome: boolean }) {
             }}
           >
             <div style={{ height: ROW_HEIGHT }} className="flex w-full shrink-0 items-center">
-              <form action="/shop/search" method="GET" className="flex w-full">
+              <Form action="/shop/search" className="flex w-full">
                 <input
                   type="search"
                   name="q"
@@ -159,7 +160,7 @@ export function HeaderSearchBar({ isHome }: { isHome: boolean }) {
                     isHome ? "text-white placeholder:text-white/60" : ""
                   }`}
                 />
-              </form>
+              </Form>
             </div>
 
             <div

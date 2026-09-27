@@ -8,6 +8,7 @@ import { CustomerAccountMenu } from "@/components/shop/CustomerAccountMenu";
 import { CartIcon } from "@/components/shop/CartIcon";
 import { ThemeToggle } from "@/components/shop/ThemeToggle";
 import { HeaderSearchBar } from "@/components/shop/HeaderSearchBar";
+import { ShopLink } from "@/components/shop/ShopLink";
 import { getCrmBadge } from "@/actions/crm/session-badge";
 
 export function ShopHeader() {
@@ -52,7 +53,8 @@ export function ShopHeader() {
         <CartIcon light={isHome} />
         <ThemeToggle light={isHome} />
         {isCustomer && (
-          <Link
+          <ShopLink
+            eager
             href="/shop/orders"
             className={`rounded-md border px-3 py-1.5 text-xs transition-opacity hover:opacity-80 ${
               isHome
@@ -61,7 +63,7 @@ export function ShopHeader() {
             }`}
           >
             Мои заказы
-          </Link>
+          </ShopLink>
         )}
         <CustomerAccountMenu variant={isHome ? "dark" : "light"} />
       </div>

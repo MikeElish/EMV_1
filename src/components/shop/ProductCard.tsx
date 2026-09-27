@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { ShopLink } from "@/components/shop/ShopLink";
 import type { Product } from "@prisma/client";
 import { formatRub } from "@/lib/money";
 import { useCart } from "@/components/shop/CartProvider";
@@ -128,7 +128,7 @@ export function ProductCard({
   }
 
   return (
-    <Link
+    <ShopLink
       href={`/shop/product/${product.slug}`}
       className="group flex flex-col overflow-hidden rounded-lg border border-foreground/10 transition-colors hover:border-foreground/30"
     >
@@ -158,6 +158,6 @@ export function ProductCard({
           <StockBadge stock={product.stock} />
         </div>
       </div>
-    </Link>
+    </ShopLink>
   );
 }

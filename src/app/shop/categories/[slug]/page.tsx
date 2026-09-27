@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProductGrid } from "@/components/shop/ProductGrid";
-import Link from "next/link";
+import { ShopLink } from "@/components/shop/ShopLink";
 
 type Attributes = { machineType?: string } | null;
 
@@ -67,23 +67,23 @@ export default async function CategoryPage({
         {brands.length > 0 && (
           <div>
             <span className="text-foreground/50">Бренд: </span>
-            <Link
+            <ShopLink
               href={filterHref({ brand: undefined })}
               className={!brand ? "font-semibold underline" : "text-foreground/70"}
             >
               Все
-            </Link>
+            </ShopLink>
             {brands.map((b) => (
               <span key={b}>
                 {" · "}
-                <Link
+                <ShopLink
                   href={filterHref({ brand: b })}
                   className={
                     brand === b ? "font-semibold underline" : "text-foreground/70"
                   }
                 >
                   {b}
-                </Link>
+                </ShopLink>
               </span>
             ))}
           </div>
@@ -92,16 +92,16 @@ export default async function CategoryPage({
         {machineTypes.length > 0 && (
           <div>
             <span className="text-foreground/50">Техника: </span>
-            <Link
+            <ShopLink
               href={filterHref({ machineType: undefined })}
               className={!machineType ? "font-semibold underline" : "text-foreground/70"}
             >
               Все
-            </Link>
+            </ShopLink>
             {machineTypes.map((m) => (
               <span key={m}>
                 {" · "}
-                <Link
+                <ShopLink
                   href={filterHref({ machineType: m })}
                   className={
                     machineType === m
@@ -110,7 +110,7 @@ export default async function CategoryPage({
                   }
                 >
                   {m}
-                </Link>
+                </ShopLink>
               </span>
             ))}
           </div>
@@ -118,30 +118,30 @@ export default async function CategoryPage({
 
         <div className="ml-auto">
           <span className="text-foreground/50">Сортировка: </span>
-          <Link
+          <ShopLink
             href={filterHref({ sort: undefined })}
             className={!sort ? "font-semibold underline" : "text-foreground/70"}
           >
             По умолчанию
-          </Link>
+          </ShopLink>
           {" · "}
-          <Link
+          <ShopLink
             href={filterHref({ sort: "price_asc" })}
             className={
               sort === "price_asc" ? "font-semibold underline" : "text-foreground/70"
             }
           >
             Дешевле
-          </Link>
+          </ShopLink>
           {" · "}
-          <Link
+          <ShopLink
             href={filterHref({ sort: "price_desc" })}
             className={
               sort === "price_desc" ? "font-semibold underline" : "text-foreground/70"
             }
           >
             Дороже
-          </Link>
+          </ShopLink>
         </div>
       </div>
 

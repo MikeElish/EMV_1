@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatRub } from "@/lib/money";
 import { AddToCartButton } from "@/components/shop/AddToCartButton";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
+import { ShopLink } from "@/components/shop/ShopLink";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
@@ -28,12 +29,13 @@ export default async function ProductPage({
           Каталог
         </Link>
         {" / "}
-        <Link
+        <ShopLink
+          eager
           href={`/shop/categories/${product.category.slug}`}
           className="hover:underline"
         >
           {product.category.name}
-        </Link>
+        </ShopLink>
       </nav>
 
       <div className="mt-6 grid gap-10 sm:grid-cols-2">
