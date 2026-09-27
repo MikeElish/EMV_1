@@ -7,6 +7,7 @@ import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 import { PaidToggle } from "@/components/admin/PaidToggle";
 import { DeliveryDateInput } from "@/components/admin/DeliveryDateInput";
 import { OrderFilesMenu } from "@/components/admin/OrderFilesMenu";
+import { NewOrderModal } from "@/components/admin/NewOrderModal";
 import type { Order, OrderItem, OrderStatus } from "@prisma/client";
 
 type Row = {
@@ -58,6 +59,7 @@ export function OrdersTable({
     orderNumber: initialOrderNumber ?? "",
   });
   const [syncedOrderNumber, setSyncedOrderNumber] = useState(initialOrderNumber);
+  const [creating, setCreating] = useState(false);
 
   if (initialOrderNumber !== syncedOrderNumber) {
     setSyncedOrderNumber(initialOrderNumber);
@@ -100,7 +102,17 @@ export function OrdersTable({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Заказы</h1>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            aria-label="Создать заказ"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-green-600 text-lg font-bold leading-none text-white transition-opacity hover:opacity-90"
+          >
+            +
+          </button>
+          <h1 className="text-lg font-semibold">Заказы</h1>
+        </div>
         {hasActiveFilters && (
           <button
             type="button"
@@ -111,6 +123,8 @@ export function OrdersTable({
           </button>
         )}
       </div>
+
+      {creating && <NewOrderModal onClose={() => setCreating(false)} />}
 
       {orders.length === 0 ? (
         <p className="mt-4 text-sm text-foreground/40">Заказов пока нет.</p>
