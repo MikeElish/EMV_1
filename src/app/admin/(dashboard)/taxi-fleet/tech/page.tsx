@@ -1,7 +1,12 @@
-export default function CrmTechPage() {
+import { prisma } from "@/lib/prisma";
+import { VehiclesTable } from "@/components/admin/VehiclesTable";
+
+export default async function CrmTechPage() {
+  const vehicles = await prisma.vehicle.findMany({ orderBy: { createdAt: "desc" } });
+
   return (
-    <div className="flex h-40 items-center justify-center text-foreground/40">
-      Раздел «Техника» в разработке
+    <div className="overflow-x-auto">
+      <VehiclesTable vehicles={vehicles} />
     </div>
   );
 }

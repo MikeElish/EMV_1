@@ -8,6 +8,7 @@ export const ASSIGNABLE_ROLES = [
   "SUPPLIER",
   "MECHANIC",
   "DISPATCHER",
+  "ACCOUNTANT",
   "CUSTOMER",
   "DRIVER",
 ] as const;
@@ -21,6 +22,7 @@ export const ROLE_LABELS: Record<string, string> = {
   SUPPLIER: "Снабженец",
   MECHANIC: "Механик",
   DISPATCHER: "Диспетчер",
+  ACCOUNTANT: "Бухгалтер",
   CUSTOMER: "Покупатель",
   DRIVER: "Водитель",
 };

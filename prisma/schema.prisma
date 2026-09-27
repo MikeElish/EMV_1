@@ -152,6 +152,7 @@ enum Role {
   SUPPLIER
   MECHANIC
   DISPATCHER
+  ACCOUNTANT
   CUSTOMER
   DRIVER
 }
@@ -228,6 +229,47 @@ enum CompanyPaymentType {
 enum DriverApplicationStatus {
   NEW
   CONTACTED
+}
+
+enum VehicleStatus {
+  FREE
+  IN_WORK
+  IN_REPAIR
+  IN_RENT
+  DECOMMISSIONED
+}
+
+model Vehicle {
+  id           String            @id @default(cuid())
+  brand        String
+  model        String
+  licensePlate String            @unique
+  vin          String            @unique
+  color        String
+  year         Int
+  ptsNumber    String
+  ptsIssueDate DateTime
+  stsNumber    String
+  stsIssueDate DateTime
+  // Status transition logic isn't defined yet -- every vehicle is created as
+  // FREE for now.
+  status       VehicleStatus     @default(FREE)
+  documents    VehicleDocument[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([status])
+}
+
+model VehicleDocument {
+  id         String   @id @default(cuid())
+  vehicleId  String
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+
+  @@index([vehicleId])
 }
 
 model DriverApplication {
