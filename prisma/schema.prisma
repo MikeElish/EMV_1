@@ -179,11 +179,31 @@ model User {
   defaultHouse          String?
   defaultApartment      String?
   defaultTerminal       String?
+  // Personal mailbox for staff correspondence -- server/ports come from the
+  // site's MailSettings, only the credentials are per user. Never set for
+  // CUSTOMER accounts.
+  mailLogin             String?
+  mailPasswordEnc       String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
   @@index([role])
   @@index([companyId])
+}
+
+// Singleton (id is always 1): the site's own mailbox, used to send
+// informational emails, plus the server settings every user mailbox reuses.
+model MailSettings {
+  id          Int      @id @default(1)
+  smtpHost    String
+  smtpPort    Int
+  imapHost    String
+  imapPort    Int
+  login       String
+  passwordEnc String
+  senderEmail String
+  senderName  String?
+  updatedAt   DateTime @updatedAt
 }
 
 model Company {
