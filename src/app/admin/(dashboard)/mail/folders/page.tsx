@@ -22,8 +22,8 @@ export default async function MyFoldersPage({ searchParams }: PageProps<"/admin/
   const current = folders.find((f) => f.path === path) ?? folders[0];
 
   return (
-    <div className="flex gap-6">
-      <nav className="w-52 shrink-0 space-y-1 text-sm" aria-label="Мои папки">
+    <div className="flex min-h-0 flex-1 gap-6">
+      <nav className="w-52 shrink-0 space-y-1 overflow-y-auto text-sm" aria-label="Мои папки">
         {folders.map((f) => (
           <Link
             key={f.path}
@@ -45,7 +45,7 @@ export default async function MyFoldersPage({ searchParams }: PageProps<"/admin/
         </Link>
       </nav>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {current ? (
           <MailFolderPage
             path={current.path}

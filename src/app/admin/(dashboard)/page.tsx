@@ -2,21 +2,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminDashboardPage() {
-  const [
-    newOrders,
-    totalProducts,
-    lowStockProducts,
-    totalCategories,
-    newDriverApplications,
-  ] = await Promise.all([
+  const [newOrders, lowStockProducts, newDriverApplications] = await Promise.all([
     prisma.order.count({ where: { status: "AWAITING_PAYMENT" } }),
-    prisma.product.count({ where: { isActive: true } }),
     prisma.product.findMany({
       where: { isActive: true, stock: { lte: 2 } },
       orderBy: { stock: "asc" },
       take: 5,
     }),
-    prisma.category.count(),
     prisma.driverApplication.count({ where: { status: "NEW" } }),
   ]);
 
@@ -31,20 +23,6 @@ export default async function AdminDashboardPage() {
         >
           <p className="text-sm text-foreground/50">Новые заказы</p>
           <p className="mt-1 text-3xl font-bold">{newOrders}</p>
-        </Link>
-        <Link
-          href="/admin/crm/products"
-          className="rounded-lg border border-foreground/10 p-4 transition-colors hover:border-foreground/30"
-        >
-          <p className="text-sm text-foreground/50">Активных товаров</p>
-          <p className="mt-1 text-3xl font-bold">{totalProducts}</p>
-        </Link>
-        <Link
-          href="/admin/crm/categories"
-          className="rounded-lg border border-foreground/10 p-4 transition-colors hover:border-foreground/30"
-        >
-          <p className="text-sm text-foreground/50">Категорий</p>
-          <p className="mt-1 text-3xl font-bold">{totalCategories}</p>
         </Link>
         <Link
           href="/admin/taxi-fleet/driver-applications"

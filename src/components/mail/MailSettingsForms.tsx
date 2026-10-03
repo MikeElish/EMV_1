@@ -115,8 +115,65 @@ function SignatureLogo({ logo }: { logo: string | null }) {
   );
 }
 
+/** How the signature will look in a letter -- same layout as the sent HTML. */
+function SignaturePreview({
+  senderName,
+  signature,
+  logo,
+  unsaved,
+}: {
+  senderName: string;
+  signature: string;
+  logo: string | null;
+  unsaved: boolean;
+}) {
+  const hasSignature = signature.trim() !== "" || !!logo;
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <p className="whitespace-nowrap text-sm text-foreground/60">Так подпись выглядит в письме</p>
+        {unsaved && (
+          <span className="whitespace-nowrap rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-700">
+            не сохранено
+          </span>
+        )}
+      </div>
+      <div
+        aria-label="Предпросмотр подписи"
+        className="mt-2 rounded-lg border border-foreground/10 bg-white p-5 text-[14px] leading-normal text-[#111]"
+        style={{ fontFamily: "Arial, sans-serif" }}
+      >
+        {senderName.trim() && <p className="mb-3 text-xs text-[#777]">От: {senderName.trim()}</p>}
+        <div className="space-y-1.5" aria-hidden>
+          <div className="h-2.5 w-11/12 rounded bg-[#e5e5e5]" />
+          <div className="h-2.5 w-3/4 rounded bg-[#e5e5e5]" />
+        </div>
+        {hasSignature ? (
+          <div className="mt-4 whitespace-pre-wrap">
+            {`-- \n${signature.trim()}`}
+            {logo && (
+              // eslint-disable-next-line @next/next/no-img-element -- data: URI preview
+              <img
+                src={logo}
+                alt="Логотип"
+                style={{ display: "block", maxWidth: 240, maxHeight: 80, marginTop: 8 }}
+              />
+            )}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-[#999]">Подпись не задана</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PersonalSettings({ logo, ...prefs }: Prefs & { logo: string | null }) {
   const { result, pending, save } = usePrefsSave(prefs);
+  // Live values for the preview; equal to the saved ones until edited.
+  const [senderName, setSenderName] = useState(prefs.senderName);
+  const [signature, setSignature] = useState(prefs.signature);
+  const unsaved = senderName !== prefs.senderName || signature !== prefs.signature;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,46 +185,58 @@ export function PersonalSettings({ logo, ...prefs }: Prefs & { logo: string | nu
   }
 
   return (
-    <>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <h1 className="text-lg font-semibold">Личные данные, подпись</h1>
-        <div>
-          <label htmlFor="senderName" className="text-sm text-foreground/60">
-            Имя отправителя
-          </label>
-          <input
-            id="senderName"
-            name="senderName"
-            defaultValue={prefs.senderName}
-            placeholder="По умолчанию — имя и фамилия из профиля"
-            className={inputClassName}
-          />
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h1 className="text-lg font-semibold">Личные данные, подпись</h1>
+          <div>
+            <label htmlFor="senderName" className="text-sm text-foreground/60">
+              Имя отправителя
+            </label>
+            <input
+              id="senderName"
+              name="senderName"
+              value={senderName}
+              onChange={(e) => setSenderName(e.target.value)}
+              placeholder="По умолчанию — имя и фамилия из профиля"
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label htmlFor="signature" className="text-sm text-foreground/60">
+              Подпись
+            </label>
+            <textarea
+              id="signature"
+              name="signature"
+              rows={5}
+              value={signature}
+              onChange={(e) => setSignature(e.target.value)}
+              placeholder={"С уважением,\nИван Иванов\nEMV"}
+              className={inputClassName}
+            />
+            <p className="mt-1 text-xs text-foreground/40">
+              Подставляется в новые письма, ответы и пересылки.
+            </p>
+          </div>
+          <button type="submit" disabled={pending} className={primaryButton}>
+            {pending ? "Сохраняем..." : "Сохранить"}
+          </button>
+          <Result result={result} />
+        </form>
+        <div className="mt-8 border-t border-foreground/10 pt-6">
+          <SignatureLogo logo={logo} />
         </div>
-        <div>
-          <label htmlFor="signature" className="text-sm text-foreground/60">
-            Подпись
-          </label>
-          <textarea
-            id="signature"
-            name="signature"
-            rows={5}
-            defaultValue={prefs.signature}
-            placeholder={"С уважением,\nИван Иванов\nEMV"}
-            className={inputClassName}
-          />
-          <p className="mt-1 text-xs text-foreground/40">
-            Подставляется в новые письма, ответы и пересылки.
-          </p>
-        </div>
-        <button type="submit" disabled={pending} className={primaryButton}>
-          {pending ? "Сохраняем..." : "Сохранить"}
-        </button>
-        <Result result={result} />
-      </form>
-      <div className="mt-8 border-t border-foreground/10 pt-6">
-        <SignatureLogo logo={logo} />
       </div>
-    </>
+      <div className="lg:pt-11">
+        <SignaturePreview
+          senderName={senderName}
+          signature={signature}
+          logo={logo}
+          unsaved={unsaved}
+        />
+      </div>
+    </div>
   );
 }
 

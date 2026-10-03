@@ -101,8 +101,8 @@ export function MessageList({
   };
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <input
           type="checkbox"
           aria-label="Выбрать все"
@@ -152,7 +152,10 @@ export function MessageList({
       {data.items.length === 0 ? (
         <p className="mt-10 text-center text-sm text-foreground/40">В папке «{folder.name}» нет писем</p>
       ) : (
-        <ul className="mt-3 divide-y divide-foreground/10 border-y border-foreground/10">
+        <ul
+          aria-label="Письма"
+          className="mt-3 min-h-0 flex-1 divide-y divide-foreground/10 overflow-y-auto border-y border-foreground/10"
+        >
           {data.items.map((m) => (
             <li
               key={m.uid}
@@ -192,7 +195,7 @@ export function MessageList({
       )}
 
       {data.pages > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+        <div className="mt-3 flex shrink-0 items-center justify-center gap-4 text-sm">
           {data.page > 1 ? (
             <Link prefetch={false} href={`${basePath}${query}page=${data.page - 1}`} className="underline underline-offset-4">
               ← Новее

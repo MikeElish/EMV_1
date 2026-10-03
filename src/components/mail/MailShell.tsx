@@ -45,9 +45,11 @@ export function MailShell({ configured, children }: { configured: boolean; child
     );
   }
 
+  // The section fills the window (main has 2rem padding top and bottom):
+  // tabs and toolbars stay put, only the letter / folder lists scroll.
   return (
-    <div>
-      <div className="flex items-end gap-6 border-b border-foreground/10">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+      <div className="flex shrink-0 items-end gap-6 border-b border-foreground/10">
         {/* Each tab is an IMAP round-trip, so no background prefetch here. */}
         {TABS.map((tab) => {
           const active = pathname.startsWith(tab.href);
@@ -75,7 +77,7 @@ export function MailShell({ configured, children }: { configured: boolean; child
           </Link>
         )}
       </div>
-      <div className="mt-6">{children}</div>
+      <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
     </div>
   );
 }

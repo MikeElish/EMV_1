@@ -64,7 +64,8 @@ export default async function MailSettingsPage({ searchParams }: PageProps<"/adm
         ))}
       </nav>
 
-      <div className="min-w-0 max-w-xl flex-1">
+      {/* The signature section is wider: the preview sits to the right of the form. */}
+      <div className={`min-w-0 flex-1 ${section === "personal" ? "max-w-6xl" : "max-w-xl"}`}>
         {section === "personal" && (
           <PersonalSettings
             senderName={user?.mailSenderName ?? ""}
