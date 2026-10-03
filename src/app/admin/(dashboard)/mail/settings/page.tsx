@@ -5,6 +5,7 @@ import { getMailAccount } from "@/lib/mail/account";
 import { MailError, type MailFolder } from "@/lib/mail/imap";
 import { getFoldersWithCounts } from "@/lib/mail/unread";
 import { MAIL_DEFAULTS } from "@/lib/validators/mail-settings";
+import { getSignatureLogoDataUri } from "@/lib/mail/signature-logo";
 import {
   FoldersSettings,
   OtherSettings,
@@ -69,6 +70,7 @@ export default async function MailSettingsPage({ searchParams }: PageProps<"/adm
             senderName={user?.mailSenderName ?? ""}
             signature={user?.mailSignature ?? ""}
             pageSize={user?.mailPageSize ?? 30}
+            logo={await getSignatureLogoDataUri(userId)}
           />
         )}
         {section === "folders" &&

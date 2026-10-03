@@ -6,6 +6,8 @@ import { getMessage, type MailAddress, type MessageDetail } from "@/lib/mail/mes
 import { MailErrorBox } from "@/components/mail/MailPages";
 import { ComposeForm, type ComposeInitial } from "@/components/mail/ComposeForm";
 import { formatFullDate } from "@/components/mail/format";
+import { signatureText } from "@/lib/mail/compose";
+import { getSignatureLogoDataUri } from "@/lib/mail/signature-logo";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -16,8 +18,10 @@ function withPrefix(prefix: string, subject: string) {
   return new RegExp(`^${prefix}:`, "i").test(subject) ? subject : `${prefix}: ${subject}`;
 }
 
-function signatureBlock(signature: string) {
-  return signature.trim() ? `\n\n-- \n${signature.trim()}` : "";
+// With a logo the "-- " line is kept even without signature text: the logo
+// is placed under it, i.e. above a quoted reply.
+function signatureBlock(signature: string, hasLogo: boolean) {
+  return signature.trim() || hasLogo ? `\n\n${signatureText(signature)}` : "";
 }
 
 function quote(message: MessageDetail) {
@@ -34,7 +38,8 @@ export default async function ComposePage({ searchParams }: PageProps<"/admin/ma
   const params = await searchParams;
   const mode = one(params.mode);
   const draftUid = Number(one(params.draft));
-  const signature = signatureBlock(account.signature);
+  const logo = await getSignatureLogoDataUri(userId);
+  const signature = signatureBlock(account.signature, !!logo);
 
   let initial: ComposeInitial = { to: "", cc: "", subject: "", body: signature };
 
@@ -104,5 +109,11 @@ export default async function ComposePage({ searchParams }: PageProps<"/admin/ma
     return <MailErrorBox message={error instanceof MailError ? error.message : "Не удалось открыть письмо"} />;
   }
 
-  return <ComposeForm initial={initial} from={`${account.senderName} <${account.login}>`} />;
+  return (
+    <ComposeForm
+      initial={initial}
+      from={`${account.senderName} <${account.login}>`}
+      logo={logo}
+    />
+  );
 }

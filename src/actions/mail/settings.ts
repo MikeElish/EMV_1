@@ -7,6 +7,7 @@ import { encryptSecret } from "@/lib/secret-box";
 import { getMailAccount } from "@/lib/mail/account";
 import { listFolders, MailError } from "@/lib/mail/imap";
 import { invalidateUnread } from "@/lib/mail/unread";
+import { MAX_SIGNATURE_LOGO_BYTES, sniffImageType } from "@/lib/mail/signature-logo";
 import { userMailboxSchema } from "@/lib/validators/mail-settings";
 import { mailPreferencesSchema, type MailPreferencesInput } from "@/lib/validators/mail";
 
@@ -64,6 +65,37 @@ export async function clearMyMailbox(): Promise<SettingsResult> {
   return { ok: true, message: "Ящик отключён" };
 }
 
+export async function uploadSignatureLogo(form: FormData): Promise<SettingsResult> {
+  const session = await getStaffSession();
+  if (!session) return { ok: false, error: "Требуется вход" };
+  const file = form.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Выберите файл" };
+  if (file.size > MAX_SIGNATURE_LOGO_BYTES) {
+    return { ok: false, error: "Логотип больше 300 КБ — уменьшите картинку" };
+  }
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const type = sniffImageType(bytes);
+  if (!type) return { ok: false, error: "Нужна картинка PNG, JPEG или GIF" };
+
+  await prisma.user.update({
+    where: { id: session.userId },
+    data: { mailSignatureLogo: bytes, mailSignatureLogoType: type },
+  });
+  revalidatePath("/admin/mail", "layout");
+  return { ok: true, message: "Логотип сохранён" };
+}
+
+export async function deleteSignatureLogo(): Promise<SettingsResult> {
+  const session = await getStaffSession();
+  if (!session) return { ok: false, error: "Требуется вход" };
+  await prisma.user.update({
+    where: { id: session.userId },
+    data: { mailSignatureLogo: null, mailSignatureLogoType: null },
+  });
+  revalidatePath("/admin/mail", "layout");
+  return { ok: true, message: "Логотип удалён" };
+}
+
 export async function saveMailPreferences(input: MailPreferencesInput): Promise<SettingsResult> {
   const session = await getStaffSession();
   if (!session) return { ok: false, error: "Требуется вход" };
@@ -73,7 +105,7 @@ export async function saveMailPreferences(input: MailPreferencesInput): Promise<
     where: { id: session.userId },
     data: {
       mailSenderName: parsed.data.senderName || null,
-      mailSignature: parsed.data.signature?.trim() ? parsed.data.signature : null,
+      mailSignature: parsed.data.signature?.trim() ? parsed.data.signature.replace(/\r\n/g, "\n") : null,
       mailPageSize: parsed.data.pageSize,
     },
   });

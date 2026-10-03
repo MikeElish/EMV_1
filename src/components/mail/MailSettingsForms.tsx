@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   clearMyMailbox,
+  deleteSignatureLogo,
   saveMailPreferences,
+  uploadSignatureLogo,
   saveMyMailbox,
   type SettingsResult,
 } from "@/actions/mail/settings";
@@ -44,49 +46,128 @@ function usePrefsSave(prefs: Prefs) {
   return { result, pending, save };
 }
 
-export function PersonalSettings(prefs: Prefs) {
+function SignatureLogo({ logo }: { logo: string | null }) {
+  const router = useRouter();
+  const [result, setResult] = useState<SettingsResult | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function upload(file: File) {
+    const form = new FormData();
+    form.set("logo", file);
+    setResult(null);
+    startTransition(async () => {
+      setResult(await uploadSignatureLogo(form));
+      router.refresh();
+    });
+  }
+
+  return (
+    <div>
+      <p className="text-sm text-foreground/60">Логотип в подписи</p>
+      <div className="mt-2 flex items-center gap-4">
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- data: URI preview
+          <img
+            src={logo}
+            alt="Логотип подписи"
+            className="max-h-20 max-w-[240px] rounded border border-foreground/10 bg-white p-1"
+          />
+        ) : (
+          <span className="text-sm text-foreground/40">не загружен</span>
+        )}
+        <label className="cursor-pointer text-sm text-foreground/70 underline underline-offset-4 hover:text-foreground">
+          {logo ? "Заменить" : "Загрузить"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/gif"
+            aria-label="Файл логотипа"
+            className="hidden"
+            disabled={pending}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) upload(file);
+            }}
+          />
+        </label>
+        {logo && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                setResult(await deleteSignatureLogo());
+                router.refresh();
+              })
+            }
+            className="text-sm text-red-600 underline underline-offset-4"
+          >
+            Удалить
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-foreground/40">
+        PNG, JPEG или GIF до 300 КБ. Встраивается в письмо под подписью (не больше 240×80 точек).
+      </p>
+      {pending && <p className="text-sm text-foreground/50">Подождите…</p>}
+      <Result result={result} />
+    </div>
+  );
+}
+
+export function PersonalSettings({ logo, ...prefs }: Prefs & { logo: string | null }) {
   const { result, pending, save } = usePrefsSave(prefs);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    save({ senderName: String(form.get("senderName") ?? ""), signature: String(form.get("signature") ?? "") });
+    save({
+      senderName: String(form.get("senderName") ?? ""),
+      signature: String(form.get("signature") ?? ""),
+    });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h1 className="text-lg font-semibold">Личные данные, подпись</h1>
-      <div>
-        <label htmlFor="senderName" className="text-sm text-foreground/60">
-          Имя отправителя
-        </label>
-        <input
-          id="senderName"
-          name="senderName"
-          defaultValue={prefs.senderName}
-          placeholder="По умолчанию — имя и фамилия из профиля"
-          className={inputClassName}
-        />
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <h1 className="text-lg font-semibold">Личные данные, подпись</h1>
+        <div>
+          <label htmlFor="senderName" className="text-sm text-foreground/60">
+            Имя отправителя
+          </label>
+          <input
+            id="senderName"
+            name="senderName"
+            defaultValue={prefs.senderName}
+            placeholder="По умолчанию — имя и фамилия из профиля"
+            className={inputClassName}
+          />
+        </div>
+        <div>
+          <label htmlFor="signature" className="text-sm text-foreground/60">
+            Подпись
+          </label>
+          <textarea
+            id="signature"
+            name="signature"
+            rows={5}
+            defaultValue={prefs.signature}
+            placeholder={"С уважением,\nИван Иванов\nEMV"}
+            className={inputClassName}
+          />
+          <p className="mt-1 text-xs text-foreground/40">
+            Подставляется в новые письма, ответы и пересылки.
+          </p>
+        </div>
+        <button type="submit" disabled={pending} className={primaryButton}>
+          {pending ? "Сохраняем..." : "Сохранить"}
+        </button>
+        <Result result={result} />
+      </form>
+      <div className="mt-8 border-t border-foreground/10 pt-6">
+        <SignatureLogo logo={logo} />
       </div>
-      <div>
-        <label htmlFor="signature" className="text-sm text-foreground/60">
-          Подпись
-        </label>
-        <textarea
-          id="signature"
-          name="signature"
-          rows={5}
-          defaultValue={prefs.signature}
-          placeholder={"С уважением,\nИван Иванов\nEMV"}
-          className={inputClassName}
-        />
-        <p className="mt-1 text-xs text-foreground/40">Подставляется в новые письма, ответы и пересылки.</p>
-      </div>
-      <button type="submit" disabled={pending} className={primaryButton}>
-        {pending ? "Сохраняем..." : "Сохранить"}
-      </button>
-      <Result result={result} />
-    </form>
+    </>
   );
 }
 
@@ -194,14 +275,21 @@ export function ProgramsSettings({
             placeholder={hasPassword ? "•••••••• (сохранён)" : ""}
             className={inputClassName}
           />
-          {hasPassword && <p className="mt-1 text-xs text-foreground/40">Оставьте пустым, чтобы не менять.</p>}
+          {hasPassword && (
+            <p className="mt-1 text-xs text-foreground/40">Оставьте пустым, чтобы не менять.</p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button type="submit" disabled={pending} className={primaryButton}>
             {pending ? "Проверяем..." : "Сохранить и проверить"}
           </button>
           {hasPassword && (
-            <button type="button" onClick={handleClear} disabled={pending} className="text-sm text-red-600 underline underline-offset-4">
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={pending}
+              className="text-sm text-red-600 underline underline-offset-4"
+            >
               Отключить ящик
             </button>
           )}
@@ -213,12 +301,13 @@ export function ProgramsSettings({
         <p className="font-medium">Как подключить ящик Яндекса</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-foreground/70">
           <li>
-            В Яндекс.Почте откройте «Все настройки → Почтовые программы» и включите доступ «С сервера imap.yandex.ru
-            по протоколу IMAP» и способ авторизации «Пароли приложений и OAuth-токены».
+            В Яндекс.Почте откройте «Все настройки → Почтовые программы» и включите доступ «С
+            сервера imap.yandex.ru по протоколу IMAP» и способ авторизации «Пароли приложений и
+            OAuth-токены».
           </li>
           <li>
-            В Яндекс ID → «Безопасность → Пароли приложений» создайте пароль для «Почты» и вставьте его выше. Обычный
-            пароль от Яндекса здесь не подойдёт.
+            В Яндекс ID → «Безопасность → Пароли приложений» создайте пароль для «Почты» и вставьте
+            его выше. Обычный пароль от Яндекса здесь не подойдёт.
           </li>
         </ol>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-foreground/60">
@@ -244,13 +333,22 @@ export function ProgramsSettings({
   );
 }
 
-export function FoldersSettings({ folders, error }: { folders: MailFolder[] | null; error: string | null }) {
+export function FoldersSettings({
+  folders,
+  error,
+}: {
+  folders: MailFolder[] | null;
+  error: string | null;
+}) {
   const router = useRouter();
   const [result, setResult] = useState<SettingsResult | null>(null);
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
 
-  function run(action: () => Promise<{ ok: true } | { ok: false; error: string }>, message: string) {
+  function run(
+    action: () => Promise<{ ok: true } | { ok: false; error: string }>,
+    message: string
+  ) {
     setResult(null);
     startTransition(async () => {
       const r = await action();
@@ -312,7 +410,8 @@ export function FoldersSettings({ folders, error }: { folders: MailFolder[] | nu
                         disabled={pending}
                         onClick={() => {
                           const next = prompt("Новое название папки", f.name);
-                          if (next && next.trim() !== f.name) run(() => renameFolder(f.path, next), "Папка переименована");
+                          if (next && next.trim() !== f.name)
+                            run(() => renameFolder(f.path, next), "Папка переименована");
                         }}
                         className="text-foreground/60 underline underline-offset-4 hover:text-foreground"
                       >

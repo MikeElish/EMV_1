@@ -137,7 +137,9 @@ function readOutgoing(form: FormData): { ok: true; mail: OutgoingMail } | { ok: 
       to: to.list,
       cc: cc.list,
       subject: String(form.get("subject") ?? "").trim(),
-      body: String(form.get("body") ?? ""),
+      // Form submission turns textarea line breaks into CRLF.
+      body: String(form.get("body") ?? "").replace(/\r\n/g, "\n"),
+      includeLogo: form.get("includeLogo") === "1",
       inReplyTo: String(form.get("inReplyTo") ?? "") || undefined,
       references,
       files,

@@ -5,6 +5,7 @@ import type Mail from "nodemailer/lib/mailer";
 import type { MailAccount } from "@/lib/mail/account";
 import { withImap, withFolder, listFolders, folderByRole, MailError } from "@/lib/mail/imap";
 import { getParsedMessage } from "@/lib/mail/messages";
+import { getSignatureLogo, SIGNATURE_LOGO_CID } from "@/lib/mail/signature-logo";
 
 export type OutgoingMail = {
   to: string[];
@@ -16,7 +17,14 @@ export type OutgoingMail = {
   files: File[];
   /** Carry over the attachments of this message (forward / reopened draft). */
   attachFrom?: { path: string; uid: number };
+  /** Put the signature logo (Почта → Настройки) under the signature. */
+  includeLogo?: boolean;
 };
+
+/** The signature as the compose page inserts it into the text. */
+export function signatureText(signature: string) {
+  return `-- \n${signature.trim()}`;
+}
 
 function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]!);
@@ -39,13 +47,31 @@ async function buildRaw(account: MailAccount, mail: OutgoingMail): Promise<{ raw
     }
   }
 
+  let html = escapeHtml(mail.body);
+  const logo = mail.includeLogo ? await getSignatureLogo(account.userId) : null;
+  if (logo) {
+    attachments.push({
+      filename: "logo" + (logo.contentType === "image/png" ? ".png" : logo.contentType === "image/gif" ? ".gif" : ".jpg"),
+      contentType: logo.contentType,
+      content: logo.content,
+      cid: SIGNATURE_LOGO_CID,
+      contentDisposition: "inline",
+    });
+    const img = `<img src="cid:${SIGNATURE_LOGO_CID}" alt="" style="display:block;max-width:240px;max-height:80px;margin-top:8px">`;
+    // Right under the signature (above a quoted reply); at the end if the
+    // signature text was edited away.
+    const marker = escapeHtml(signatureText(account.signature));
+    const at = html.indexOf(marker);
+    html = at >= 0 ? html.slice(0, at + marker.length) + img + html.slice(at + marker.length) : html + img;
+  }
+
   const composer = new MailComposer({
     from: { name: account.senderName, address: account.login },
     to: mail.to,
     cc: mail.cc.length ? mail.cc : undefined,
     subject: mail.subject,
     text: mail.body,
-    html: `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px">${escapeHtml(mail.body)}</div>`,
+    html: `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px">${html}</div>`,
     inReplyTo: mail.inReplyTo,
     references: mail.references?.length ? mail.references : undefined,
     attachments,

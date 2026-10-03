@@ -213,6 +213,9 @@ model User {
   // Own preferences from Почта → Настройки.
   mailSenderName        String?
   mailSignature         String?
+  // Image appended to the signature, sent as an inline (cid) attachment.
+  mailSignatureLogo     Bytes?
+  mailSignatureLogoType String?
   mailPageSize          Int             @default(30)
   // E-mail confirmation for self-registered customers. Null = not yet
   // confirmed. The 6-digit code is stored only as a sha256 hash.

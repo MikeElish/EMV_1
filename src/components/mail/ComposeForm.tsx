@@ -22,7 +22,17 @@ export type ComposeInitial = {
 const inputClassName =
   "w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50";
 
-export function ComposeForm({ initial, from }: { initial: ComposeInitial; from: string }) {
+export function ComposeForm({
+  initial,
+  from,
+  logo,
+}: {
+  initial: ComposeInitial;
+  from: string;
+  /** Signature logo from Почта → Настройки, as a data: URI for the preview. */
+  logo: string | null;
+}) {
+  const [includeLogo, setIncludeLogo] = useState(true);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [showCc, setShowCc] = useState(!!initial.cc);
@@ -46,6 +56,7 @@ export function ComposeForm({ initial, from }: { initial: ComposeInitial; from: 
       data.set("attachFromPath", carried.path);
       data.set("attachFromUid", String(carried.uid));
     }
+    if (logo && includeLogo) data.set("includeLogo", "1");
     return data;
   }
 
@@ -189,6 +200,21 @@ export function ComposeForm({ initial, from }: { initial: ComposeInitial; from: 
           <p className="text-sm text-red-600">Вложения больше 15 МБ ({formatSize(totalSize)})</p>
         )}
       </div>
+
+      {logo && (
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-foreground/70">
+            <input type="checkbox" checked={includeLogo} onChange={(e) => setIncludeLogo(e.target.checked)} />
+            Логотип в подписи
+          </label>
+          {/* eslint-disable-next-line @next/next/no-img-element -- data: URI preview */}
+          <img
+            src={logo}
+            alt="Логотип подписи"
+            className={`max-h-10 max-w-[160px] rounded border border-foreground/10 bg-white p-1 ${includeLogo ? "" : "opacity-30"}`}
+          />
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {notice && <p className="text-sm text-green-600">{notice}</p>}
