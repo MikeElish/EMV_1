@@ -4,6 +4,7 @@ const TABS = [
   { href: "/admin/taxi-fleet/driver-applications", label: "Заявки водителей" },
   { href: "/admin/taxi-fleet/tech", label: "Техника" },
   { href: "/admin/taxi-fleet/dispatch", label: "Диспетчерская" },
+  { href: "/admin/taxi-fleet/glonass", label: "ГЛОНАСС" },
   { href: "/admin/taxi-fleet/repair", label: "Ремонт" },
 ];
 
