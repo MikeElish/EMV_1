@@ -8,6 +8,7 @@ import {
   customerSettingsSchema,
   type CustomerSettingsInput,
 } from "@/lib/validators/customer-settings";
+import { issueEmailCode, setEmailUnverifiedFlag } from "@/lib/email-verification";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -15,6 +16,7 @@ export type MyProfile = {
   lastName: string | null;
   firstName: string | null;
   email: string | null;
+  emailVerified: boolean;
   companyName: string | null;
   deliveryMethod: string | null;
   settlement: string | null;
@@ -38,6 +40,7 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     lastName: user.lastName,
     firstName: user.firstName,
     email: user.email,
+    emailVerified: !!user.emailVerifiedAt,
     companyName: user.company?.name ?? null,
     deliveryMethod: user.defaultDeliveryMethod,
     settlement: user.defaultSettlement,
@@ -90,7 +93,8 @@ export async function updateMyProfile(input: CustomerSettingsInput): Promise<Act
       lastName: data.lastName || null,
       firstName: data.firstName || null,
       email: data.email,
-      ...(emailChanged ? { login: data.email } : {}),
+      // A new address has to be confirmed again.
+      ...(emailChanged ? { login: data.email, emailVerifiedAt: null } : {}),
       ...(passwordHash ? { passwordHash } : {}),
       defaultDeliveryMethod: data.deliveryMethod ?? null,
       defaultSettlement: data.settlement || null,
@@ -105,6 +109,9 @@ export async function updateMyProfile(input: CustomerSettingsInput): Promise<Act
     // Re-issue the session so the header badge (which reads the login off
     // the JWT) reflects the new address immediately, not the stale one.
     await createAdminSession(user.id, user.role, data.email);
+    await setEmailUnverifiedFlag(true);
+    const issued = await issueEmailCode({ id: user.id, email: data.email });
+    if (!issued.ok) return { ok: false, error: `Данные сохранены. ${issued.error}` };
   }
 
   revalidatePath("/shop/orders");
@@ -113,5 +120,6 @@ export async function updateMyProfile(input: CustomerSettingsInput): Promise<Act
 
 export async function logoutCustomer(): Promise<{ ok: true }> {
   await deleteAdminSession();
+  await setEmailUnverifiedFlag(false);
   return { ok: true };
 }

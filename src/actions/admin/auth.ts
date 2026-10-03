@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createAdminSession, deleteAdminSession } from "@/lib/session";
+import { needsEmailVerification, setEmailUnverifiedFlag } from "@/lib/email-verification";
 import { loginSchema, setupSchema } from "@/lib/validators/auth";
 import type { Role } from "@prisma/client";
 
@@ -34,11 +35,13 @@ export async function login(input: {
   }
 
   await createAdminSession(user.id, user.role, user.login);
+  await setEmailUnverifiedFlag(needsEmailVerification(user));
   return { ok: true, role: user.role };
 }
 
 export async function logout() {
   await deleteAdminSession();
+  await setEmailUnverifiedFlag(false);
   redirect("/crm");
 }
 

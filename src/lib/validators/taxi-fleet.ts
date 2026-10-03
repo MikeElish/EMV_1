@@ -9,10 +9,14 @@ export const VEHICLE_STATUS_LABELS: Record<(typeof VEHICLE_STATUSES)[number], st
   DECOMMISSIONED: "Списание",
 };
 
-// X ZZZ XXX ZZZ, where X is a Latin letter and Z is a digit -- as specified,
-// literally, not the real-world RU plate format (1 letter + 3 digits + 2
-// letters + region code).
-const LICENSE_PLATE_REGEX = /^[A-Za-z] \d{3} [A-Za-z]{3} \d{3}$/;
+// ZXXXZZXX or ZXXXZZXXX (Z -- Latin letter, X -- digit), no spaces: letter,
+// 3 digits, 2 letters, 2- or 3-digit region. Any case on input, stored
+// upper-case. Shared with the form's HTML `pattern` so the browser rejects
+// the same values the server does.
+export const LICENSE_PLATE_PATTERN = "[A-Za-z][0-9]{3}[A-Za-z]{2}[0-9]{2,3}";
+export const LICENSE_PLATE_HINT =
+  "Без пробелов: ZXXXZZXX или ZXXXZZXXX (Z — латинская буква, X — цифра), например A123BC77";
+const LICENSE_PLATE_REGEX = new RegExp(`^${LICENSE_PLATE_PATTERN}$`);
 
 export const vehicleSchema = z.object({
   brand: z.string().trim().min(1, "Укажите марку"),
@@ -20,7 +24,7 @@ export const vehicleSchema = z.object({
   licensePlate: z
     .string()
     .trim()
-    .regex(LICENSE_PLATE_REGEX, "Формат: X ZZZ XXX ZZZ (X — латинская буква, Z — цифра)")
+    .regex(LICENSE_PLATE_REGEX, `Гос.номер: ${LICENSE_PLATE_HINT}`)
     .transform((v) => v.toUpperCase()),
   vin: z.string().trim().min(1, "Укажите VIN-номер"),
   color: z.string().trim().min(1, "Укажите цвет"),

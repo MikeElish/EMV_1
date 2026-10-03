@@ -3,8 +3,12 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createAdminSession } from "@/lib/session";
+import { issueEmailCode, needsEmailVerification, setEmailUnverifiedFlag } from "@/lib/email-verification";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+export type CustomerAuthResult =
+  | { ok: true; emailVerified: boolean; sendError?: string }
+  | { ok: false; error: string };
 
 /**
  * Used by checkout to decide the password modal's label ("Введите пароль"
@@ -29,7 +33,7 @@ export async function checkCustomerEmailExists(email: string): Promise<{ exists:
 export async function registerOrLoginCustomer(input: {
   email: string;
   password: string;
-}): Promise<ActionResult> {
+}): Promise<CustomerAuthResult> {
   const email = input.email.trim();
   const password = input.password;
 
@@ -54,7 +58,13 @@ export async function registerOrLoginCustomer(input: {
       return { ok: false, error: "Неверный пароль" };
     }
     await createAdminSession(existing.id, existing.role, existing.login);
-    return { ok: true };
+    if (!needsEmailVerification(existing)) {
+      await setEmailUnverifiedFlag(false);
+      return { ok: true, emailVerified: true };
+    }
+    await setEmailUnverifiedFlag(true);
+    const issued = await issueEmailCode({ id: existing.id, email }, { onlyIfNeverSent: true });
+    return { ok: true, emailVerified: false, ...(issued.ok ? {} : { sendError: issued.error }) };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -62,5 +72,9 @@ export async function registerOrLoginCustomer(input: {
     data: { email, login: email, passwordHash, role: "CUSTOMER" },
   });
   await createAdminSession(user.id, user.role, user.login);
-  return { ok: true };
+  // A new account must confirm its e-mail before ordering: the 6-digit code
+  // goes out right away.
+  await setEmailUnverifiedFlag(true);
+  const issued = await issueEmailCode({ id: user.id, email });
+  return { ok: true, emailVerified: false, ...(issued.ok ? {} : { sendError: issued.error }) };
 }

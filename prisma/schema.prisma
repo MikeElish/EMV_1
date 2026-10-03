@@ -210,6 +210,13 @@ model User {
   // CUSTOMER accounts.
   mailLogin             String?
   mailPasswordEnc       String?
+  // E-mail confirmation for self-registered customers. Null = not yet
+  // confirmed. The 6-digit code is stored only as a sha256 hash.
+  emailVerifiedAt       DateTime?
+  emailCodeHash         String?
+  emailCodeExpiresAt    DateTime?
+  emailCodeSentAt       DateTime?
+  emailCodeAttempts     Int             @default(0)
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -229,6 +236,16 @@ model MailSettings {
   passwordEnc String
   senderEmail String
   senderName  String?
+  updatedAt   DateTime @updatedAt
+}
+
+// Singleton (id is always 1): GlonassSoft monitoring account whose map is
+// shown in Таксопарк → Диспетчерская.
+model GlonassSettings {
+  id          Int      @id @default(1)
+  serverUrl   String
+  login       String
+  passwordEnc String
   updatedAt   DateTime @updatedAt
 }
 

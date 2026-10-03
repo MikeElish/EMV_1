@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import type { ActionResult } from "@/actions/admin/vehicles";
 import { VehicleDocumentsModal } from "@/components/admin/VehicleDocumentsModal";
+import { LICENSE_PLATE_HINT, LICENSE_PLATE_PATTERN } from "@/lib/validators/taxi-fleet";
 
 export type VehicleFormInitial = {
   brand?: string;
@@ -80,8 +81,21 @@ export function VehicleForm({
             id="licensePlate"
             name="licensePlate"
             required
-            placeholder="A 123 BCD 456"
+            placeholder="A123BC77"
+            maxLength={9}
+            pattern={LICENSE_PLATE_PATTERN}
+            title={LICENSE_PLATE_HINT}
+            autoComplete="off"
             defaultValue={initial?.licensePlate}
+            onInput={(e) => {
+              const input = e.currentTarget;
+              const upper = input.value.toUpperCase();
+              if (upper !== input.value) {
+                const caret = input.selectionStart;
+                input.value = upper;
+                input.setSelectionRange(caret, caret);
+              }
+            }}
             className={inputClassName}
           />
         </div>

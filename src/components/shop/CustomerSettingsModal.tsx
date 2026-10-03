@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
 import { SuggestField } from "@/components/SuggestField";
 import { DeliveryMethodSelect, type DeliveryMethod } from "@/components/shop/DeliveryMethodSelect";
@@ -8,6 +8,8 @@ import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
 import { getMyProfile, updateMyProfile } from "@/actions/shop/settings";
 import type { DELIVERY_METHOD_VALUES } from "@/lib/validators/customer-settings";
+import { EmailVerificationPanel } from "@/components/shop/EmailVerificationPanel";
+import { EMAIL_VERIFIED_EVENT } from "@/lib/email-verification-shared";
 
 type AccountDeliveryMethod = (typeof DELIVERY_METHOD_VALUES)[number];
 
@@ -31,6 +33,9 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
+  // The address as saved on the account (the field above may be mid-edit).
+  const [savedEmail, setSavedEmail] = useState("");
+  const [emailVerified, setEmailVerified] = useState(true);
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -41,15 +46,16 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
   const [apartment, setApartment] = useState("");
   const [terminal, setTerminal] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    getMyProfile().then((profile) => {
-      if (cancelled) return;
+  const loadProfile = useCallback((isCancelled: () => boolean = () => false) => {
+    return getMyProfile().then((profile) => {
+      if (isCancelled()) return;
       setLoading(false);
       if (!profile) return;
       setLastName(profile.lastName ?? "");
       setFirstName(profile.firstName ?? "");
       setEmail(profile.email ?? "");
+      setSavedEmail(profile.email ?? "");
+      setEmailVerified(profile.emailVerified);
       setCompanyName(profile.companyName);
       setDeliveryMethod(
         profile.deliveryMethod ? DELIVERY_METHOD_FROM_ACCOUNT[profile.deliveryMethod] : null
@@ -60,9 +66,20 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
       setApartment(profile.apartment ?? "");
       setTerminal(profile.terminal ?? "");
     });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadProfile(() => cancelled);
     return () => {
       cancelled = true;
     };
+  }, [loadProfile]);
+
+  useEffect(() => {
+    const onVerified = () => setEmailVerified(true);
+    window.addEventListener(EMAIL_VERIFIED_EVENT, onVerified);
+    return () => window.removeEventListener(EMAIL_VERIFIED_EVENT, onVerified);
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -86,6 +103,9 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
     });
 
     setSubmitting(false);
+    // A changed address resets confirmation -- pick up the new state either
+    // way (the save itself may succeed even if mailing the code failed).
+    await loadProfile();
     if (!result.ok) {
       setError(result.error);
       return;
@@ -129,8 +149,34 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label htmlFor="settings-email" className="text-sm text-foreground/60">
+            <label
+              htmlFor="settings-email"
+              className="flex items-center gap-2 text-sm text-foreground/60"
+            >
               Email
+              {emailVerified ? (
+                <span
+                  className="inline-flex items-center gap-1 text-green-600"
+                  title="Адрес подтверждён"
+                  aria-label="Адрес подтверждён"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-xs">подтверждён</span>
+                </span>
+              ) : (
+                <span className="text-xs text-red-600">не подтверждён</span>
+              )}
             </label>
             <input
               id="settings-email"
@@ -140,6 +186,14 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
             />
+            {!emailVerified && savedEmail && (
+              <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                <p className="mb-2 text-sm text-foreground/70">
+                  Введите код из письма, отправленного на {savedEmail}
+                </p>
+                <EmailVerificationPanel email={savedEmail} showHeading={false} />
+              </div>
+            )}
           </div>
 
           <div>

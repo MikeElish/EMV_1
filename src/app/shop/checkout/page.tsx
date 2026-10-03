@@ -12,6 +12,7 @@ import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
 import { SuggestField } from "@/components/SuggestField";
 import { Modal } from "@/components/Modal";
+import { EmailVerificationPanel } from "@/components/shop/EmailVerificationPanel";
 import {
   DeliveryMethodSelect,
   DELIVERY_LABELS,
@@ -49,8 +50,7 @@ const DELIVERY_METHOD_FROM_ACCOUNT: Record<string, DeliveryMethod> = {
 function digitsFromPhoneInput(raw: string): string {
   const allDigits = raw.replace(/\D/g, "");
   if (!allDigits) return "";
-  const normalized =
-    allDigits[0] === "7" || allDigits[0] === "8" ? allDigits.slice(1) : allDigits;
+  const normalized = allDigits[0] === "7" || allDigits[0] === "8" ? allDigits.slice(1) : allDigits;
   return normalized.slice(0, 10);
 }
 
@@ -93,6 +93,12 @@ export default function CheckoutPage() {
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // Set once signed in with an unconfirmed address: the order waits until
+  // the 6-digit code from the letter is entered.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [codeSendError, setCodeSendError] = useState<string | undefined>();
+  const [authStep, setAuthStep] = useState<"password" | "code">("password");
+
   const ndsAmount = Math.round(totalAmount * 0.22);
 
   useEffect(() => {
@@ -119,6 +125,7 @@ export default function CheckoutPage() {
     getMyProfile().then((profile) => {
       if (cancelled) return;
       setIsCustomer(profile !== null);
+      if (profile && !profile.emailVerified) setUnverifiedEmail(profile.email);
       const accountMethod = profile?.deliveryMethod
         ? DELIVERY_METHOD_FROM_ACCOUNT[profile.deliveryMethod]
         : null;
@@ -173,7 +180,10 @@ export default function CheckoutPage() {
       customerPhone: formatRuPhone(phoneDigits),
       customerEmail,
       deliveryNote: deliveryNoteLines.join("\n"),
-      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      items: items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+      })),
     });
 
     setSubmitting(false);
@@ -223,6 +233,13 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (isCustomer && unverifiedEmail) {
+      setAuthStep("code");
+      setCodeSendError(undefined);
+      setPasswordModalOpen(true);
+      return;
+    }
+
     if (!isCustomer) {
       // Not signed in yet -- the password modal handles registering or
       // logging the shopper in before the order itself is created.
@@ -232,6 +249,7 @@ export default function CheckoutPage() {
       setEmailExists(exists);
       setPassword("");
       setAuthError(null);
+      setAuthStep("password");
       setPasswordModalOpen(true);
       return;
     }
@@ -243,7 +261,10 @@ export default function CheckoutPage() {
     event.preventDefault();
     setAuthError(null);
     setAuthSubmitting(true);
-    const authResult = await registerOrLoginCustomer({ email: customerEmail, password });
+    const authResult = await registerOrLoginCustomer({
+      email: customerEmail,
+      password,
+    });
     setAuthSubmitting(false);
 
     if (!authResult.ok) {
@@ -251,8 +272,20 @@ export default function CheckoutPage() {
       return;
     }
 
-    setPasswordModalOpen(false);
     setIsCustomer(true);
+    if (!authResult.emailVerified) {
+      setUnverifiedEmail(customerEmail.trim());
+      setCodeSendError(authResult.sendError);
+      setAuthStep("code");
+      return;
+    }
+    setPasswordModalOpen(false);
+    await submitOrder();
+  }
+
+  async function handleEmailVerified() {
+    setUnverifiedEmail(null);
+    setPasswordModalOpen(false);
     await submitOrder();
   }
 
@@ -260,10 +293,7 @@ export default function CheckoutPage() {
     return (
       <section className="mx-auto max-w-2xl px-6 py-16 text-center">
         <h1 className="text-2xl font-bold">Корзина пуста</h1>
-        <Link
-          href="/shop"
-          className="mt-6 inline-block text-sm underline underline-offset-4"
-        >
+        <Link href="/shop" className="mt-6 inline-block text-sm underline underline-offset-4">
           Перейти в каталог
         </Link>
       </section>
@@ -308,8 +338,7 @@ export default function CheckoutPage() {
 
             {(deliveryMethod === "address" || deliveryMethod === "terminal") && (
               <p className="mt-4 border-t border-foreground/10 pt-4 text-sm text-foreground/50">
-                Доставка осуществляется силами транспортной компании «Деловые
-                линии»
+                Доставка осуществляется силами транспортной компании «Деловые линии»
               </p>
             )}
 
@@ -330,9 +359,7 @@ export default function CheckoutPage() {
             {deliveryMethod === "address" && (
               <div className="mt-3 space-y-3">
                 <div className="flex items-center gap-3">
-                  <label className="w-32 shrink-0 text-sm text-foreground/60">
-                    Адрес доставки
-                  </label>
+                  <label className="w-32 shrink-0 text-sm text-foreground/60">Адрес доставки</label>
                   <SuggestField
                     value={settlement}
                     onChange={setSettlement}
@@ -456,37 +483,48 @@ export default function CheckoutPage() {
                 : "Зарегистрироваться и заказать"}
           </button>
           <p className="mt-3 text-center text-xs text-foreground/40">
-            Онлайн-оплата появится на следующем этапе — пока заказ передаётся
-            менеджеру для подтверждения.
+            Онлайн-оплата появится на следующем этапе — пока заказ передаётся менеджеру для
+            подтверждения.
           </p>
         </form>
       </div>
 
       {passwordModalOpen && (
         <Modal onClose={() => setPasswordModalOpen(false)} maxWidthClassName="max-w-sm">
-          <h2 className="text-lg font-bold">
-            {emailExists ? "Введите пароль" : "Новый пароль"}
-          </h2>
-          <p className="mt-1 text-sm text-foreground/60">{customerEmail}</p>
-          <form onSubmit={handlePasswordConfirm} className="mt-4 space-y-4">
-            <input
-              type="password"
+          {authStep === "code" && unverifiedEmail ? (
+            <EmailVerificationPanel
+              email={unverifiedEmail}
+              sendError={codeSendError}
               autoFocus
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+              onVerified={handleEmailVerified}
             />
-            {authError && <p className="text-sm text-red-600">{authError}</p>}
-            <button
-              type="submit"
-              disabled={authSubmitting}
-              className="w-full rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {authSubmitting ? "..." : "Продолжить"}
-            </button>
-          </form>
+          ) : (
+            <>
+              <h2 className="text-lg font-bold">
+                {emailExists ? "Введите пароль" : "Новый пароль"}
+              </h2>
+              <p className="mt-1 text-sm text-foreground/60">{customerEmail}</p>
+              <form onSubmit={handlePasswordConfirm} className="mt-4 space-y-4">
+                <input
+                  type="password"
+                  autoFocus
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+                />
+                {authError && <p className="text-sm text-red-600">{authError}</p>}
+                <button
+                  type="submit"
+                  disabled={authSubmitting}
+                  className="w-full rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {authSubmitting ? "..." : "Продолжить"}
+                </button>
+              </form>
+            </>
+          )}
         </Modal>
       )}
     </section>

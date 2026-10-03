@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validators/checkout";
 import { getAdminSession } from "@/lib/session";
 import { generateOrderNumber } from "@/lib/order-number-db";
+import { needsEmailVerification } from "@/lib/email-verification";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -43,14 +44,23 @@ export async function createOrder(
     };
   });
 
-  const orderNumber = await generateOrderNumber();
-
   // Guest checkout stays the default -- if the shopper happens to be logged
   // in as a Покупатель at the moment of checkout, the order is silently
   // linked to their account so it shows up under "Мои заказы".
   const session = await getAdminSession();
   const userId = session?.role === "CUSTOMER" ? session.userId : null;
 
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, email: true, emailVerifiedAt: true },
+    });
+    if (user && needsEmailVerification(user)) {
+      return { ok: false, error: "Подтвердите электронную почту — код отправлен на ваш адрес" };
+    }
+  }
+
+  const orderNumber = await generateOrderNumber();
   const order = await prisma.order.create({
     data: {
       orderNumber,
