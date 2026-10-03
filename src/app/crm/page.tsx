@@ -4,14 +4,20 @@ import { getAdminSession } from "@/lib/session";
 import { Logo } from "@/components/Logo";
 import { CrmLoginForm } from "@/components/crm/CrmLoginForm";
 
-export default async function CrmLoginPage() {
+// Only the customer's own orders page may be the target of ?next=.
+function customerNextPath(value: unknown): string | undefined {
+  return typeof value === "string" && /^\/shop\/orders(\?|$)/.test(value) ? value : undefined;
+}
+
+export default async function CrmLoginPage({ searchParams }: PageProps<"/crm">) {
+  const customerNext = customerNextPath((await searchParams).next);
   const session = await getAdminSession();
   if (session?.userId) {
     redirect(
       session.role === "OWNER"
         ? "/admin"
         : session.role === "CUSTOMER"
-          ? "/shop"
+          ? (customerNext ?? "/shop")
           : "/crm/cabinet"
     );
   }
@@ -23,7 +29,7 @@ export default async function CrmLoginPage() {
           <Logo className="h-14 w-14" />
           <span className="text-lg leading-none text-white/80">crm</span>
         </Link>
-        <CrmLoginForm />
+        <CrmLoginForm customerNext={customerNext} />
       </div>
     </main>
   );

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
+import { releaseAwaitingSupply } from "@/lib/order-status";
 import {
   csvRowSchema,
   IMPORT_COLUMN_ORDER,
@@ -228,6 +229,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
   // "Новое поступление" rotator) via an exact newArrivalAt match.
   const importedAt = new Date();
   const markups = await getMarkups();
+  const restockedIds: string[] = [];
 
   for (const row of rows) {
     const category = await prisma.category.findUnique({ where: { id: row.categoryId } });
@@ -276,6 +278,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
             pricing: { upsert: { create: pricing, update: pricing } },
           },
         });
+        if (restocked) restockedIds.push(existing.id);
         updated++;
       } else {
         await prisma.product.create({
@@ -288,7 +291,10 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
     }
   }
 
+  await releaseAwaitingSupply(restockedIds);
+
   revalidatePath("/admin/crm/products");
+  revalidatePath("/admin/crm/orders");
   revalidatePath("/shop");
   revalidatePath("/shop/cart");
 

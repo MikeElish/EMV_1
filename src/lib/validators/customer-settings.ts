@@ -7,6 +7,12 @@ export const customerSettingsSchema = z
     lastName: z.string().trim().optional(),
     firstName: z.string().trim().optional(),
     email: z.string().trim().email("Некорректный email"),
+    phone: z
+      .union([
+        z.string().trim().regex(/^\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}$/, "Введите номер телефона полностью"),
+        z.literal(""),
+      ])
+      .optional(),
     currentPassword: z.string().optional(),
     newPassword: z.union([z.string().min(6, "Минимум 6 символов"), z.literal("")]).optional(),
     deliveryMethod: z.enum(DELIVERY_METHOD_VALUES).optional(),

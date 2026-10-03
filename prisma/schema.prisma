@@ -13,6 +13,12 @@ enum OrderStatus {
   SHIPPED_AWAITING_PAYMENT
   CANCELLED
   DONE
+  // Something ordered is not in stock -- staff check it (Проценка).
+  CHECKING
+  // In stock and paid (or on agreed deferral).
+  READY_TO_SHIP
+  // Not in stock, paid (or on agreed deferral) -- waits for the supplier.
+  AWAITING_SUPPLY
 }
 
 enum OrderDocumentCategory {
@@ -124,8 +130,13 @@ model Order {
   customerPhone      String
   customerEmail      String?
   deliveryNote       String?
+  // Derived from the lines: their common status, or the least advanced one
+  // while they differ (src/lib/order-status.ts).
   status             OrderStatus     @default(AWAITING_PAYMENT)
-  paid               Boolean         @default(false)
+  paid              Boolean         @default(false)
+  // "Отсрочка": payment after shipment is agreed for this order. Taken from
+  // the customer company's terms at creation, editable in CRM → Заказы.
+  deferred           Boolean         @default(false)
   deliveryDate       DateTime?
   // Set once, automatically, the first time the order enters
   // SHIPPED_AWAITING_PAYMENT -- distinct from deliveryDate, which staff set
@@ -170,8 +181,18 @@ model OrderItem {
   priceSnapshot Int
   quantity      Int
   cancelled     Boolean @default(false)
+  // Each line moves through the statuses on its own; cancelled mirrors
+  // status == CANCELLED.
+  status              OrderStatus @default(AWAITING_PAYMENT)
+  // Changed while the rest of the order sits in other statuses: the customer
+  // gets one summary letter at the next 5-minute mark.
+  statusNotifyPending Boolean     @default(false)
+  // Shipped lines have been taken off Product.stock.
+  stockWrittenOff     Boolean     @default(false)
 
   @@index([orderId])
+  @@index([productId, status])
+  @@index([statusNotifyPending])
 }
 
 model Payment {

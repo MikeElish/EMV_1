@@ -12,5 +12,5 @@ const TABS = [
 ];
 
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
-  return <NavTabs tabs={TABS}>{children}</NavTabs>;
+  return <NavTabs tabs={TABS} fill>{children}</NavTabs>;
 }

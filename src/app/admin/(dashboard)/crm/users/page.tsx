@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { UsersTable } from "@/components/admin/UsersTable";
 
 export default async function CrmUsersPage() {
@@ -25,8 +26,8 @@ export default async function CrmUsersPage() {
   ]);
 
   return (
-    <div className="overflow-x-auto">
+    <CrmPage>
       <UsersTable users={users} companies={companies} />
-    </div>
+    </CrmPage>
   );
 }

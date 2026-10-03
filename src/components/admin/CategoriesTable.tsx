@@ -1,5 +1,6 @@
 "use client";
 
+import { CrmPage, CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -31,7 +32,7 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
   }, [categories, search]);
 
   return (
-    <div>
+    <CrmPage>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -51,8 +52,9 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
       ) : filtered.length === 0 ? (
         <p className="mt-4 text-sm text-foreground/40">Ничего не найдено.</p>
       ) : (
-        <table className="mt-4 w-full text-sm">
-          <thead>
+        <CrmTableScroll>
+        <table className="w-full text-sm">
+          <thead className={STICKY_THEAD}>
             <tr className="border-b border-foreground/10 text-left text-foreground/50">
               <th className="py-2">Название</th>
               <th className="py-2">Slug</th>
@@ -73,6 +75,7 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
             ))}
           </tbody>
         </table>
+        </CrmTableScroll>
       )}
 
       {selected && (
@@ -97,6 +100,6 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
           </div>
         </Modal>
       )}
-    </div>
+    </CrmPage>
   );
 }

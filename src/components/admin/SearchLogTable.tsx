@@ -1,5 +1,6 @@
 "use client";
 
+import { CrmPage, CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { utils, write } from "xlsx";
@@ -47,7 +48,7 @@ export function SearchLogTable({
   }, [logs, search]);
 
   return (
-    <div>
+    <CrmPage>
       <div className="mt-6 flex items-center justify-between">
         <select
           value={selectedBrand}
@@ -77,8 +78,9 @@ export function SearchLogTable({
         </div>
       </div>
 
-      <table className="mt-6 w-full text-sm">
-        <thead>
+      <CrmTableScroll className="mt-6">
+      <table className="w-full text-sm">
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-foreground/10 text-left text-foreground/50">
             <th className="py-2">Бренд</th>
             <th className="py-2">Наименование</th>
@@ -124,8 +126,9 @@ export function SearchLogTable({
           })}
         </tbody>
       </table>
+      </CrmTableScroll>
 
       {filtered.length === 0 && <p className="mt-6 text-foreground/60">Ничего не найдено.</p>}
-    </div>
+    </CrmPage>
   );
 }

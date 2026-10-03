@@ -16,6 +16,7 @@ export type MyProfile = {
   lastName: string | null;
   firstName: string | null;
   email: string | null;
+  phone: string | null;
   emailVerified: boolean;
   companyName: string | null;
   deliveryMethod: string | null;
@@ -40,6 +41,7 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     lastName: user.lastName,
     firstName: user.firstName,
     email: user.email,
+    phone: user.phone,
     emailVerified: !!user.emailVerifiedAt,
     companyName: user.company?.name ?? null,
     deliveryMethod: user.defaultDeliveryMethod,
@@ -93,6 +95,7 @@ export async function updateMyProfile(input: CustomerSettingsInput): Promise<Act
       lastName: data.lastName || null,
       firstName: data.firstName || null,
       email: data.email,
+      phone: data.phone || null,
       // A new address has to be confirmed again.
       ...(emailChanged ? { login: data.email, emailVerifiedAt: null } : {}),
       ...(passwordHash ? { passwordHash } : {}),

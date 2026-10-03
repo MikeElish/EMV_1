@@ -2,12 +2,14 @@ import { getPaymentDisplayStatus } from "@/lib/validators/payment-status";
 
 export function PaymentStatusBadge({
   paid,
+  deferred,
   plannedPaymentDate,
 }: {
   paid: boolean;
+  deferred?: boolean;
   plannedPaymentDate: Date | null;
 }) {
-  const status = getPaymentDisplayStatus({ paid, plannedPaymentDate });
+  const status = getPaymentDisplayStatus({ paid, deferred, plannedPaymentDate });
 
   if (status.kind === "paid") {
     return <span className="text-green-600 dark:text-green-500">Оплачено</span>;
@@ -15,6 +17,10 @@ export function PaymentStatusBadge({
 
   if (status.kind === "unpaid") {
     return <span className="text-red-600 dark:text-red-500">Не оплачено</span>;
+  }
+
+  if (status.kind === "agreed") {
+    return <span className="text-yellow-600 dark:text-yellow-500">Отсрочка</span>;
   }
 
   const colorClass = status.graceActive

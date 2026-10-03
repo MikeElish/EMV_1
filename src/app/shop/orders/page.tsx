@@ -10,10 +10,13 @@ const DOCUMENT_CATEGORIES = Object.keys(
   ORDER_DOCUMENT_CATEGORY_LABELS
 ) as OrderDocumentCategory[];
 
-export default async function MyOrdersPage() {
+export default async function MyOrdersPage({ searchParams }: PageProps<"/shop/orders">) {
+  const query = await searchParams;
+  const orderNumber = typeof query.orderNumber === "string" ? query.orderNumber : undefined;
   const session = await getAdminSession();
   if (!session?.userId || session.role !== "CUSTOMER") {
-    redirect("/crm");
+    const back = orderNumber ? `/shop/orders?orderNumber=${encodeURIComponent(orderNumber)}` : "/shop/orders";
+    redirect(`/crm?next=${encodeURIComponent(back)}`);
   }
 
   const orders = await prisma.order.findMany({
@@ -39,7 +42,7 @@ export default async function MyOrdersPage() {
     <div className="mx-auto max-w-6xl px-6 py-10">
       <h1 className="text-2xl font-bold">Мои заказы</h1>
       <div className="mt-6 overflow-x-auto">
-        <CustomerOrdersTable orders={ordersWithLatestDocs} />
+        <CustomerOrdersTable orders={ordersWithLatestDocs} initialOrderNumber={orderNumber} />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { SearchLogTable } from "@/components/admin/SearchLogTable";
 
 export default async function AdminSearchPage({
@@ -21,9 +22,9 @@ export default async function AdminSearchPage({
   ]);
 
   return (
-    <div>
+    <CrmPage>
       <h1 className="text-2xl font-bold">Поиск</h1>
       <SearchLogTable logs={logs} brands={brandRows.map((b) => b.brand)} selectedBrand={brand ?? ""} />
-    </div>
+    </CrmPage>
   );
 }

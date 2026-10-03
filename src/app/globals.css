@@ -24,16 +24,33 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Manual light/dark switch for the "Магазин запчастей" section only --
-   scoped to the #shop-root wrapper so it overrides the OS-driven :root
-   theme for every page under /shop, independent of the rest of the site. */
-[data-shop-theme="light"] {
+/* Manual light/dark switch for "Магазин запчастей" (#shop-root) and the
+   admin (#admin-root) -- each overrides the OS-driven :root theme for its own
+   pages, independent of the rest of the site. */
+[data-shop-theme="light"],
+[data-admin-theme="light"] {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
 }
-[data-shop-theme="dark"] {
+[data-shop-theme="dark"],
+[data-admin-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
+  color-scheme: dark;
+}
+
+/* dark: utilities follow the section's manual switch (shop, admin) and the
+   OS everywhere else. */
+@custom-variant dark {
+  &:where([data-shop-theme="dark"] *, [data-admin-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:not(:where([data-shop-theme="light"] *, [data-admin-theme="light"] *)) {
+      @slot;
+    }
+  }
 }
 
 /* Native scrollbars default to an opaque track on Windows/Edge. This keeps
@@ -72,47 +89,22 @@ body {
   }
 }
 
-/* Order status badges ("Мои заказы"): a smoothly pulsing border/glow on
-   statuses that still need attention (awaiting payment, in progress,
-   shipped-awaiting-payment) -- same box-shadow-pulse technique as
-   .search-bar-drop-pulse above, one color per status. Terminal statuses
-   (cancelled, done) render with a static border instead, no class needed. */
-.status-blink-yellow {
-  animation: status-blink-yellow 1.6s ease-in-out infinite;
+/* Order status badges ("Мои заказы"): on statuses that still need
+   attention the border smoothly fades out and back in. Only the 50% frame is
+   given, so the start/end colour is the badge's own border-* class -- one
+   rule for every colour. Terminal statuses (cancelled, done) keep a static
+   border. */
+.status-blink {
+  animation: status-border-fade 1.8s ease-in-out infinite;
 }
-@keyframes status-blink-yellow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.55);
-  }
+@keyframes status-border-fade {
   50% {
-    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0);
+    border-color: transparent;
   }
 }
-
-.status-blink-green {
-  animation: status-blink-green 1.6s ease-in-out infinite;
-}
-@keyframes status-blink-green {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0);
-  }
-}
-
-.status-blink-blue {
-  animation: status-blink-blue 1.6s ease-in-out infinite;
-}
-@keyframes status-blink-blue {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0);
+@media (prefers-reduced-motion: reduce) {
+  .status-blink {
+    animation: none;
   }
 }
 

@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/actions/admin/auth";
 
-export function CrmLoginForm() {
+/** Where a customer goes after signing in, e.g. a link from an order letter. */
+export function CrmLoginForm({ customerNext }: { customerNext?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -31,7 +32,7 @@ export function CrmLoginForm() {
       result.role === "OWNER"
         ? "/admin"
         : result.role === "CUSTOMER"
-          ? "/shop"
+          ? (customerNext ?? "/shop")
           : "/crm/cabinet"
     );
     router.refresh();

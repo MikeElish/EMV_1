@@ -10,6 +10,7 @@ import { getMyProfile, updateMyProfile } from "@/actions/shop/settings";
 import type { DELIVERY_METHOD_VALUES } from "@/lib/validators/customer-settings";
 import { EmailVerificationPanel } from "@/components/shop/EmailVerificationPanel";
 import { EMAIL_VERIFIED_EVENT } from "@/lib/email-verification-shared";
+import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
 
 type AccountDeliveryMethod = (typeof DELIVERY_METHOD_VALUES)[number];
 
@@ -33,6 +34,7 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneDigits, setPhoneDigits] = useState("");
   // The address as saved on the account (the field above may be mid-edit).
   const [savedEmail, setSavedEmail] = useState("");
   const [emailVerified, setEmailVerified] = useState(true);
@@ -54,6 +56,7 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
       setLastName(profile.lastName ?? "");
       setFirstName(profile.firstName ?? "");
       setEmail(profile.email ?? "");
+      setPhoneDigits(profile.phone ? digitsFromPhoneInput(profile.phone) : "");
       setSavedEmail(profile.email ?? "");
       setEmailVerified(profile.emailVerified);
       setCompanyName(profile.companyName);
@@ -86,12 +89,17 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     setError(null);
     setSuccess(false);
+    if (phoneDigits && phoneDigits.length !== 10) {
+      setError("Введите номер телефона полностью");
+      return;
+    }
     setSubmitting(true);
 
     const result = await updateMyProfile({
       lastName: lastName || undefined,
       firstName: firstName || undefined,
       email,
+      phone: phoneDigits ? formatRuPhone(phoneDigits) : "",
       currentPassword: currentPassword || undefined,
       newPassword: newPassword || undefined,
       deliveryMethod: deliveryMethod ? DELIVERY_METHOD_TO_ACCOUNT[deliveryMethod] : undefined,
@@ -194,6 +202,21 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
                 <EmailVerificationPanel email={savedEmail} showHeading={false} />
               </div>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="settings-phone" className="text-sm text-foreground/60">
+              Телефон
+            </label>
+            <input
+              id="settings-phone"
+              type="tel"
+              inputMode="numeric"
+              value={phoneDigits ? formatRuPhone(phoneDigits) : ""}
+              onChange={(e) => setPhoneDigits(digitsFromPhoneInput(e.target.value))}
+              placeholder="+7 (___) ___-__-__"
+              className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+            />
           </div>
 
           <div>

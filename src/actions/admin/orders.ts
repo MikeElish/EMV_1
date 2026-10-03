@@ -8,54 +8,63 @@ import {
   uploadOrderDocumentFile,
   deleteOrderDocumentFile,
 } from "@/lib/order-document-storage";
+import { applyPaymentTerms, setLineStatuses } from "@/lib/order-status";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
-export async function updateOrderStatus(
-  id: string,
-  status: OrderStatus
+function revalidateOrders() {
+  revalidatePath("/admin/crm/orders");
+  revalidatePath("/admin/crm/products");
+  revalidatePath("/shop/orders");
+}
+
+/** Status of one line, or (scope "order") of every line of its order that isn't cancelled. */
+export async function updateOrderItemStatus(
+  itemId: string,
+  status: OrderStatus,
+  scope: "item" | "order" = "item"
 ): Promise<ActionResult> {
   await verifyAdminSession();
 
   if (!Object.values(OrderStatus).includes(status)) {
     return { ok: false, error: "Некорректный статус" };
   }
+  const item = await prisma.orderItem.findUnique({
+    where: { id: itemId },
+    select: { id: true, orderId: true, order: { select: { items: { select: { id: true, status: true } } } } },
+  });
+  if (!item) return { ok: false, error: "Позиция не найдена" };
 
-  const data: { status: OrderStatus; shippedAt?: Date; plannedPaymentDate?: Date } = { status };
-
-  if (status === "SHIPPED_AWAITING_PAYMENT") {
-    const order = await prisma.order.findUnique({
-      where: { id },
-      select: {
-        shippedAt: true,
-        user: { select: { company: { select: { paymentType: true, paymentDeferralDays: true } } } },
-      },
-    });
-
-    // Only stamped the first time the order is shipped -- re-entering this
-    // status later (e.g. after a correction) doesn't push the date forward.
-    const shippedAt = order?.shippedAt ?? new Date();
-    data.shippedAt = shippedAt;
-
-    const company = order?.user?.company;
-    if (company?.paymentType === "DEFERRED" && company.paymentDeferralDays) {
-      const planned = new Date(shippedAt);
-      planned.setDate(planned.getDate() + company.paymentDeferralDays);
-      data.plannedPaymentDate = planned;
-    }
-  }
-
-  await prisma.order.update({ where: { id }, data });
-  revalidatePath("/admin/crm/orders");
+  const targets =
+    scope === "order"
+      ? item.order.items.filter((i) => i.id === item.id || i.status !== "CANCELLED").map((i) => i.id)
+      : [item.id];
+  await setLineStatuses(
+    item.orderId,
+    targets.map((id) => ({ itemId: id, status })),
+    { notify: true }
+  );
+  revalidateOrders();
   return { ok: true };
 }
 
-export async function updatePaid(id: string, paid: boolean): Promise<ActionResult> {
+export type PaymentState = "paid" | "unpaid" | "deferred";
+
+export async function updatePaymentState(id: string, state: PaymentState): Promise<ActionResult> {
   await verifyAdminSession();
-  await prisma.order.update({ where: { id }, data: { paid } });
-  revalidatePath("/admin/crm/orders");
+  if (!["paid", "unpaid", "deferred"].includes(state)) return { ok: false, error: "Некорректный статус оплаты" };
+
+  await prisma.order.update({
+    where: { id },
+    data:
+      state === "paid"
+        ? { paid: true }
+        : { paid: false, deferred: state === "deferred" },
+  });
+  await applyPaymentTerms(id);
+  revalidateOrders();
   return { ok: true };
 }
 
@@ -74,8 +83,13 @@ export async function updateDeliveryDate(
 
 export async function cancelOrderAsStaff(id: string): Promise<ActionResult> {
   await verifyAdminSession();
-  await prisma.order.update({ where: { id }, data: { status: "CANCELLED" } });
-  revalidatePath("/admin/crm/orders");
+  const items = await prisma.orderItem.findMany({ where: { orderId: id }, select: { id: true } });
+  await setLineStatuses(
+    id,
+    items.map((i) => ({ itemId: i.id, status: "CANCELLED" as const })),
+    { notify: true }
+  );
+  revalidateOrders();
   return { ok: true };
 }
 

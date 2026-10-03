@@ -8,12 +8,13 @@ import { OrderActionMenu, type LatestDocs } from "@/components/shop/OrderActionM
 import { OrderStatusBadge } from "@/components/shop/OrderStatusBadge";
 import { PaymentStatusBadge } from "@/components/shop/PaymentStatusBadge";
 import { SuggestField } from "@/components/SuggestField";
-import type { Order, OrderItem, OrderStatus } from "@prisma/client";
+import type { Order, OrderItem } from "@prisma/client";
 
-function paymentStatusText(order: Pick<Order, "paid" | "plannedPaymentDate">): string {
+function paymentStatusText(order: Pick<Order, "paid" | "deferred" | "plannedPaymentDate">): string {
   const status = getPaymentDisplayStatus(order);
   if (status.kind === "paid") return "Оплачено";
   if (status.kind === "unpaid") return "Не оплачено";
+  if (status.kind === "agreed") return "Отсрочка";
   return `План оплаты ${status.date.toLocaleDateString("ru-RU")}`;
 }
 
@@ -45,8 +46,7 @@ const COLUMNS: {
   {
     key: "status",
     label: "Статус",
-    accessor: (r) =>
-      r.item.cancelled ? "Отменено" : ORDER_STATUS_LABELS[r.order.status as OrderStatus],
+    accessor: (r) => ORDER_STATUS_LABELS[r.item.status],
   },
   {
     key: "deliveryDate",
@@ -57,8 +57,17 @@ const COLUMNS: {
   { key: "paid", label: "Оплата", accessor: (r) => paymentStatusText(r.order) },
 ];
 
-export function CustomerOrdersTable({ orders }: { orders: OrderWithExtras[] }) {
-  const [filters, setFilters] = useState<Record<string, string>>({});
+export function CustomerOrdersTable({
+  orders,
+  initialOrderNumber,
+}: {
+  orders: OrderWithExtras[];
+  /** From ?orderNumber= -- the link in the status letters. */
+  initialOrderNumber?: string;
+}) {
+  const [filters, setFilters] = useState<Record<string, string>>(
+    initialOrderNumber ? { orderNumber: initialOrderNumber } : {}
+  );
 
   const rows: Row[] = useMemo(
     () => orders.flatMap((order) => order.items.map((item) => ({ order, item }))),
@@ -134,7 +143,7 @@ export function CustomerOrdersTable({ orders }: { orders: OrderWithExtras[] }) {
               <td className="py-2 pr-4">{formatRub(item.priceSnapshot)}</td>
               <td className="py-2 pr-4">{formatRub(item.priceSnapshot * item.quantity)}</td>
               <td className="py-2 pr-4">
-                <OrderStatusBadge status={order.status as OrderStatus} cancelled={item.cancelled} />
+                <OrderStatusBadge status={item.status} />
               </td>
               <td className="py-2 pr-4">
                 {order.deliveryDate
@@ -142,7 +151,11 @@ export function CustomerOrdersTable({ orders }: { orders: OrderWithExtras[] }) {
                   : "—"}
               </td>
               <td className="py-2 pr-4">
-                <PaymentStatusBadge paid={order.paid} plannedPaymentDate={order.plannedPaymentDate} />
+                <PaymentStatusBadge
+                  paid={order.paid}
+                  deferred={order.deferred}
+                  plannedPaymentDate={order.plannedPaymentDate}
+                />
               </td>
               <td className="py-2 pr-4">
                 <OrderActionMenu

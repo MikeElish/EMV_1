@@ -5,6 +5,7 @@ import { checkoutSchema, type CheckoutInput } from "@/lib/validators/checkout";
 import { getAdminSession } from "@/lib/session";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { needsEmailVerification } from "@/lib/email-verification";
+import { aggregateOrderStatus, initialLineStatuses } from "@/lib/order-status";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -50,16 +51,29 @@ export async function createOrder(
   const session = await getAdminSession();
   const userId = session?.role === "CUSTOMER" ? session.userId : null;
 
+  let deferred = false;
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true, email: true, emailVerifiedAt: true },
+      select: {
+        role: true,
+        email: true,
+        phone: true,
+        emailVerifiedAt: true,
+        company: { select: { paymentType: true } },
+      },
     });
     if (user && needsEmailVerification(user)) {
       return { ok: false, error: "Подтвердите электронную почту — код отправлен на ваш адрес" };
     }
+    deferred = user?.company?.paymentType === "DEFERRED";
+    // First order of an account without a phone: remember it for next time.
+    if (user && !user.phone) {
+      await prisma.user.update({ where: { id: userId }, data: { phone: customerPhone } });
+    }
   }
 
+  const statuses = await initialLineStatuses(orderItemsData, deferred);
   const orderNumber = await generateOrderNumber();
   const order = await prisma.order.create({
     data: {
@@ -70,7 +84,9 @@ export async function createOrder(
       deliveryNote,
       totalAmount,
       userId,
-      items: { create: orderItemsData },
+      deferred,
+      status: aggregateOrderStatus(statuses),
+      items: { create: orderItemsData.map((item, i) => ({ ...item, status: statuses[i] })) },
     },
   });
 

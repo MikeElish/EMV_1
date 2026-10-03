@@ -1,43 +1,47 @@
 "use client";
 
 import { useLayoutEffect, useState } from "react";
+import { THEME_SCOPES, type ThemeScope } from "@/lib/theme";
 
-const STORAGE_KEY = "shop-theme";
+type Theme = "light" | "dark";
 
-function applyTheme(theme: "light" | "dark") {
-  document.getElementById("shop-root")?.setAttribute("data-shop-theme", theme);
+function applyTheme(scope: ThemeScope, theme: Theme) {
+  const { rootId, attribute } = THEME_SCOPES[scope];
+  document.getElementById(rootId)?.setAttribute(attribute, theme);
 }
 
-// Same fallback as the layout's inline init script (localStorage, else the
-// dark default) -- kept here too because that inline script only runs on a
-// hard page load. A client-side navigation into /shop mounts this component
-// without ever running the inline script, so this is what actually restores
-// the saved theme (or applies the default) for that case.
-function readStoredTheme(): "light" | "dark" {
+// Same fallback as the layouts' inline init scripts -- kept here too because
+// those only run on a hard page load. A client-side navigation into the
+// section mounts this component without ever running the inline script, so
+// this is what restores the saved theme (or the default) in that case.
+function readStoredTheme(scope: ThemeScope): Theme {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(THEME_SCOPES[scope].storageKey);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     // ignore unavailable storage
   }
+  if (scope === "admin") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
   return "dark";
 }
 
-export function ThemeToggle({ light = false }: { light?: boolean }) {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+export function ThemeToggle({ light = false, scope = "shop" }: { light?: boolean; scope?: ThemeScope }) {
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useLayoutEffect(() => {
-    const resolved = readStoredTheme();
-    applyTheme(resolved);
+    const resolved = readStoredTheme(scope);
+    applyTheme(scope, resolved);
     setTheme(resolved);
-  }, []);
+  }, [scope]);
 
   function toggle() {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    applyTheme(next);
+    applyTheme(scope, next);
     try {
-      localStorage.setItem(STORAGE_KEY, next);
+      localStorage.setItem(THEME_SCOPES[scope].storageKey, next);
     } catch {
       // ignore storage write failures (private mode, quota, etc.)
     }
@@ -50,6 +54,7 @@ export function ThemeToggle({ light = false }: { light?: boolean }) {
       type="button"
       onClick={toggle}
       aria-label={isDark ? "Включить светлую тему" : "Включить тёмную тему"}
+      title={isDark ? "Светлая тема" : "Тёмная тема"}
       aria-pressed={isDark}
       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
         light

@@ -8,6 +8,7 @@ import { createOrder } from "@/actions/shop/checkout";
 import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
 import { formatRub, formatRubPrecise } from "@/lib/money";
+import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
 import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
 import { SuggestField } from "@/components/SuggestField";
@@ -42,26 +43,6 @@ const DELIVERY_METHOD_FROM_ACCOUNT: Record<string, DeliveryMethod> = {
   TERMINAL: "terminal",
   PICKUP: "pickup",
 };
-
-// Phone mask: typing 0-6 or 9 starts/extends the significant number; typing
-// 7, 8, or anything non-numeric is treated as the (already implied) "+7 ("
-// trunk prefix and doesn't get inserted -- covers "9...", "89...", "79...",
-// "+79..." all normalizing to the same "+7 (XXX) XXX-XX-XX".
-function digitsFromPhoneInput(raw: string): string {
-  const allDigits = raw.replace(/\D/g, "");
-  if (!allDigits) return "";
-  const normalized = allDigits[0] === "7" || allDigits[0] === "8" ? allDigits.slice(1) : allDigits;
-  return normalized.slice(0, 10);
-}
-
-function formatRuPhone(digits: string): string {
-  let out = "+7 (" + digits.slice(0, 3);
-  if (digits.length >= 3) out += ")";
-  if (digits.length > 3) out += " " + digits.slice(3, 6);
-  if (digits.length > 6) out += "-" + digits.slice(6, 8);
-  if (digits.length > 8) out += "-" + digits.slice(8, 10);
-  return out;
-}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -126,6 +107,18 @@ export default function CheckoutPage() {
       if (cancelled) return;
       setIsCustomer(profile !== null);
       if (profile && !profile.emailVerified) setUnverifiedEmail(profile.email);
+      // A signed-in customer's own contact details win over the last order
+      // typed on this browser (which may have been someone else's).
+      if (profile) {
+        const fullName = [profile.lastName, profile.firstName].filter(Boolean).join(" ");
+        if (fullName) setCustomerName(fullName);
+        if (profile.email) setCustomerEmail(profile.email);
+        const accountPhone = profile.phone ? digitsFromPhoneInput(profile.phone) : "";
+        if (accountPhone) {
+          setPhoneDigits(accountPhone);
+          setPhoneTouched(true);
+        }
+      }
       const accountMethod = profile?.deliveryMethod
         ? DELIVERY_METHOD_FROM_ACCOUNT[profile.deliveryMethod]
         : null;

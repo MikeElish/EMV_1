@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { OrdersTable } from "@/components/admin/OrdersTable";
 
 export default async function CrmOrdersPage({
@@ -8,13 +9,27 @@ export default async function CrmOrdersPage({
   const orderNumber = typeof query.orderNumber === "string" ? query.orderNumber : undefined;
 
   const orders = await prisma.order.findMany({
-    include: { items: { include: { product: { select: { sku: true } } } } },
+    include: {
+      items: {
+        include: { product: { select: { sku: true, stock: true } } },
+        orderBy: { id: "asc" },
+      },
+      user: {
+        select: {
+          lastName: true,
+          firstName: true,
+          patronymic: true,
+          login: true,
+          company: { select: { name: true } },
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 
   return (
-    <div className="overflow-x-auto">
+    <CrmPage>
       <OrdersTable orders={orders} initialOrderNumber={orderNumber} />
-    </div>
+    </CrmPage>
   );
 }

@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { CompaniesTable, type CompanyBalance } from "@/components/admin/CompaniesTable";
-import type { OrderStatus } from "@prisma/client";
-
-const SHIPPED_STATUSES: OrderStatus[] = ["SHIPPED_AWAITING_PAYMENT", "DONE"];
+import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 
 export default async function CrmCompaniesPage() {
   const [companies, managers, orders] = await Promise.all([
@@ -22,6 +21,7 @@ export default async function CrmCompaniesPage() {
         shippedAt: true,
         paid: true,
         totalAmount: true,
+        items: { select: { status: true, priceSnapshot: true, quantity: true } },
         user: { select: { companyId: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -34,7 +34,10 @@ export default async function CrmCompaniesPage() {
     if (!companyId) continue;
 
     const paidAmount = order.paid ? order.totalAmount : 0;
-    const shippedAmount = SHIPPED_STATUSES.includes(order.status) ? order.totalAmount : 0;
+    // Lines ship one by one, so only the shipped ones count.
+    const shippedAmount = order.items
+      .filter((i) => SHIPPED_STATUSES.includes(i.status))
+      .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
 
     const entry = balances[companyId] ?? { balance: 0, orders: [] };
     entry.balance += paidAmount - shippedAmount;
@@ -51,8 +54,8 @@ export default async function CrmCompaniesPage() {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <CrmPage>
       <CompaniesTable companies={companies} managers={managers} balances={balances} />
-    </div>
+    </CrmPage>
   );
 }

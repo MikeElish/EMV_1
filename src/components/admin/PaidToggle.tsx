@@ -1,34 +1,70 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updatePaid } from "@/actions/admin/orders";
+import { updatePaymentState, type PaymentState } from "@/actions/admin/orders";
 
-export function PaidToggle({ orderId, paid }: { orderId: string; paid: boolean }) {
-  const [value, setValue] = useState(paid);
+const OPTIONS: { value: PaymentState; label: string; className: string }[] = [
+  {
+    value: "unpaid",
+    label: "Не оплачено",
+    className: "border-foreground/20 bg-foreground/5 text-foreground/60",
+  },
+  {
+    value: "deferred",
+    label: "Отсрочка",
+    className: "border-yellow-500 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+  },
+  {
+    value: "paid",
+    label: "Оплачено",
+    className: "border-green-600 bg-green-600/10 text-green-700 dark:text-green-500",
+  },
+];
+
+export function paymentStateOf(order: { paid: boolean; deferred: boolean }): PaymentState {
+  return order.paid ? "paid" : order.deferred ? "deferred" : "unpaid";
+}
+
+export const PAYMENT_STATE_LABELS: Record<PaymentState, string> = {
+  unpaid: "Не оплачено",
+  deferred: "Отсрочка",
+  paid: "Оплачено",
+};
+
+/** Оплачено / Не оплачено / Отсрочка. Paid or deferred lets in-stock lines ship. */
+export function PaidToggle({ orderId, state }: { orderId: string; state: PaymentState }) {
+  const [value, setValue] = useState(state);
   const [pending, startTransition] = useTransition();
 
-  function toggle() {
+  const [synced, setSynced] = useState(state);
+  if (state !== synced) {
+    setSynced(state);
+    setValue(state);
+  }
+
+  function change(next: PaymentState) {
     const previous = value;
-    const next = !value;
     setValue(next);
     startTransition(async () => {
-      const result = await updatePaid(orderId, next);
+      const result = await updatePaymentState(orderId, next);
       if (!result.ok) setValue(previous);
     });
   }
 
+  const current = OPTIONS.find((o) => o.value === value)!;
   return (
-    <button
-      type="button"
-      onClick={toggle}
+    <select
+      value={value}
       disabled={pending}
-      className={`rounded-md border px-2 py-1 text-xs transition-opacity hover:opacity-80 disabled:opacity-50 ${
-        value
-          ? "border-green-600 bg-green-600/10 text-green-700 dark:text-green-500"
-          : "border-foreground/20 bg-foreground/5 text-foreground/60"
-      }`}
+      onChange={(e) => change(e.target.value as PaymentState)}
+      aria-label="Оплата"
+      className={`rounded-md border px-2 py-1 text-xs outline-none transition-opacity disabled:opacity-50 ${current.className}`}
     >
-      {value ? "Оплачено" : "Не оплачено"}
-    </button>
+      {OPTIONS.map((o) => (
+        <option key={o.value} value={o.value} className="bg-background text-foreground">
+          {o.label}
+        </option>
+      ))}
+    </select>
   );
 }

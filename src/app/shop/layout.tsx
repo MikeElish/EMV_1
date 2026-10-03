@@ -17,7 +17,7 @@ export default function ShopLayout({ children }: LayoutProps<"/shop">) {
         id="shop-root"
         data-shop-theme="dark"
         suppressHydrationWarning
-        className="flex min-h-full flex-col bg-background text-foreground"
+        className="flex min-h-full flex-1 flex-col bg-background text-foreground"
       >
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 

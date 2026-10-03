@@ -18,12 +18,25 @@ function TabIndicator({ active }: { active: boolean }) {
   );
 }
 
-export function NavTabs({ tabs, children }: { tabs: NavTab[]; children: React.ReactNode }) {
+/**
+ * `fill`: the section takes the rest of the window and the tabs stay put --
+ * a page can then keep its toolbar fixed and scroll only its table
+ * (see CrmTableFrame).
+ */
+export function NavTabs({
+  tabs,
+  children,
+  fill = false,
+}: {
+  tabs: NavTab[];
+  children: React.ReactNode;
+  fill?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
-    <div>
-      <div className="flex gap-6 border-b border-foreground/10">
+    <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
+      <div className="flex shrink-0 gap-6 border-b border-foreground/10">
         {tabs.map((tab) => {
           const active = pathname.startsWith(tab.href);
           return (
@@ -41,7 +54,7 @@ export function NavTabs({ tabs, children }: { tabs: NavTab[]; children: React.Re
           );
         })}
       </div>
-      <div className="mt-6">{children}</div>
+      <div className={fill ? "mt-6 flex min-h-0 flex-1 flex-col overflow-auto" : "mt-6"}>{children}</div>
     </div>
   );
 }

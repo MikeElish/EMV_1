@@ -45,10 +45,10 @@ export function MailShell({ configured, children }: { configured: boolean; child
     );
   }
 
-  // The section fills the window (main has 2rem padding top and bottom):
-  // tabs and toolbars stay put, only the letter / folder lists scroll.
+  // The section fills the rest of the window (main is a flex column): tabs
+  // and toolbars stay put, only the letter / folder lists scroll.
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-end gap-6 border-b border-foreground/10">
         {/* Each tab is an IMAP round-trip, so no background prefetch here. */}
         {TABS.map((tab) => {

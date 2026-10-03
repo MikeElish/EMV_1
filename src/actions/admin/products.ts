@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
+import { Prisma, type OrderStatus } from "@prisma/client";
+import { RESERVE_STATUSES } from "@/lib/validators/orders";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
+import { releaseAwaitingSupply } from "@/lib/order-status";
 import { productSchema, type ProductInput } from "@/lib/validators/product";
 import { buildProductSlug } from "@/lib/slug";
 
@@ -114,8 +116,10 @@ export async function updateProduct(
       },
     },
   });
+  if (restocked) await releaseAwaitingSupply([id]);
 
   revalidatePath("/admin/crm/products");
+  revalidatePath("/admin/crm/orders");
   revalidatePath("/shop");
   revalidatePath("/shop/cart");
   redirect("/admin/crm/products");
@@ -138,6 +142,29 @@ export async function toggleProductActive(
   revalidatePath("/shop");
   revalidatePath("/shop/cart");
   return { ok: true };
+}
+
+export type ProductDocumentLine = {
+  orderNumber: string;
+  status: OrderStatus;
+  quantity: number;
+  date: Date;
+};
+
+/** Customer orders holding this product in reserve (CRM → Товары, "Резерв"). */
+export async function listProductReserve(productId: string): Promise<ProductDocumentLine[]> {
+  await verifyAdminSession();
+  const lines = await prisma.orderItem.findMany({
+    where: { productId, status: { in: RESERVE_STATUSES } },
+    select: { quantity: true, status: true, order: { select: { orderNumber: true, createdAt: true } } },
+    orderBy: { order: { createdAt: "asc" } },
+  });
+  return lines.map((l) => ({
+    orderNumber: l.order.orderNumber,
+    status: l.status,
+    quantity: l.quantity,
+    date: l.order.createdAt,
+  }));
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {

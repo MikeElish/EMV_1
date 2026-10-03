@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateProduct } from "@/actions/admin/products";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { ProductBackButton } from "@/components/admin/ProductBackButton";
 import { getMarkups, getSuppliers } from "@/lib/price-settings";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
@@ -23,7 +24,10 @@ export default async function EditProductPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Изменить товар</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Изменить товар</h1>
+        <ProductBackButton />
+      </div>
       <ProductForm
         categories={categories}
         suppliers={suppliers}

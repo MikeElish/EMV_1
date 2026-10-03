@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { generateOrderNumber } from "@/lib/order-number-db";
+import { aggregateOrderStatus, initialLineStatuses } from "@/lib/order-status";
 import { manualOrderSchema, type ManualOrderInput } from "@/lib/validators/manual-order";
 
 export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false; error: string };
@@ -78,9 +79,14 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
   }
   const { customerId, customerName, customerPhone, customerEmail, deliveryNote, items } = parsed.data;
 
+  let deferred = false;
   if (customerId) {
-    const customer = await prisma.user.findUnique({ where: { id: customerId }, select: { role: true } });
+    const customer = await prisma.user.findUnique({
+      where: { id: customerId },
+      select: { role: true, company: { select: { paymentType: true } } },
+    });
     if (customer?.role !== "CUSTOMER") return { ok: false, error: "Покупатель не найден" };
+    deferred = customer.company?.paymentType === "DEFERRED";
   }
 
   const productIds = [...new Set(items.map((i) => i.productId))];
@@ -93,6 +99,7 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
   }
   const nameById = new Map(products.map((p) => [p.id, p.name]));
 
+  const statuses = await initialLineStatuses(items, deferred);
   const orderNumber = await generateOrderNumber();
   await prisma.order.create({
     data: {
@@ -103,12 +110,15 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
       deliveryNote: deliveryNote || null,
       totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
       userId: customerId || null,
+      deferred,
+      status: aggregateOrderStatus(statuses),
       items: {
-        create: items.map((i) => ({
+        create: items.map((i, index) => ({
           productId: i.productId,
           nameSnapshot: nameById.get(i.productId)!,
           priceSnapshot: i.price,
           quantity: i.quantity,
+          status: statuses[index],
         })),
       },
     },
