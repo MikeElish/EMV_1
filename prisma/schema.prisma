@@ -210,6 +210,10 @@ model User {
   // CUSTOMER accounts.
   mailLogin             String?
   mailPasswordEnc       String?
+  // Own preferences from Почта → Настройки.
+  mailSenderName        String?
+  mailSignature         String?
+  mailPageSize          Int             @default(30)
   // E-mail confirmation for self-registered customers. Null = not yet
   // confirmed. The 6-digit code is stored only as a sha256 hash.
   emailVerifiedAt       DateTime?

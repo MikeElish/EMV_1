@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/session";
 import { logout } from "@/actions/admin/auth";
@@ -14,6 +15,14 @@ export default async function CrmCabinetPage() {
       <p className="text-sm text-foreground/60">
         Скоро здесь появится рабочее пространство для вашей роли.
       </p>
+      {session.role !== "CUSTOMER" && (
+        <Link
+          href="/admin/mail"
+          className="rounded-md bg-foreground px-6 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          Почта
+        </Link>
+      )}
       <form action={logout}>
         <button type="submit" className="text-sm underline underline-offset-4">
           Выйти

@@ -16,8 +16,12 @@ export async function proxy(request: NextRequest) {
     if (!session?.userId) {
       return NextResponse.redirect(new URL("/crm", request.url));
     }
-    if (session.role !== "OWNER") {
+    if (session.role === "CUSTOMER") {
       return NextResponse.redirect(new URL("/crm/cabinet", request.url));
+    }
+    // Почта is open to every employee; the rest of /admin is owner-only.
+    if (session.role !== "OWNER" && !pathname.startsWith("/admin/mail")) {
+      return NextResponse.redirect(new URL("/admin/mail", request.url));
     }
     return NextResponse.next();
   }
