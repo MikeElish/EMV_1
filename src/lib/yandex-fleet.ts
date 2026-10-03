@@ -23,7 +23,6 @@ export async function fleetRequest<T>(path: string, body: unknown): Promise<T> {
         "Accept-Language": "ru",
         "X-Client-ID": settings.clientId,
         "X-API-Key": decryptSecret(settings.apiKeyEnc),
-        "X-Park-ID": settings.parkId,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),

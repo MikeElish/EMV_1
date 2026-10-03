@@ -65,7 +65,7 @@ export function YandexFleetSettingsForm({
       <form onSubmit={handleSubmit} className="mt-4 max-w-xl space-y-4">
         <div>
           <label htmlFor="fleetParkId" className="text-sm text-foreground/60">
-            ID парка
+            Идентификатор партнёра (park_id)
           </label>
           <input
             id="fleetParkId"
@@ -83,7 +83,7 @@ export function YandexFleetSettingsForm({
         </div>
         <div>
           <label htmlFor="fleetClientId" className="text-sm text-foreground/60">
-            Client ID
+            Идентификатор клиента (X-Client-ID)
           </label>
           <input
             id="fleetClientId"
@@ -95,7 +95,7 @@ export function YandexFleetSettingsForm({
         </div>
         <div>
           <label htmlFor="fleetApiKey" className="text-sm text-foreground/60">
-            API-ключ
+            Секретный API-ключ (X-API-Key)
           </label>
           <input
             id="fleetApiKey"
@@ -142,15 +142,18 @@ export function YandexFleetSettingsForm({
       </form>
 
       <div className="mt-8 max-w-xl rounded-lg border border-foreground/10 p-4 text-sm">
-        <p className="font-medium">Где взять API-ключ</p>
+        <p className="font-medium">Где взять данные</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-foreground/70">
-          <li>Войдите в fleet.yandex.ru под учётной записью руководителя парка.</li>
-          <li>Откройте «Настройки → API» (ключи API) и создайте ключ.</li>
+          <li>Войдите в Диспетчерскую fleet.yandex.ru сотрудником с ролью «Директор».</li>
+          <li>Откройте «Настройки → API».</li>
           <li>
-            Отметьте права, которые понадобятся сайту: водители, автомобили, заказы, транзакции. Для
-            проверки подключения достаточно прав на чтение водителей и автомобилей.
+            Перенесите сюда три значения: идентификатор партнёра (park_id), идентификатор клиента
+            (X-Client-ID) и секретный API-ключ (X-API-Key).
           </li>
-          <li>Скопируйте ключ сюда — повторно Яндекс его не покажет.</li>
+          <li>
+            Если при создании ключа предлагают выбрать права — отметьте водителей, автомобили, заказы и
+            транзакции. Для проверки подключения достаточно чтения водителей и автомобилей.
+          </li>
         </ol>
       </div>
     </div>

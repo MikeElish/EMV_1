@@ -13,10 +13,13 @@ export const yandexFleetSettingsSchema = z.object({
     .string()
     .transform(extractParkId)
     .refine((v) => /^[0-9a-f]{32}$/.test(v), "ID парка — 32 символа из цифр и букв a–f (или ссылка из кабинета с park_id=…)"),
+  // Copied as shown in fleet.yandex.ru → Настройки → API («Идентификатор клиента»).
   clientId: z
     .string()
     .trim()
-    .regex(/^taxi\/park\/[0-9a-f]{32}$/i, "Client ID имеет вид taxi/park/<ID парка>"),
+    .min(1, "Укажите идентификатор клиента (X-Client-ID)")
+    .max(200)
+    .refine((v) => !/\s/.test(v), "Идентификатор клиента не должен содержать пробелов"),
   // Empty means "keep the stored key".
   apiKey: z.string().trim().optional(),
 });

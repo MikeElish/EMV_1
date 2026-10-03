@@ -24,8 +24,8 @@ export async function saveYandexFleetSettings(input: YandexFleetSettingsInput): 
 
   await prisma.yandexFleetSettings.upsert({
     where: { id: 1 },
-    create: { id: 1, parkId, clientId: clientId.toLowerCase(), apiKeyEnc },
-    update: { parkId, clientId: clientId.toLowerCase(), apiKeyEnc },
+    create: { id: 1, parkId, clientId, apiKeyEnc },
+    update: { parkId, clientId, apiKeyEnc },
   });
   revalidatePath("/admin/settings/yandex-fleet");
   return { ok: true, message: "Сохранено" };
