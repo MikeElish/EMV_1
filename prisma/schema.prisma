@@ -246,6 +246,16 @@ model MailSettings {
   updatedAt   DateTime @updatedAt
 }
 
+// Singleton (id is always 1): 1С:Бухгалтерия (1С:Фреш) reached over the
+// standard OData interface with a dedicated integration user.
+model OneCSettings {
+  id          Int      @id @default(1)
+  baseUrl     String
+  login       String
+  passwordEnc String
+  updatedAt   DateTime @updatedAt
+}
+
 // Singleton (id is always 1): Яндекс.Флот (Яндекс Про) park connection for
 // the Fleet API (fleet-api.taxi.yandex.net).
 model YandexFleetSettings {
