@@ -9,12 +9,20 @@ import { VehicleForm } from "@/components/admin/VehicleForm";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
 import { VEHICLE_STATUS_LABELS } from "@/lib/validators/taxi-fleet";
+import type { FleetLink } from "@/lib/fleet-reconcile";
 
 function toInputValue(date: Date): string {
   return new Date(date).toISOString().slice(0, 10);
 }
 
-export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
+export function VehiclesTable({
+  vehicles,
+  fleetLinks,
+}: {
+  vehicles: Vehicle[];
+  /** Match with Яндекс.Флот per vehicle; null when the Fleet isn't connected. */
+  fleetLinks: Record<string, FleetLink | null> | null;
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<Vehicle | null>(null);
 
@@ -46,6 +54,7 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
               <th className="py-2 pr-4">Модель</th>
               <th className="py-2 pr-4">Гос.номер</th>
               <th className="py-2 pr-4">Статус</th>
+              {fleetLinks && <th className="py-2 pr-4">Яндекс.Флот</th>}
             </tr>
           </thead>
           <tbody>
@@ -59,6 +68,22 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
                 <td className="py-2 pr-4">{vehicle.model}</td>
                 <td className="py-2 pr-4">{vehicle.licensePlate}</td>
                 <td className="py-2 pr-4">{VEHICLE_STATUS_LABELS[vehicle.status]}</td>
+                {fleetLinks && (
+                  <td className="py-2 pr-4">
+                    {fleetLinks[vehicle.id] ? (
+                      <span className="text-green-600">
+                        ✓ есть
+                        {fleetLinks[vehicle.id]!.callsign && (
+                          <span className="ml-1 text-xs text-foreground/50">
+                            позывной {fleetLinks[vehicle.id]!.callsign}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-foreground/40">нет во Флоте</span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

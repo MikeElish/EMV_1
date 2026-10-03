@@ -2,7 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
-import { getGlonassVehicles, GlonassError, normalizePlate, type GlonassVehicle } from "@/lib/glonass";
+import { getGlonassVehicles, GlonassError, type GlonassVehicle } from "@/lib/glonass";
+import { normalizePlate } from "@/lib/plate";
 
 export type MapVehicle = GlonassVehicle & {
   /** Brand + model from Таксопарк → Техника when the plate matches. */
