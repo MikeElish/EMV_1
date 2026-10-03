@@ -18,10 +18,11 @@ type ProductRow = Product & {
 const priceOrDash = (kopecks: number | undefined) => (kopecks === undefined ? "—" : formatRub(kopecks));
 
 function buildExportHref(products: ProductRow[]) {
-  const header = ["Товар", "Артикул", "Категория", "Поставщик", "Закупка", "Розница", "Опт", "Дилер", "Остаток", "Активен"];
+  const header = ["Товар", "Артикул", "Бренд", "Категория", "Поставщик", "Закупка", "Розница", "Опт", "Дилер", "Остаток", "Активен"];
   const body = products.map((product) => [
     product.name,
     product.sku,
+    product.brand ?? "",
     product.category.name,
     product.pricing?.supplier?.name ?? "",
     priceOrDash(product.pricing?.purchasePrice),

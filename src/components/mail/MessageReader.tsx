@@ -144,7 +144,10 @@ export function MessageReader({
           {message.attachments.map((a) => (
             <a
               key={a.index}
-              href={`/admin/mail/attachment?path=${encodeURIComponent(folder.path)}&uid=${message.uid}&i=${a.index}`}
+              // Preview in a new tab; the download button is in its top-right corner.
+              href={`/admin/mail-attachment?path=${encodeURIComponent(folder.path)}&uid=${message.uid}&i=${a.index}`}
+              target="_blank"
+              rel="noopener"
               className="rounded-md border border-foreground/15 px-3 py-1.5 text-sm hover:bg-foreground/5"
             >
               📎 {a.filename} <span className="text-foreground/50">({formatSize(a.size)})</span>
