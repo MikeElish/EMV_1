@@ -39,6 +39,25 @@ export async function oneCGet<T>(path: string): Promise<T> {
   }
 }
 
+/**
+ * Every row of a catalog/document set, paged ($top/$skip), with the given
+ * $select. Pages are ordered by Ref_Key: without $orderby 1С returns pages
+ * in no stable order, so rows repeat across pages while others are skipped.
+ */
+export async function oneCGetAll<T extends { Ref_Key: string }>(entitySet: string, select: string[]): Promise<T[]> {
+  const byRef = new Map<string, T>();
+  const page = 500;
+  for (let skip = 0; ; skip += page) {
+    const res = await oneCGet<{ value?: T[] }>(
+      `/${encodeURIComponent(entitySet)}?$select=${select.join(",")}&$orderby=Ref_Key&$top=${page}&$skip=${skip}`
+    );
+    const rows = res.value ?? [];
+    for (const row of rows) byRef.set(row.Ref_Key, row);
+    if (rows.length < page) break;
+  }
+  return [...byRef.values()];
+}
+
 /** Names of all objects published over OData (Catalog_…, Document_…, …). */
 export async function listOneCObjects(): Promise<string[]> {
   const root = await oneCGet<{ value?: { name: string }[] }>("/");

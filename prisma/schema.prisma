@@ -70,9 +70,26 @@ model Product {
   searchLogs SearchLog[]
   pricing    ProductPricing?
 
+  // Cards in 1С:Бухгалтерия this product stands for (1С often holds the same
+  // article on several cards).
+  oneCLinks   OneCProductLink[]
+  // Confirmed in «Сопоставление с 1С»: there is no such card in 1С yet.
+  oneCNoMatch Boolean           @default(false)
+
   @@index([categoryId])
   @@index([isActive])
   @@index([newArrivalAt])
+}
+
+// One 1С card (Catalog_Номенклатура Ref_Key) -> the site product it is. The
+// first link is the card new documents for the product are written with.
+model OneCProductLink {
+  ref       String   @id
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
 }
 
 // Internal prices live apart from Product on purpose: storefront pages pass
@@ -295,6 +312,9 @@ model Company {
   paymentDeferralDays Int?
   documents           CompanyDocument[]
   suppliedProducts    ProductPricing[]
+  kpp                 String?
+  // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
+  oneCRef             String?            @unique
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 

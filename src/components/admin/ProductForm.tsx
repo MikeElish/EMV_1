@@ -59,17 +59,21 @@ export function ProductForm({
     event.preventDefault();
     setError(null);
 
-    const purchasePrice = toKopecks(prices.purchaseRub);
-    if (purchasePrice === null || purchasePrice <= 0) return failOnPrices("Укажите закупочную цену");
+    const formData = new FormData(event.currentTarget);
+    // An inactive product (e.g. imported from 1С, still being sorted out) can
+    // be saved without prices; they are required once it goes on sale.
+    const active = formData.get("isActive") === "on";
+
+    const purchasePrice = toKopecks(prices.purchaseRub) ?? (active ? null : 0);
+    if (purchasePrice === null || (active && purchasePrice <= 0)) return failOnPrices("Укажите закупочную цену");
     const sale = {} as Record<(typeof SALE_KINDS)[number]["kind"], number>;
     for (const { kind, label } of SALE_KINDS) {
-      const value = toKopecks(prices.sale[kind].rub);
+      const value = toKopecks(prices.sale[kind].rub) ?? (active ? null : 0);
       if (value === null) return failOnPrices(`Укажите цену: ${label.toLowerCase()}`);
       sale[kind] = value;
     }
 
     setSubmitting(true);
-    const formData = new FormData(event.currentTarget);
 
     const input: ProductInput = {
       sku: String(formData.get("sku") ?? ""),
@@ -86,7 +90,7 @@ export function ProductForm({
       machineType: String(formData.get("machineType") ?? "") || undefined,
       compatibleWith: splitList(String(formData.get("compatibleWith") ?? "")),
       images,
-      isActive: formData.get("isActive") === "on",
+      isActive: active,
     };
 
     // on success, onSubmit redirects server-side and this call never resolves

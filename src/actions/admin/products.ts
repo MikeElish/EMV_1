@@ -86,6 +86,10 @@ export async function updateProduct(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   }
 
+  if (parsed.data.isActive && (parsed.data.purchasePrice <= 0 || parsed.data.price <= 0)) {
+    return { ok: false, error: "Чтобы товар был активен, укажите закупочную и оптовую цену (вкладка «Цены»)" };
+  }
+
   const slug = buildProductSlug(parsed.data.brand, parsed.data.sku);
   const conflict = await prisma.product.findFirst({
     where: {
@@ -122,6 +126,13 @@ export async function toggleProductActive(
   isActive: boolean
 ): Promise<ActionResult> {
   await verifyAdminSession();
+  if (isActive) {
+    // Products imported from 1С arrive with price 0 -- they must not go on sale for free.
+    const product = await prisma.product.findUnique({ where: { id }, select: { price: true } });
+    if (!product || product.price <= 0) {
+      return { ok: false, error: "Сначала укажите цены в карточке товара" };
+    }
+  }
   await prisma.product.update({ where: { id }, data: { isActive } });
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop");

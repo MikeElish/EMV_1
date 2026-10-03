@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   checkOneCConnection,
@@ -224,6 +225,21 @@ export function OneCSettingsForm({ saved }: { saved: Saved }) {
             {checking && !check && <p className="text-sm text-foreground/50">Проверяем подключение…</p>}
             {check && <CheckResult check={check} />}
           </div>
+        </section>
+      )}
+
+      {check?.ok && check.total > 0 && (
+        <section className="mt-8 rounded-lg border border-foreground/10 p-4">
+          <h2 className="text-sm font-semibold">Сопоставление и перенос данных</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            Связать товары и компании сайта с карточками 1С, добавить на сайт товары из 1С и перенести контрагентов.
+          </p>
+          <Link
+            href="/admin/settings/1c/matching"
+            className="mt-3 inline-block rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+          >
+            Открыть сопоставление
+          </Link>
         </section>
       )}
     </div>

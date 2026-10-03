@@ -18,7 +18,8 @@ export function ActiveToggle({
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await toggleProductActive(productId, !isActive);
+          const result = await toggleProductActive(productId, !isActive);
+          if (!result.ok) alert(result.error);
         })
       }
       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
