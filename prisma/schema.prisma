@@ -246,6 +246,16 @@ model MailSettings {
   updatedAt   DateTime @updatedAt
 }
 
+// Singleton (id is always 1): Яндекс.Флот (Яндекс Про) park connection for
+// the Fleet API (fleet-api.taxi.yandex.net).
+model YandexFleetSettings {
+  id        Int      @id @default(1)
+  parkId    String
+  clientId  String
+  apiKeyEnc String
+  updatedAt DateTime @updatedAt
+}
+
 // Singleton (id is always 1): GlonassSoft monitoring account whose map is
 // shown in Таксопарк → Диспетчерская.
 model GlonassSettings {
