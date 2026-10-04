@@ -1,5 +1,6 @@
 "use client";
 
+import { FitWidth } from "@/components/FitWidth";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
@@ -253,7 +254,8 @@ export function MailSettingsTable({ site, users }: { site: SiteMail | null; user
   return (
     <div>
       <h1 className="text-lg font-semibold">Почта</h1>
-      <table className="mt-4 w-full text-sm">
+      <FitWidth>
+      <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-foreground/10 text-left text-foreground/50">
             <th className="py-2 pr-4">Пользователь</th>
@@ -290,6 +292,7 @@ export function MailSettingsTable({ site, users }: { site: SiteMail | null; user
           ))}
         </tbody>
       </table>
+      </FitWidth>
 
       {selected && (
         <Modal onClose={() => setSelected(null)} maxWidthClassName="max-w-xl">

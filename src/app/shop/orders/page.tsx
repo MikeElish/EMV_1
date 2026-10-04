@@ -1,3 +1,4 @@
+import { FitWidth } from "@/components/FitWidth";
 import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -41,9 +42,9 @@ export default async function MyOrdersPage({ searchParams }: PageProps<"/shop/or
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
       <h1 className="text-2xl font-bold">Мои заказы</h1>
-      <div className="mt-6 overflow-x-auto">
+      <FitWidth className="mt-6 overflow-x-auto">
         <CustomerOrdersTable orders={ordersWithLatestDocs} initialOrderNumber={orderNumber} />
-      </div>
+      </FitWidth>
     </div>
   );
 }

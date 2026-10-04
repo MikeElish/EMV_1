@@ -1,3 +1,4 @@
+import { FitWidth } from "@/components/FitWidth";
 import Link from "next/link";
 import type { FleetCar } from "@/lib/yandex-fleet-data";
 
@@ -9,7 +10,8 @@ export function FleetOnlyCars({ cars }: { cars: FleetCar[] }) {
       {cars.length === 0 ? (
         <p className="mt-2 text-sm text-foreground/40">Все автомобили из Яндекс.Флота уже есть в Технике.</p>
       ) : (
-        <table className="mt-3 w-full text-sm">
+        <FitWidth>
+        <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-foreground/10 text-left text-foreground/50">
               <th className="py-2 pr-4 font-normal">Марка</th>
@@ -42,6 +44,7 @@ export function FleetOnlyCars({ cars }: { cars: FleetCar[] }) {
             ))}
           </tbody>
         </table>
+        </FitWidth>
       )}
     </section>
   );

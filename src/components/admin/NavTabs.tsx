@@ -2,6 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { FitWidth } from "@/components/FitWidth";
 
 export type NavTab = { href: string; label: string };
 
@@ -36,25 +37,30 @@ export function NavTabs({
 
   return (
     <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
-      <div className="flex shrink-0 gap-6 border-b border-foreground/10">
-        {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href);
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              prefetch
-              className={`relative px-1 pb-3 text-sm font-medium transition-colors ${
-                active ? "text-foreground" : "text-foreground/50 hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <TabIndicator active={active} />
-            </Link>
-          );
-        })}
+      {/* A row of tabs wider than the window is scaled down like the tables. */}
+      <FitWidth className="shrink-0">
+        <div className="flex gap-6 border-b border-foreground/10">
+          {tabs.map((tab) => {
+            const active = pathname.startsWith(tab.href);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                prefetch
+                className={`relative px-1 pb-3 text-sm font-medium transition-colors ${
+                  active ? "text-foreground" : "text-foreground/50 hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+                <TabIndicator active={active} />
+              </Link>
+            );
+          })}
+        </div>
+      </FitWidth>
+      <div className={fill ? "mt-6 flex min-h-0 flex-1 flex-col overflow-auto" : "mt-6"}>
+        {children}
       </div>
-      <div className={fill ? "mt-6 flex min-h-0 flex-1 flex-col overflow-auto" : "mt-6"}>{children}</div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { cssZoomOf } from "@/lib/css-zoom";
 import { useEffect, useRef, useState } from "react";
 
 // Positions the panel with `position: fixed`, computed from the trigger's
@@ -23,8 +24,10 @@ export function DropdownMenu({
 
   function toggle() {
     if (!open && buttonRef.current) {
+      // Inside a FitWidth-scaled table, fixed offsets are scaled too.
+      const zoom = cssZoomOf(buttonRef.current);
       const rect = buttonRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      setPos({ top: (rect.bottom + 4) / zoom, right: (window.innerWidth - rect.right) / zoom });
     }
     setOpen((v) => !v);
   }

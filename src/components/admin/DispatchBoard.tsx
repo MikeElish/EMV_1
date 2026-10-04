@@ -1,5 +1,6 @@
 "use client";
 
+import { FitWidth } from "@/components/FitWidth";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getDispatchData, type DispatchResult } from "@/actions/admin/dispatch";
@@ -156,7 +157,7 @@ export function DispatchBoard({ initial }: { initial: DispatchResult }) {
       {data.ok && pollError && <p className="mt-2 text-xs text-red-600">Последнее обновление не удалось: {pollError}</p>}
 
       {data.ok && (
-        <div className="mt-4 overflow-x-auto">
+        <FitWidth className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-foreground/10 text-left text-foreground/50">
@@ -214,7 +215,7 @@ export function DispatchBoard({ initial }: { initial: DispatchResult }) {
               {drivers.length === 0 ? "В парке нет водителей" : "Никого не найдено"}
             </p>
           )}
-        </div>
+        </FitWidth>
       )}
     </div>
   );

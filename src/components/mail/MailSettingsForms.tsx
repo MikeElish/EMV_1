@@ -1,5 +1,6 @@
 "use client";
 
+import { FitWidth } from "@/components/FitWidth";
 import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -456,6 +457,7 @@ export function FoldersSettings({
       <Result result={result} />
 
       {folders && (
+        <FitWidth>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-foreground/10 text-left text-foreground/50">
@@ -506,6 +508,7 @@ export function FoldersSettings({
             ))}
           </tbody>
         </table>
+        </FitWidth>
       )}
     </div>
   );

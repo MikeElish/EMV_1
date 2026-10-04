@@ -1,5 +1,6 @@
 "use client";
 
+import { FitWidth } from "@/components/FitWidth";
 import { useRouter } from "next/navigation";
 import { formatRub } from "@/lib/money";
 
@@ -21,7 +22,8 @@ export function CompanyBalanceTab({ orders }: { orders: CompanyOrderRow[] }) {
   }
 
   return (
-    <table className="mt-4 w-full text-sm">
+    <FitWidth>
+    <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-foreground/10 text-left text-foreground/50">
           <th className="py-2 pr-4">Дата</th>
@@ -57,5 +59,6 @@ export function CompanyBalanceTab({ orders }: { orders: CompanyOrderRow[] }) {
         ))}
       </tbody>
     </table>
+    </FitWidth>
   );
 }

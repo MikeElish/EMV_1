@@ -1,5 +1,6 @@
 "use client";
 
+import { cssZoomOf } from "@/lib/css-zoom";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { useOutsideClose } from "@/lib/use-outside-close";
 
@@ -33,8 +34,10 @@ export function SuggestField({
 
   function openPanel() {
     if (panelPositioning === "fixed" && inputRef.current) {
+      // Inside a FitWidth-scaled table, fixed offsets are scaled too.
+      const zoom = cssZoomOf(inputRef.current);
       const rect = inputRef.current.getBoundingClientRect();
-      setFixedPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      setFixedPos({ top: (rect.bottom + 4) / zoom, left: rect.left / zoom, width: rect.width / zoom });
     }
     setOpen(true);
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ThemedPortal } from "@/components/ThemedPortal";
 
 const TRANSITION_MS = 200;
 
@@ -34,29 +35,33 @@ export function Modal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Rendered at the section root: a modal opened from a FitWidth-scaled
+  // table must not shrink with it.
   return (
-    <div
-      onClick={close}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm transition-opacity duration-200 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
-    >
+    <ThemedPortal>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[80vh] w-[90vw] ${maxWidthClassName} flex-col overflow-y-auto rounded-lg bg-background p-6 shadow-xl transition-all duration-200 ${
-          visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+        onClick={close}
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm transition-opacity duration-200 ${
+          visible ? "opacity-100" : "opacity-0"
         }`}
       >
-        <button
-          type="button"
-          onClick={close}
-          aria-label="Закрыть"
-          className="ml-auto text-foreground/40 hover:text-foreground"
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`flex max-h-[80vh] w-[90vw] ${maxWidthClassName} flex-col overflow-y-auto rounded-lg bg-background p-6 shadow-xl transition-all duration-200 ${
+            visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+          }`}
         >
-          ✕
-        </button>
-        {children}
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Закрыть"
+            className="ml-auto text-foreground/40 hover:text-foreground"
+          >
+            ✕
+          </button>
+          {children}
+        </div>
       </div>
-    </div>
+    </ThemedPortal>
   );
 }

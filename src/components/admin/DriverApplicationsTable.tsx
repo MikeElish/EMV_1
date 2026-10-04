@@ -1,5 +1,6 @@
 "use client";
 
+import { FitWidth } from "@/components/FitWidth";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DriverApplication } from "@prisma/client";
@@ -33,7 +34,8 @@ export function DriverApplicationsTable({
     <div>
       <h1 className="text-2xl font-bold">Заявки водителей</h1>
 
-      <table className="mt-6 w-full text-sm">
+      <FitWidth>
+      <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-foreground/10 text-left text-foreground/50">
             <th className="py-2">Имя</th>
@@ -80,6 +82,7 @@ export function DriverApplicationsTable({
           )}
         </tbody>
       </table>
+      </FitWidth>
 
       {selected && (
         <Modal onClose={() => setSelected(null)} maxWidthClassName="max-w-xl">

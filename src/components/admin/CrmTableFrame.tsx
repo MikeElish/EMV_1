@@ -1,7 +1,9 @@
+import { FitWidth } from "@/components/FitWidth";
 import { forwardRef } from "react";
 
 // CRM tables fill the window under the tabs: the toolbar above stays put,
-// only the table body scrolls, and its header row sticks to the top.
+// only the table body scrolls, and its header row sticks to the top. A table
+// wider than the window is scaled down to fit it (FitWidth).
 
 /** Root of a CRM table page: takes the rest of the window. */
 export function CrmPage({ children }: { children: React.ReactNode }) {
@@ -13,7 +15,7 @@ export const CrmTableScroll = forwardRef<HTMLDivElement, { children: React.React
   function CrmTableScroll({ children, className = "mt-4" }, ref) {
     return (
       <div ref={ref} className={`min-h-0 flex-1 overflow-auto ${className}`}>
-        {children}
+        <FitWidth>{children}</FitWidth>
       </div>
     );
   }

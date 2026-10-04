@@ -1,5 +1,6 @@
 "use client";
 
+import { FitWidth } from "@/components/FitWidth";
 import { applyMarkup, markupOf, type Markups } from "@/lib/pricing";
 import { rublesToKopecksRoundedUp } from "@/lib/money";
 
@@ -135,6 +136,7 @@ export function ProductPricesPanel({
         />
       </div>
 
+      <FitWidth>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-foreground/50">
@@ -172,6 +174,7 @@ export function ProductPricesPanel({
           ))}
         </tbody>
       </table>
+      </FitWidth>
     </div>
   );
 }
