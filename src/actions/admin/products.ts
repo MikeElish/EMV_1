@@ -132,9 +132,15 @@ export async function toggleProductActive(
   await verifyAdminSession();
   if (isActive) {
     // Products imported from 1С arrive with price 0 -- they must not go on sale for free.
-    const product = await prisma.product.findUnique({ where: { id }, select: { price: true } });
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: { price: true, category: { select: { name: true, isActive: true } } },
+    });
     if (!product || product.price <= 0) {
       return { ok: false, error: "Сначала укажите цены в карточке товара" };
+    }
+    if (!product.category.isActive) {
+      return { ok: false, error: `Категория «${product.category.name}» скрыта с сайта — сначала включите её` };
     }
   }
   await prisma.product.update({ where: { id }, data: { isActive } });

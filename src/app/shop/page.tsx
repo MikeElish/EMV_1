@@ -6,8 +6,9 @@ import { NewArrivalsRotator } from "@/components/shop/NewArrivalsRotator";
 export default async function ShopHomePage() {
   const [categories, allActiveProducts] = await Promise.all([
     prisma.category.findMany({
+      where: { isActive: true },
       orderBy: { name: "asc" },
-      include: { _count: { select: { products: true } } },
+      include: { _count: { select: { products: { where: { isActive: true } } } } },
     }),
     // Full rows (not a narrow select) so the same records can be handed
     // straight to ProductQuickViewModal for the category browser's and the

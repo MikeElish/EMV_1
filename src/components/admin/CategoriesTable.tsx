@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { Category } from "@prisma/client";
 import { updateCategory, deleteCategory } from "@/actions/admin/categories";
 import { CategoryForm } from "@/components/admin/CategoryForm";
+import { CategoryActiveSwitch } from "@/components/admin/CategoryActiveSwitch";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
@@ -59,6 +60,7 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
               <th className="py-2">Название</th>
               <th className="py-2">Slug</th>
               <th className="py-2">Товаров</th>
+              <th className="py-2">На сайте</th>
             </tr>
           </thead>
           <tbody>
@@ -66,11 +68,21 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
               <tr
                 key={category.id}
                 onClick={() => setSelected(category)}
-                className="cursor-pointer border-b border-foreground/10 hover:bg-foreground/5"
+                className={`cursor-pointer border-b border-foreground/10 hover:bg-foreground/5 ${
+                  category.isActive ? "" : "text-foreground/50"
+                }`}
               >
                 <td className="py-2">{category.name}</td>
                 <td className="py-2 text-foreground/50">{category.slug}</td>
                 <td className="py-2">{category._count.products}</td>
+                <td className="py-2">
+                  <CategoryActiveSwitch
+                    categoryId={category.id}
+                    name={category.name}
+                    isActive={category.isActive}
+                    productCount={category._count.products}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -81,6 +93,15 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
       {selected && (
         <Modal onClose={() => setSelected(null)} maxWidthClassName="max-w-md">
           <h2 className="text-xl font-bold">Категория: {selected.name}</h2>
+          <div className="mt-4">
+            <CategoryActiveSwitch
+              categoryId={selected.id}
+              name={selected.name}
+              isActive={categories.find((c) => c.id === selected.id)?.isActive ?? selected.isActive}
+              productCount={selected._count.products}
+              variant="checkbox"
+            />
+          </div>
           <CategoryForm
             initial={{ name: selected.name, slug: selected.slug }}
             onSubmit={(input) => updateCategory(selected.id, input)}

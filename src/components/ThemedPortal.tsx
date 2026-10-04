@@ -15,7 +15,10 @@ export function ThemedPortal({ children }: { children: React.ReactNode }) {
 
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
-    setTarget(anchor?.closest("[data-admin-theme], [data-shop-theme]") ?? document.body);
+    const themed = "[data-admin-theme], [data-shop-theme]";
+    // Declared outside a section (site-wide dialogs in the root layout):
+    // take the section of the page that is open.
+    setTarget(anchor?.closest(themed) ?? document.querySelector(themed) ?? document.body);
   }, []);
 
   return (

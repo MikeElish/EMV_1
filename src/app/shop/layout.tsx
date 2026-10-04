@@ -1,6 +1,8 @@
 import { CartProvider } from "@/components/shop/CartProvider";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { companyInfo } from "@/content/company";
+import { CookieNotice } from "@/components/CookieNotice";
+import { PERSONAL_DATA_CONSENT_URL, USER_AGREEMENT_URL } from "@/lib/legal-docs";
 
 // Sets #shop-root's data-shop-theme before paint, from the visitor's saved
 // choice (defaulting to dark when nothing's saved yet) -- avoids a flash of
@@ -41,8 +43,18 @@ export default function ShopLayout({ children }: LayoutProps<"/shop">) {
                 {companyInfo.email}
               </a>
             </p>
+            <p>
+              <a href={USER_AGREEMENT_URL} target="_blank" rel="noopener" className="underline-offset-4 hover:text-foreground hover:underline">
+                Пользовательское соглашение
+              </a>{" "}
+              ·{" "}
+              <a href={PERSONAL_DATA_CONSENT_URL} target="_blank" rel="noopener" className="underline-offset-4 hover:text-foreground hover:underline">
+                Согласие на обработку персональных данных
+              </a>
+            </p>
           </div>
         </footer>
+        <CookieNotice />
       </div>
     </CartProvider>
   );

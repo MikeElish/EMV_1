@@ -9,6 +9,7 @@ import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
 import { formatRub, formatRubPrecise } from "@/lib/money";
 import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
+import { PERSONAL_DATA_CONSENT_URL } from "@/lib/legal-docs";
 import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
 import { SuggestField } from "@/components/SuggestField";
@@ -257,6 +258,7 @@ export default function CheckoutPage() {
     const authResult = await registerOrLoginCustomer({
       email: customerEmail,
       password,
+      personalDataConsent: consent,
     });
     setAuthSubmitting(false);
 
@@ -456,7 +458,17 @@ export default function CheckoutPage() {
                     onChange={(e) => setConsent(e.target.checked)}
                     className="mt-0.5"
                   />
-                  Согласие на обработку персональных данных
+                  <span>
+                    Согласие на{" "}
+                    <a
+                      href={PERSONAL_DATA_CONSENT_URL}
+                      target="_blank"
+                      rel="noopener"
+                      className="text-foreground underline underline-offset-4 hover:opacity-80"
+                    >
+                      обработку персональных данных
+                    </a>
+                  </span>
                 </label>
               )}
             </div>

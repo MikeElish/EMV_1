@@ -9,10 +9,13 @@ export function Modal({
   onClose,
   children,
   maxWidthClassName = "max-w-md",
+  dismissible = true,
 }: {
   onClose: () => void;
   children: React.ReactNode;
   maxWidthClassName?: string;
+  /** false: no ✕, Esc and a click outside do nothing -- the content decides. */
+  dismissible?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -22,6 +25,7 @@ export function Modal({
   }, []);
 
   function close() {
+    if (!dismissible) return;
     setVisible(false);
     setTimeout(onClose, TRANSITION_MS);
   }
@@ -51,14 +55,16 @@ export function Modal({
             visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
           }`}
         >
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Закрыть"
-            className="ml-auto text-foreground/40 hover:text-foreground"
-          >
-            ✕
-          </button>
+          {dismissible && (
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Закрыть"
+              className="ml-auto text-foreground/40 hover:text-foreground"
+            >
+              ✕
+            </button>
+          )}
           {children}
         </div>
       </div>

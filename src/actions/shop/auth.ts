@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createAdminSession } from "@/lib/session";
 import { issueEmailCode, needsEmailVerification, setEmailUnverifiedFlag } from "@/lib/email-verification";
+import { setConsentPendingFlag } from "@/lib/personal-data-consent";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type CustomerAuthResult =
@@ -33,6 +34,8 @@ export async function checkCustomerEmailExists(email: string): Promise<{ exists:
 export async function registerOrLoginCustomer(input: {
   email: string;
   password: string;
+  /** «Согласие на обработку персональных данных» ticked in the form. */
+  personalDataConsent?: boolean;
 }): Promise<CustomerAuthResult> {
   const email = input.email.trim();
   const password = input.password;
@@ -58,6 +61,12 @@ export async function registerOrLoginCustomer(input: {
       return { ok: false, error: "Неверный пароль" };
     }
     await createAdminSession(existing.id, existing.role, existing.login);
+    let consentAt = existing.personalDataConsentAt;
+    if (!consentAt && input.personalDataConsent) {
+      consentAt = new Date();
+      await prisma.user.update({ where: { id: existing.id }, data: { personalDataConsentAt: consentAt } });
+    }
+    await setConsentPendingFlag(!consentAt);
     if (!needsEmailVerification(existing)) {
       await setEmailUnverifiedFlag(false);
       return { ok: true, emailVerified: true };
@@ -69,8 +78,15 @@ export async function registerOrLoginCustomer(input: {
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { email, login: email, passwordHash, role: "CUSTOMER" },
+    data: {
+      email,
+      login: email,
+      passwordHash,
+      role: "CUSTOMER",
+      personalDataConsentAt: input.personalDataConsent ? new Date() : null,
+    },
   });
+  await setConsentPendingFlag(!input.personalDataConsent);
   await createAdminSession(user.id, user.role, user.login);
   // A new account must confirm its e-mail before ordering: the 6-digit code
   // goes out right away.

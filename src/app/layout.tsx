@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import { EmailVerificationGate } from "@/components/EmailVerificationGate";
+import { PersonalDataConsentGate } from "@/components/PersonalDataConsentGate";
 import "./globals.css";
 
 const inter = Inter({
@@ -35,6 +36,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </noscript>
         {children}
         <EmailVerificationGate />
+        {/* After the e-mail one, so it opens on top: consent comes first. */}
+        <PersonalDataConsentGate />
       </body>
     </html>
   );

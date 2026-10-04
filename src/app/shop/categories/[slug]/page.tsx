@@ -13,7 +13,7 @@ export default async function CategoryPage({
   const query = await searchParams;
 
   const category = await prisma.category.findUnique({ where: { slug } });
-  if (!category) notFound();
+  if (!category || !category.isActive) notFound();
 
   const allProducts = await prisma.product.findMany({
     where: { categoryId: category.id, isActive: true },

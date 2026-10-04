@@ -9,6 +9,7 @@ import {
   type CustomerSettingsInput,
 } from "@/lib/validators/customer-settings";
 import { issueEmailCode, setEmailUnverifiedFlag } from "@/lib/email-verification";
+import { setConsentPendingFlag } from "@/lib/personal-data-consent";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -124,5 +125,6 @@ export async function updateMyProfile(input: CustomerSettingsInput): Promise<Act
 export async function logoutCustomer(): Promise<{ ok: true }> {
   await deleteAdminSession();
   await setEmailUnverifiedFlag(false);
+  await setConsentPendingFlag(false);
   return { ok: true };
 }

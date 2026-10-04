@@ -48,6 +48,9 @@ model Category {
   parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryTree")
   products  Product[]
+  // Shown in the shop. Switching it also switches every product inside
+  // (and in sub-categories) -- see setCategoryActive.
+  isActive  Boolean    @default(true)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -307,6 +310,10 @@ model User {
   emailCodeExpiresAt    DateTime?
   emailCodeSentAt       DateTime?
   emailCodeAttempts     Int             @default(0)
+  // «Согласие на обработку персональных данных» (152-ФЗ): ticked at
+  // registration, or in the dialog on first sign-in for accounts created by
+  // staff. Null = not given yet.
+  personalDataConsentAt DateTime?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -432,6 +439,7 @@ model Vehicle {
   // FREE for now.
   status       VehicleStatus     @default(FREE)
   documents    VehicleDocument[]
+  fuelReceipts FuelReceipt[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -446,6 +454,36 @@ model VehicleDocument {
   fileUrl    String
   uploadedAt DateTime @default(now())
 
+  @@index([vehicleId])
+}
+
+enum FuelType {
+  AI95
+  AI92
+  LPG
+}
+
+// Таксопарк → Заправки: one fuel receipt (чек АЗС) of a park car.
+model FuelReceipt {
+  id            String   @id @default(cuid())
+  date          DateTime
+  driverName    String
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  fuelType      FuelType
+  liters        Float
+  // Kopecks; totalAmount = liters × pricePerLiter, rounded.
+  pricePerLiter Int
+  totalAmount   Int
+  // Percent; null = без НДС.
+  vatRate       Int?
+  stationInn    String
+  stationName   String
+  fileName      String
+  fileUrl       String
+  createdAt     DateTime @default(now())
+
+  @@index([date])
   @@index([vehicleId])
 }
 

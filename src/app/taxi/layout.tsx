@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { CrmEntryButton } from "@/components/CrmEntryButton";
 import { taxiContent } from "@/content/taxi";
+import { CookieNotice } from "@/components/CookieNotice";
+import { PERSONAL_DATA_CONSENT_URL, USER_AGREEMENT_URL } from "@/lib/legal-docs";
 
 const navLinks = [
   { href: "/taxi", label: "Главная" },
@@ -102,8 +104,18 @@ export default function TaxiLayout({ children }: LayoutProps<"/taxi">) {
             {taxiContent.contacts.phone} · {taxiContent.contacts.email} ·{" "}
             {taxiContent.contacts.workHours}
           </p>
+          <p>
+            <a href={USER_AGREEMENT_URL} target="_blank" rel="noopener" className="underline-offset-4 hover:underline">
+              Пользовательское соглашение
+            </a>{" "}
+            ·{" "}
+            <a href={PERSONAL_DATA_CONSENT_URL} target="_blank" rel="noopener" className="underline-offset-4 hover:underline">
+              Согласие на обработку персональных данных
+            </a>
+          </p>
         </div>
       </footer>
+      <CookieNotice />
     </>
   );
 }
