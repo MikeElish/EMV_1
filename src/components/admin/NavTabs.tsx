@@ -58,7 +58,7 @@ export function NavTabs({
           })}
         </div>
       </FitWidth>
-      <div className={fill ? "mt-6 flex min-h-0 flex-1 flex-col overflow-auto" : "mt-6"}>
+      <div className={fill ? "mt-6 flex min-h-0 flex-1 flex-col overflow-auto [scrollbar-gutter:stable]" : "mt-6"}>
         {children}
       </div>
     </div>

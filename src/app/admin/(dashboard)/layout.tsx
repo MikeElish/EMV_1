@@ -46,7 +46,7 @@ export default async function AdminDashboardLayout({
         <header className="flex h-14 shrink-0 items-center justify-end border-b border-foreground/10 px-8">
           <ThemeToggle scope="admin" />
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-8 pt-6">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-8 pt-6 [scrollbar-gutter:stable]">{children}</main>
       </div>
     </div>
   );

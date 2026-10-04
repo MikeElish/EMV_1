@@ -2,11 +2,21 @@
 
 import { useLayoutEffect, useRef } from "react";
 
+// A full recalculation only when the frame width changes by more than this:
+// a vertical scrollbar appearing/disappearing (≈17px on Windows) must not
+// rock the scale.
+const RECALC_THRESHOLD_PX = 24;
+
 /**
  * Scales its content down (CSS zoom -- fonts, paddings, inputs, everything)
  * when it is wider than the space available, so a wide table fits the
  * screen without horizontal scrolling. Never scales up; below `minZoom` the
  * frame scrolls instead. When the content fits, nothing is touched.
+ *
+ * Stability matters more than the last pixel: the scale is worked out when
+ * the page opens and when the window gets noticeably wider or narrower. While
+ * someone works with the table (filters, status changes, refreshed rows) it
+ * only ever shrinks, and only if something actually sticks out.
  */
 export function FitWidth({
   children,
@@ -24,43 +34,61 @@ export function FitWidth({
     const outer = outerRef.current;
     const inner = innerRef.current;
     if (!outer || !inner) return;
+    let zoom = 1;
+    let fittedFor = 0; // frame width the current zoom was worked out for
     let frame = 0;
 
-    // Applied straight to the DOM (no React re-render on every resize), all
-    // within one task, so the measuring layout is never painted.
-    const fit = () => {
-      const available = outer.clientWidth;
-      if (!available) return;
-      // The narrowest the content can get by wrapping its text -- what the
-      // browser would squeeze a table to anyway before it overflows.
+    // Straight to the DOM -- no React re-render.
+    const apply = (next: number, available: number) => {
+      zoom = next > 0.999 ? 1 : next;
+      inner.style.width = zoom === 1 ? "" : `${available / zoom}px`;
+      inner.style.zoom = zoom === 1 ? "" : String(zoom);
+    };
+
+    // Squeeze a little more while something still sticks out (small text is
+    // relatively wider than full-size text).
+    const squeeze = (available: number) => {
+      for (let i = 0; i < 4 && zoom > minZoom; i++) {
+        const overflow = inner.scrollWidth / inner.clientWidth;
+        if (overflow <= 1.001) break;
+        apply(Math.max(minZoom, zoom / overflow), available);
+      }
+    };
+
+    // Full calculation, all in one task so the measuring layout is never
+    // painted: the narrowest the content can get by wrapping its text.
+    const fit = (available: number) => {
       inner.style.zoom = "";
       inner.style.width = "min-content";
       const needed = inner.getBoundingClientRect().width;
-      const zoom = needed ? Math.max(minZoom, Math.min(1, available / needed)) : 1;
-      if (zoom > 0.999) {
-        inner.style.width = "";
-        return;
-      }
-      // Laid out as wide as the scaled-down box needs, then shrunk to fit.
-      // Small text is relatively wider than full-size text, so squeeze a
-      // little more while something still sticks out.
-      let current = zoom;
-      for (let i = 0; i < 4; i++) {
-        inner.style.width = `${available / current}px`;
-        inner.style.zoom = String(current);
-        const overflow = inner.scrollWidth / inner.clientWidth;
-        if (overflow <= 1.001 || current <= minZoom) break;
-        current = Math.max(minZoom, current / overflow);
+      apply(needed ? Math.max(minZoom, Math.min(1, available / needed)) : 1, available);
+      squeeze(available);
+      fittedFor = available;
+    };
+
+    const check = () => {
+      const available = outer.clientWidth;
+      if (!available) return;
+      if (!fittedFor || Math.abs(available - fittedFor) > RECALC_THRESHOLD_PX) {
+        fit(available);
+      } else if (available < fittedFor) {
+        // A bit narrower (a scrollbar appeared): keep the scale, shrink only if needed.
+        apply(zoom, available);
+        squeeze(available);
+        fittedFor = available;
+      } else {
+        // Same frame, the content changed: only shrink if it no longer fits.
+        squeeze(fittedFor);
       }
     };
 
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(fit);
+      frame = requestAnimationFrame(check);
     });
     observer.observe(outer);
     observer.observe(inner);
-    fit();
+    check();
     return () => {
       observer.disconnect();
       cancelAnimationFrame(frame);
