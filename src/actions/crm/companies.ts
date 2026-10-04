@@ -58,6 +58,11 @@ export async function updateCompany(id: string, input: CompanyInput): Promise<Ac
 export async function deleteCompany(id: string): Promise<ActionResult> {
   await verifyAdminSession();
 
+  const company = await prisma.company.findUnique({ where: { id }, select: { isOwn: true } });
+  if (company?.isOwn) {
+    return { ok: false, error: "Это собственная компания сайта — её нельзя удалить" };
+  }
+
   const userCount = await prisma.user.count({ where: { companyId: id } });
   if (userCount > 0) {
     return { ok: false, error: "Нельзя удалить компанию, к которой привязаны пользователи" };

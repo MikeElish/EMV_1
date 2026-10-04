@@ -388,6 +388,9 @@ model Company {
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
   oneCRef             String?            @unique
+  // The site's own company ("EMV"): every employee belongs to it. Exactly
+  // one row has it (src/lib/own-company.ts); it can't be deleted.
+  isOwn               Boolean            @default(false)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 

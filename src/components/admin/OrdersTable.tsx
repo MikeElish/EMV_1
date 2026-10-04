@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatRub } from "@/lib/money";
-import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_PROGRESS } from "@/lib/validators/orders";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 import { PaidToggle, PAYMENT_STATE_LABELS, paymentStateOf } from "@/components/admin/PaidToggle";
 import { DeliveryDateInput } from "@/components/admin/DeliveryDateInput";
@@ -96,6 +96,64 @@ const TEXT_FILTERS: { key: keyof Filters; label: string }[] = [
   { key: "grand", label: "ИТОГО" },
 ];
 
+// «Группировать по заказам»: one read-only row per order.
+const GROUPED_KEY = "crm-orders-grouped";
+const GROUPED_COLUMNS = new Set<keyof Filters>([
+  "orderNumber",
+  "customer",
+  "quantity",
+  "total",
+  "extra",
+  "grand",
+]);
+const STATUS_ORDER: OrderStatus[] = [...ORDER_STATUS_PROGRESS, "CANCELLED"];
+const PAYMENT_ORDER: PaymentState[] = ["unpaid", "deferred", "paid"];
+
+const formatDay = (d: Date) =>
+  new Date(d).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" });
+
+type OrderGroup = {
+  order: OrderRow;
+  customer: string;
+  extra: number;
+  quantity: number;
+  status: string;
+  delivery: string;
+  deliveryPending: boolean;
+  dates: string;
+  payment: string;
+};
+
+/** One order summed up: different values are listed with « / », dates as a range. */
+function groupOf(order: OrderRow, customer: string, extra: number): OrderGroup {
+  const active = order.items.filter((i) => i.status !== "CANCELLED");
+  const lines = active.length ? active : order.items;
+  const statuses = STATUS_ORDER.filter((st) => order.items.some((i) => i.status === st));
+  const deliveries = DELIVERY_METHODS.filter((m) => lines.some((i) => i.deliveryMethod === m));
+  const payments = PAYMENT_ORDER.filter((st) => lines.some((i) => paymentStateOf(i) === st));
+  const times = lines
+    .map((i) => (i.deliveryDate ? new Date(i.deliveryDate).getTime() : null))
+    .filter((t): t is number => t !== null);
+  const min = times.length ? Math.min(...times) : null;
+  const max = times.length ? Math.max(...times) : null;
+  return {
+    order,
+    customer,
+    extra,
+    quantity: active.reduce((sum, i) => sum + i.quantity, 0),
+    status: statuses.map((st) => ORDER_STATUS_LABELS[st]).join(" / "),
+    delivery: deliveries.map((m) => DELIVERY_METHOD_LABELS[m]).join(" / ") || "—",
+    deliveryPending: lines.some((i) => i.deliveryConfirmPending),
+    dates:
+      min === null || max === null
+        ? "—"
+        : min === max
+          ? formatDay(new Date(min))
+          : `${formatDay(new Date(min))} – ${formatDay(new Date(max))}`,
+    payment: payments.map((st) => PAYMENT_STATE_LABELS[st]).join(" / "),
+  };
+}
+
 function toInputValue(date: Date | null): string {
   if (!date) return "";
   return new Date(date).toISOString().slice(0, 10);
@@ -117,6 +175,32 @@ export function OrdersTable({
   });
   const [syncedOrderNumber, setSyncedOrderNumber] = useState(initialOrderNumber);
   const [creating, setCreating] = useState(false);
+  const [grouped, setGrouped] = useState(false);
+
+  // Remembered per browser.
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after hydration
+      if (localStorage.getItem(GROUPED_KEY) === "1") setGrouped(true);
+    } catch {
+      // storage unavailable
+    }
+  }, []);
+
+  function toggleGrouped(next: boolean) {
+    setGrouped(next);
+    try {
+      localStorage.setItem(GROUPED_KEY, next ? "1" : "0");
+    } catch {
+      // storage unavailable
+    }
+  }
+
+  /** From a grouped row to the order's own lines (editable). */
+  function openOrder(orderNumber: string) {
+    setFilters({ ...EMPTY_FILTERS, orderNumber });
+    toggleGrouped(false);
+  }
 
   if (initialOrderNumber !== syncedOrderNumber) {
     setSyncedOrderNumber(initialOrderNumber);
@@ -139,25 +223,49 @@ export function OrdersTable({
   );
 
   const filtered = useMemo(() => {
-    const has = (value: string, query: string) => value.toLowerCase().includes(query.trim().toLowerCase());
+    const has = (value: string, query: string) =>
+      value.toLowerCase().includes(query.trim().toLowerCase());
     return rows.filter(({ order, item, customer, extra }) => {
       if (filters.orderNumber && !has(order.orderNumber, filters.orderNumber)) return false;
       if (filters.customer && !has(customer, filters.customer)) return false;
       if (filters.itemName && !has(item.nameSnapshot, filters.itemName)) return false;
       if (filters.sku && !has(item.product?.sku ?? "", filters.sku)) return false;
-      if (filters.quantity && !has(String(item.quantity), filters.quantity)) return false;
+      if (!grouped && filters.quantity && !has(String(item.quantity), filters.quantity))
+        return false;
       if (filters.inStock && !has(String(item.product?.stock ?? ""), filters.inStock)) return false;
       if (filters.price && !has(String(item.priceSnapshot / 100), filters.price)) return false;
       if (filters.total && !has(String(order.totalAmount / 100), filters.total)) return false;
       if (filters.extra && !has(String(extra / 100), filters.extra)) return false;
-      if (filters.grand && !has(String((order.totalAmount + extra) / 100), filters.grand)) return false;
+      if (filters.grand && !has(String((order.totalAmount + extra) / 100), filters.grand))
+        return false;
       if (filters.status && item.status !== filters.status) return false;
       if (filters.delivery && item.deliveryMethod !== filters.delivery) return false;
-      if (filters.deliveryDate && toInputValue(item.deliveryDate) !== filters.deliveryDate) return false;
+      if (filters.deliveryDate && toInputValue(item.deliveryDate) !== filters.deliveryDate)
+        return false;
       if (filters.paid && paymentStateOf(item) !== filters.paid) return false;
       return true;
     });
-  }, [rows, filters]);
+  }, [rows, filters, grouped]);
+
+  // An order is listed when any of its lines passes the filters; the row sums
+  // up all of its lines.
+  const groups = useMemo(() => {
+    if (!grouped) return [];
+    const seen = new Set<string>();
+    const result: OrderGroup[] = [];
+    for (const row of filtered) {
+      if (seen.has(row.order.id)) continue;
+      seen.add(row.order.id);
+      const group = groupOf(row.order, row.customer, row.extra);
+      if (filters.quantity && !String(group.quantity).includes(filters.quantity.trim())) continue;
+      result.push(group);
+    }
+    return result;
+  }, [grouped, filtered, filters.quantity]);
+
+  const textFilters = grouped
+    ? TEXT_FILTERS.filter((f) => GROUPED_COLUMNS.has(f.key))
+    : TEXT_FILTERS;
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -174,6 +282,14 @@ export function OrdersTable({
             +
           </button>
           <h1 className="text-lg font-semibold">Заказы</h1>
+          <label className="ml-4 flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <input
+              type="checkbox"
+              checked={grouped}
+              onChange={(e) => toggleGrouped(e.target.checked)}
+            />
+            Группировать по заказам
+          </label>
         </div>
         {hasActiveFilters && (
           <button
@@ -191,11 +307,11 @@ export function OrdersTable({
       {orders.length === 0 ? (
         <p className="mt-4 text-sm text-foreground/40">Заказов пока нет.</p>
       ) : (
-        <CrmTableScroll>
+        <CrmTableScroll key={grouped ? "grouped" : "lines" /* new scale for the other layout */}>
           <table className="w-full text-sm">
             <thead className={STICKY_THEAD}>
               <tr className="text-left text-foreground/50">
-                {TEXT_FILTERS.map((f) => (
+                {textFilters.map((f) => (
                   <th key={f.key} className="py-2 pr-4">
                     {f.label}
                   </th>
@@ -204,10 +320,10 @@ export function OrdersTable({
                 <th className="py-2 pr-4">Доставка</th>
                 <th className="py-2 pr-4">Дата поставки</th>
                 <th className="py-2 pr-4">Оплата</th>
-                <th className="py-2 pr-4">Файлы</th>
+                {!grouped && <th className="py-2 pr-4">Файлы</th>}
               </tr>
               <tr className="text-left">
-                {TEXT_FILTERS.map((f) => (
+                {textFilters.map((f) => (
                   <th key={f.key} className="pb-2 pr-4">
                     <input
                       type="text"
@@ -268,64 +384,144 @@ export function OrdersTable({
                     ))}
                   </select>
                 </th>
-                <th className="pb-2 pr-4" />
+                {!grouped && <th className="pb-2 pr-4" />}
               </tr>
             </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={TEXT_FILTERS.length + 5} className="py-4 text-sm text-foreground/40">
-                    Ничего не найдено.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map(({ order, item, customer, activeLines, extra }) => {
-                  const cancelledCellClass = item.cancelled ? "text-foreground/40 line-through" : "";
-                  const short = item.product && !item.cancelled && item.product.stock < item.quantity;
-                  return (
-                    <tr key={item.id} className="border-b border-foreground/10">
-                      <td className="whitespace-nowrap py-2 pr-4 font-medium">{order.orderNumber}</td>
-                      <td className="py-2 pr-4">{customer}</td>
-                      <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.nameSnapshot}</td>
-                      <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.product?.sku ?? "—"}</td>
-                      <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.quantity}</td>
-                      <td
-                        className={`py-2 pr-4 ${short ? "text-red-600 dark:text-red-500" : ""}`}
-                        title={short ? "Меньше, чем заказано" : undefined}
-                      >
-                        {item.product?.stock ?? "—"}
+            {grouped ? (
+              <tbody>
+                {groups.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={textFilters.length + 4}
+                      className="py-4 text-sm text-foreground/40"
+                    >
+                      Ничего не найдено.
+                    </td>
+                  </tr>
+                ) : (
+                  groups.map((g) => (
+                    <tr
+                      key={g.order.id}
+                      onClick={() => openOrder(g.order.orderNumber)}
+                      title="Открыть позиции заказа"
+                      className="cursor-pointer border-b border-foreground/10 transition-colors hover:bg-foreground/5"
+                    >
+                      <td className="whitespace-nowrap py-2 pr-4 font-medium">
+                        {g.order.orderNumber}
                       </td>
-                      <td className={`py-2 pr-4 ${cancelledCellClass}`}>{formatRub(item.priceSnapshot)}</td>
-                      <td className="whitespace-nowrap py-2 pr-4">{formatRub(order.totalAmount)}</td>
+                      <td className="py-2 pr-4">{g.customer}</td>
+                      <td className="py-2 pr-4">{g.quantity}</td>
                       <td className="whitespace-nowrap py-2 pr-4">
-                        <ExtraCostsButton orderNumber={order.orderNumber} costs={order.extraCosts} total={extra} />
+                        {formatRub(g.order.totalAmount)}
                       </td>
-                      <td className="whitespace-nowrap py-2 pr-4 font-medium">{formatRub(order.totalAmount + extra)}</td>
+                      <td className="whitespace-nowrap py-2 pr-4">{formatRub(g.extra)}</td>
+                      <td className="whitespace-nowrap py-2 pr-4 font-medium">
+                        {formatRub(g.order.totalAmount + g.extra)}
+                      </td>
+                      <td className="py-2 pr-4">{g.status}</td>
                       <td className="py-2 pr-4">
-                        <OrderStatusSelect itemId={item.id} status={item.status} activeLines={activeLines} />
+                        {g.delivery}
+                        {g.deliveryPending && (
+                          <div className="whitespace-nowrap text-[11px] text-yellow-700 dark:text-yellow-400">
+                            Ждёт подтверждения покупателя
+                          </div>
+                        )}
                       </td>
-                      <td className="py-2 pr-4">
-                        <DeliveryMethodCell
-                          itemId={item.id}
-                          method={item.deliveryMethod}
-                          confirmPending={item.deliveryConfirmPending}
-                          activeLines={activeLines}
-                        />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <DeliveryDateInput itemId={item.id} deliveryDate={item.deliveryDate} activeLines={activeLines} />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <PaidToggle itemId={item.id} state={paymentStateOf(item)} activeLines={activeLines} />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <OrderFilesMenu orderId={order.id} />
-                      </td>
+                      <td className="whitespace-nowrap py-2 pr-4">{g.dates}</td>
+                      <td className="py-2 pr-4">{g.payment}</td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
+                  ))
+                )}
+              </tbody>
+            ) : (
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={TEXT_FILTERS.length + 5}
+                      className="py-4 text-sm text-foreground/40"
+                    >
+                      Ничего не найдено.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map(({ order, item, customer, activeLines, extra }) => {
+                    const cancelledCellClass = item.cancelled
+                      ? "text-foreground/40 line-through"
+                      : "";
+                    const short =
+                      item.product && !item.cancelled && item.product.stock < item.quantity;
+                    return (
+                      <tr key={item.id} className="border-b border-foreground/10">
+                        <td className="whitespace-nowrap py-2 pr-4 font-medium">
+                          {order.orderNumber}
+                        </td>
+                        <td className="py-2 pr-4">{customer}</td>
+                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.nameSnapshot}</td>
+                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>
+                          {item.product?.sku ?? "—"}
+                        </td>
+                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.quantity}</td>
+                        <td
+                          className={`py-2 pr-4 ${short ? "text-red-600 dark:text-red-500" : ""}`}
+                          title={short ? "Меньше, чем заказано" : undefined}
+                        >
+                          {item.product?.stock ?? "—"}
+                        </td>
+                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>
+                          {formatRub(item.priceSnapshot)}
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-4">
+                          {formatRub(order.totalAmount)}
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-4">
+                          <ExtraCostsButton
+                            orderNumber={order.orderNumber}
+                            costs={order.extraCosts}
+                            total={extra}
+                          />
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-4 font-medium">
+                          {formatRub(order.totalAmount + extra)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <OrderStatusSelect
+                            itemId={item.id}
+                            status={item.status}
+                            activeLines={activeLines}
+                          />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <DeliveryMethodCell
+                            itemId={item.id}
+                            method={item.deliveryMethod}
+                            confirmPending={item.deliveryConfirmPending}
+                            activeLines={activeLines}
+                          />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <DeliveryDateInput
+                            itemId={item.id}
+                            deliveryDate={item.deliveryDate}
+                            activeLines={activeLines}
+                          />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <PaidToggle
+                            itemId={item.id}
+                            state={paymentStateOf(item)}
+                            activeLines={activeLines}
+                          />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <OrderFilesMenu orderId={order.id} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            )}
           </table>
         </CrmTableScroll>
       )}

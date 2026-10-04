@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getOwnCompanyId } from "@/lib/own-company";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { userSchema, type UserInput } from "@/lib/validators/crm";
 import type { Role } from "@prisma/client";
@@ -48,6 +49,13 @@ async function generateLogin(role: Role, email: string | undefined): Promise<str
   return `${prefix}${max + 1}`;
 }
 
+/** Employees always belong to EMV; customers to whatever company was chosen. */
+async function companyFor(role: Role, companyId: string | undefined) {
+  if (role !== "CUSTOMER") return getOwnCompanyId();
+  await assertCompanyExists(companyId);
+  return companyId || null;
+}
+
 async function assertCompanyExists(companyId: string | undefined) {
   if (!companyId) return;
   const company = await prisma.company.findUnique({ where: { id: companyId } });
@@ -68,7 +76,7 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
   }
 
   try {
-    await assertCompanyExists(data.companyId);
+    const companyId = await companyFor(data.role, data.companyId);
     const login = await generateLogin(data.role, data.email || undefined);
     const passwordHash = await bcrypt.hash(data.password, 12);
 
@@ -80,7 +88,7 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
         email: data.email || null,
         phone: data.phone || null,
         role: data.role,
-        companyId: data.companyId || null,
+        companyId,
         login,
         passwordHash,
       },
@@ -111,7 +119,7 @@ export async function updateUser(id: string, input: UserInput): Promise<ActionRe
   }
 
   try {
-    await assertCompanyExists(data.companyId);
+    const companyId = await companyFor(data.role, data.companyId);
 
     await prisma.user.update({
       where: { id },
@@ -122,7 +130,7 @@ export async function updateUser(id: string, input: UserInput): Promise<ActionRe
         email: data.email || null,
         phone: data.phone || null,
         role: data.role,
-        companyId: data.companyId || null,
+        companyId,
         ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 12) } : {}),
       },
     });
