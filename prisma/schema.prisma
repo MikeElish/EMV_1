@@ -78,6 +78,7 @@ model Product {
 
   searchLogs SearchLog[]
   pricing    ProductPricing?
+  offers     SupplierOffer[]
 
   // Cards in 1С:Бухгалтерия this product stands for (1С often holds the same
   // article on several cards).
@@ -114,6 +115,28 @@ model ProductPricing {
   supplierId    String?
   supplier      Company? @relation(fields: [supplierId], references: [id])
 
+  @@index([supplierId])
+}
+
+// A supplier's offer for a product (card → «Цены»). The selected one is the
+// purchase price behind the site prices (ProductPricing mirrors it). Entered
+// with a new product; later updates come from «Проценка».
+model SupplierOffer {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId   String?
+  supplier     Company? @relation(fields: [supplierId], references: [id])
+  // Purchase price, kopecks.
+  price        Int
+  deliveryDays Int?
+  quality      String?
+  selected     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  // «Актуальность»: when the price was last updated.
+  updatedAt    DateTime @updatedAt
+
+  @@index([productId])
   @@index([supplierId])
 }
 
@@ -314,6 +337,8 @@ model User {
   // registration, or in the dialog on first sign-in for accounts created by
   // staff. Null = not given yet.
   personalDataConsentAt DateTime?
+  mailRules             MailRule[]
+  mailRuleState         MailRuleState?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -385,6 +410,7 @@ model Company {
   paymentDeferralDays Int?
   documents           CompanyDocument[]
   suppliedProducts    ProductPricing[]
+  supplierOffers      SupplierOffer[]
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
   oneCRef             String?            @unique
@@ -538,4 +564,43 @@ model BulkSearchRequest {
   id        String   @id @default(cuid())
   rows      Json
   createdAt DateTime @default(now())
+}
+
+// Почта → Настройки → «Правила обработки писем» (as in Яндекс.Почта). Applied
+// by the site to new letters in the employee's Входящие (src/lib/mail/rules.ts).
+model MailRule {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  enabled        Boolean  @default(true)
+  position       Int      @default(0)
+  // true: all conditions must match; false: any of them.
+  matchAll       Boolean  @default(true)
+  // [{ field, op, value }] -- see MailRuleCondition.
+  conditions     Json
+  // "any" | "with" | "without" (attachments)
+  attachments    String   @default("any")
+  moveTo         String?
+  markRead       Boolean  @default(false)
+  flag           Boolean  @default(false)
+  remove         Boolean  @default(false)
+  forwardTo      String?
+  replyText      String?
+  stopProcessing Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, position])
+}
+
+// Where rule processing of a user's Входящие got to.
+model MailRuleState {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uidValidity String
+  lastUid     Int
+  // Auto-replies: { address: ISO time } -- one reply per sender a day.
+  replied     Json     @default("{}")
+  updatedAt   DateTime @updatedAt
 }

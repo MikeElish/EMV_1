@@ -2,7 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { verifyStaffSession } from "@/lib/staff-dal";
 import { getMailAccount } from "@/lib/mail/account";
-import { MailError, type MailFolder } from "@/lib/mail/imap";
+import { MailError, listFolders, type MailFolder } from "@/lib/mail/imap";
+import { MailRulesSettings, type RuleRow } from "@/components/mail/MailRulesSettings";
 import { getFoldersWithCounts } from "@/lib/mail/unread";
 import { MAIL_DEFAULTS } from "@/lib/validators/mail-settings";
 import { getSignatureLogoDataUri } from "@/lib/mail/signature-logo";
@@ -17,6 +18,7 @@ import {
 const SECTIONS = [
   { id: "personal", label: "Личные данные, подпись" },
   { id: "folders", label: "Папки" },
+  { id: "rules", label: "Правила обработки писем" },
   { id: "programs", label: "Почтовые программы" },
   { id: "other", label: "Прочее" },
 ] as const;
@@ -47,6 +49,35 @@ export default async function MailSettingsPage({ searchParams }: PageProps<"/adm
     }
   }
 
+  let rules: RuleRow[] = [];
+  let ruleFolders: { path: string; name: string }[] = [];
+  let ruleFoldersError: string | null = null;
+  if (section === "rules" && account) {
+    rules = (await prisma.mailRule.findMany({ where: { userId }, orderBy: { position: "asc" } })).map((r) => ({
+      id: r.id,
+      name: r.name,
+      enabled: r.enabled,
+      matchAll: r.matchAll,
+      conditions: r.conditions as RuleRow["conditions"],
+      attachments: r.attachments as RuleRow["attachments"],
+      moveTo: r.moveTo,
+      markRead: r.markRead,
+      flag: r.flag,
+      remove: r.remove,
+      forwardTo: r.forwardTo,
+      replyText: r.replyText,
+      stopProcessing: r.stopProcessing,
+    }));
+    try {
+      // Where a rule may put a letter: everything but Входящие, Черновики, Исходящие.
+      ruleFolders = (await listFolders(account))
+        .filter((f) => !["inbox", "drafts", "outbox"].includes(f.role))
+        .map((f) => ({ path: f.path, name: f.name }));
+    } catch (error) {
+      ruleFoldersError = error instanceof MailError ? error.message : "Не удалось загрузить папки";
+    }
+  }
+
   return (
     <div className="flex gap-8">
       <nav className="w-56 shrink-0 space-y-1 text-sm" aria-label="Разделы настроек">
@@ -65,7 +96,11 @@ export default async function MailSettingsPage({ searchParams }: PageProps<"/adm
       </nav>
 
       {/* The signature section is wider: the preview sits to the right of the form. */}
-      <div className={`min-w-0 flex-1 ${section === "personal" ? "max-w-6xl" : "max-w-xl"}`}>
+      <div
+        className={`min-w-0 flex-1 ${
+          section === "personal" ? "max-w-6xl" : section === "rules" ? "max-w-4xl" : "max-w-xl"
+        }`}
+      >
         {section === "personal" && (
           <PersonalSettings
             senderName={user?.mailSenderName ?? ""}
@@ -77,6 +112,12 @@ export default async function MailSettingsPage({ searchParams }: PageProps<"/adm
         {section === "folders" &&
           (account ? (
             <FoldersSettings folders={folders} error={foldersError} />
+          ) : (
+            <p className="text-sm text-foreground/60">Сначала подключите ящик в разделе «Почтовые программы».</p>
+          ))}
+        {section === "rules" &&
+          (account ? (
+            <MailRulesSettings rules={rules} folders={ruleFolders} foldersError={ruleFoldersError} />
           ) : (
             <p className="text-sm text-foreground/60">Сначала подключите ящик в разделе «Почтовые программы».</p>
           ))}

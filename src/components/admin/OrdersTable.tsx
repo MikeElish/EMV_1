@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { formatRub } from "@/lib/money";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_PROGRESS } from "@/lib/validators/orders";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
@@ -196,11 +196,34 @@ export function OrdersTable({
     }
   }
 
+  // Opening an order from the grouped list remembers that list (filters and
+  // scroll position) for «Назад».
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pendingScroll = useRef<number | null>(null);
+  const [returnTo, setReturnTo] = useState<{ filters: Filters; scrollTop: number } | null>(null);
+
   /** From a grouped row to the order's own lines (editable). */
-  function openOrder(orderNumber: string) {
+  function openOrder(orderNumber: string, row: HTMLElement) {
+    const frame = row.closest<HTMLElement>("[data-crm-scroll]");
+    setReturnTo({ filters, scrollTop: frame?.scrollTop ?? 0 });
     setFilters({ ...EMPTY_FILTERS, orderNumber });
     toggleGrouped(false);
   }
+
+  function backToGrouped() {
+    if (!returnTo) return;
+    pendingScroll.current = returnTo.scrollTop;
+    setFilters(returnTo.filters);
+    setReturnTo(null);
+    toggleGrouped(true);
+  }
+
+  // The frame is remounted on a mode switch -- put the list back where it was.
+  useLayoutEffect(() => {
+    if (pendingScroll.current === null || !scrollRef.current) return;
+    scrollRef.current.scrollTop = pendingScroll.current;
+    pendingScroll.current = null;
+  }, [grouped]);
 
   if (initialOrderNumber !== syncedOrderNumber) {
     setSyncedOrderNumber(initialOrderNumber);
@@ -286,10 +309,22 @@ export function OrdersTable({
             <input
               type="checkbox"
               checked={grouped}
-              onChange={(e) => toggleGrouped(e.target.checked)}
+              onChange={(e) => {
+                setReturnTo(null);
+                toggleGrouped(e.target.checked);
+              }}
             />
             Группировать по заказам
           </label>
+          {returnTo && !grouped && (
+            <button
+              type="button"
+              onClick={backToGrouped}
+              className="inline-flex items-center gap-1.5 rounded-md border border-foreground/20 px-3 py-1 text-sm font-medium transition-colors hover:bg-foreground/5"
+            >
+              <span aria-hidden>←</span> Назад
+            </button>
+          )}
         </div>
         {hasActiveFilters && (
           <button
@@ -307,7 +342,7 @@ export function OrdersTable({
       {orders.length === 0 ? (
         <p className="mt-4 text-sm text-foreground/40">Заказов пока нет.</p>
       ) : (
-        <CrmTableScroll key={grouped ? "grouped" : "lines" /* new scale for the other layout */}>
+        <CrmTableScroll ref={scrollRef} key={grouped ? "grouped" : "lines" /* new scale for the other layout */}>
           <table className="w-full text-sm">
             <thead className={STICKY_THEAD}>
               <tr className="text-left text-foreground/50">
@@ -402,7 +437,7 @@ export function OrdersTable({
                   groups.map((g) => (
                     <tr
                       key={g.order.id}
-                      onClick={() => openOrder(g.order.orderNumber)}
+                      onClick={(e) => openOrder(g.order.orderNumber, e.currentTarget)}
                       title="Открыть позиции заказа"
                       className="cursor-pointer border-b border-foreground/10 transition-colors hover:bg-foreground/5"
                     >

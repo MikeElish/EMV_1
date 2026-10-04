@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { releaseAwaitingSupply } from "@/lib/order-status";
+import { recordOffer } from "@/lib/supplier-offers";
 import {
   csvRowSchema,
   IMPORT_COLUMN_ORDER,
@@ -279,10 +280,17 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
           },
         });
         if (restocked) restockedIds.push(existing.id);
+        await recordOffer(prisma, existing.id, { supplierId: pricing.supplierId ?? null, price: pricing.purchasePrice });
         updated++;
       } else {
         await prisma.product.create({
-          data: { sku: row.sku, newArrivalAt: importedAt, ...data, pricing: { create: pricing } },
+          data: {
+            sku: row.sku,
+            newArrivalAt: importedAt,
+            ...data,
+            pricing: { create: pricing },
+            offers: { create: { supplierId: pricing.supplierId ?? null, price: pricing.purchasePrice, selected: true } },
+          },
         });
         created++;
       }

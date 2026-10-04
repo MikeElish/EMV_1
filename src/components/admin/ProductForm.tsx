@@ -10,6 +10,7 @@ import {
   SALE_KINDS,
   initialPrices,
   toKopecks,
+  type OfferRow,
   type PricesState,
 } from "@/components/admin/ProductPricesPanel";
 
@@ -32,6 +33,7 @@ export function ProductForm({
   markups,
   initial,
   initialPricing,
+  offers = [],
   onSubmit,
 }: {
   categories: Category[];
@@ -42,13 +44,15 @@ export function ProductForm({
     images?: string[];
   };
   initialPricing?: Parameters<typeof initialPrices>[1];
+  /** Supplier offers of an existing card (view only, one is picked for the site). */
+  offers?: OfferRow[];
   onSubmit: (input: ProductInput) => Promise<ActionResult>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [tab, setTab] = useState<Tab>("main");
-  const [prices, setPrices] = useState<PricesState>(() => initialPrices(markups, initialPricing));
+  const [prices, setPrices] = useState<PricesState>(() => initialPrices(markups, initialPricing, offers));
 
   function failOnPrices(message: string) {
     setError(message);
@@ -84,6 +88,9 @@ export function ProductForm({
       retailPrice: sale.retail,
       dealerPrice: sale.dealer,
       supplierId: prices.supplierId || undefined,
+      deliveryDays: prices.deliveryDays ? Number(prices.deliveryDays) : undefined,
+      quality: prices.quality.trim() || undefined,
+      selectedOfferId: prices.selectedOfferId || undefined,
       stock: Number(formData.get("stock") ?? 0),
       categoryId: String(formData.get("categoryId") ?? ""),
       brand: String(formData.get("brand") ?? "") || undefined,
@@ -130,7 +137,7 @@ export function ProductForm({
       </div>
 
       <div data-tab="prices" className={tab === "prices" ? "mt-4" : "hidden"}>
-        <ProductPricesPanel value={prices} onChange={setPrices} suppliers={suppliers} />
+        <ProductPricesPanel value={prices} onChange={setPrices} suppliers={suppliers} offers={offers} />
       </div>
 
       <div data-tab="main" className={tab === "main" ? "mt-4 space-y-4" : "hidden"}>

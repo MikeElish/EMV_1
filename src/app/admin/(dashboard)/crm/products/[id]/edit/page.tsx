@@ -12,7 +12,13 @@ export default async function EditProductPage({
 }: PageProps<"/admin/crm/products/[id]/edit">) {
   const { id } = await params;
   const [product, categories, suppliers, markups] = await Promise.all([
-    prisma.product.findUnique({ where: { id }, include: { pricing: true } }),
+    prisma.product.findUnique({
+      where: { id },
+      include: {
+        pricing: true,
+        offers: { include: { supplier: { select: { name: true } } }, orderBy: { price: "asc" } },
+      },
+    }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     getSuppliers(),
     getMarkups(),
@@ -53,6 +59,15 @@ export default async function EditProductPage({
             dealer: product.pricing.dealerPrice,
           } : undefined
         }
+        offers={product.offers.map((o) => ({
+          id: o.id,
+          supplierName: o.supplier?.name ?? null,
+          price: o.price,
+          deliveryDays: o.deliveryDays,
+          quality: o.quality,
+          selected: o.selected,
+          updatedAt: o.updatedAt,
+        }))}
         onSubmit={updateProduct.bind(null, id)}
       />
     </div>

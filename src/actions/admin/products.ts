@@ -7,6 +7,7 @@ import { RESERVE_STATUSES } from "@/lib/validators/orders";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { releaseAwaitingSupply } from "@/lib/order-status";
+import { selectOffer } from "@/lib/supplier-offers";
 import { productSchema, type ProductInput } from "@/lib/validators/product";
 import { buildProductSlug } from "@/lib/slug";
 
@@ -32,6 +33,16 @@ function toProductData(data: ProductInput) {
     images: data.images,
     isActive: data.isActive,
     attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
+  };
+}
+
+function firstOffer(data: ProductInput) {
+  return {
+    supplierId: data.supplierId || null,
+    price: data.purchasePrice,
+    deliveryDays: data.deliveryDays ?? null,
+    quality: data.quality || null,
+    selected: true,
   };
 }
 
@@ -68,7 +79,11 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
   }
 
   await prisma.product.create({
-    data: { ...toProductData(parsed.data), pricing: { create: toPricingData(parsed.data) } },
+    data: {
+      ...toProductData(parsed.data),
+      pricing: { create: toPricingData(parsed.data) },
+      offers: { create: firstOffer(parsed.data) },
+    },
   });
 
   revalidatePath("/admin/crm/products");
@@ -86,6 +101,16 @@ export async function updateProduct(
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
+  }
+
+  // With supplier offers, the purchase price is the selected offer's -- not
+  // whatever the form sent.
+  const offers = await prisma.supplierOffer.findMany({ where: { productId: id } });
+  const chosen =
+    offers.find((o) => o.id === parsed.data.selectedOfferId) ?? offers.find((o) => o.selected) ?? offers[0];
+  if (chosen) {
+    parsed.data.purchasePrice = chosen.price;
+    parsed.data.supplierId = chosen.supplierId ?? undefined;
   }
 
   if (parsed.data.isActive && (parsed.data.purchasePrice <= 0 || parsed.data.price <= 0)) {
@@ -116,6 +141,10 @@ export async function updateProduct(
       },
     },
   });
+  if (chosen && !chosen.selected) await selectOffer(prisma, id, chosen.id);
+  if (!chosen && (parsed.data.supplierId || parsed.data.purchasePrice > 0)) {
+    await prisma.supplierOffer.create({ data: { productId: id, ...firstOffer(parsed.data) } });
+  }
   if (restocked) await releaseAwaitingSupply([id]);
 
   revalidatePath("/admin/crm/products");

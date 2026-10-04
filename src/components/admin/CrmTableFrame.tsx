@@ -14,7 +14,7 @@ export function CrmPage({ children }: { children: React.ReactNode }) {
 export const CrmTableScroll = forwardRef<HTMLDivElement, { children: React.ReactNode; className?: string }>(
   function CrmTableScroll({ children, className = "mt-4" }, ref) {
     return (
-      <div ref={ref} className={`min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable] ${className}`}>
+      <div ref={ref} data-crm-scroll="" className={`min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable] ${className}`}>
         <FitWidth>{children}</FitWidth>
       </div>
     );
