@@ -1,39 +1,45 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { updateDeliveryDate } from "@/actions/admin/orders";
+import { updateLineDeliveryDate } from "@/actions/admin/orders";
+import { useLineChange } from "@/components/admin/LineChange";
 
 function toInputValue(date: Date | null): string {
   if (!date) return "";
-  return date.toISOString().slice(0, 10);
+  return new Date(date).toISOString().slice(0, 10);
 }
 
-export function DeliveryDateInput({
-  orderId,
-  deliveryDate,
-}: {
-  orderId: string;
-  deliveryDate: Date | null;
-}) {
-  const [value, setValue] = useState(toInputValue(deliveryDate));
-  const [pending, startTransition] = useTransition();
+function formatDay(value: string) {
+  return value ? value.split("-").reverse().join(".") : "без даты";
+}
 
-  function handleChange(next: string) {
-    const previous = value;
-    setValue(next);
-    startTransition(async () => {
-      const result = await updateDeliveryDate(orderId, next || null);
-      if (!result.ok) setValue(previous);
-    });
-  }
+/** Planned delivery date of one line; offers the same date for the order's other lines. */
+export function DeliveryDateInput({
+  itemId,
+  deliveryDate,
+  activeLines,
+}: {
+  itemId: string;
+  deliveryDate: Date | null;
+  activeLines: number;
+}) {
+  const line = useLineChange<string>({
+    current: toInputValue(deliveryDate),
+    activeLines,
+    apply: (value, scope) => updateLineDeliveryDate(itemId, value || null, scope),
+    question: (v) => `Установить дату поставки ${formatDay(v)} для остальных позиций заказа?`,
+  });
 
   return (
-    <input
-      type="date"
-      value={value}
-      disabled={pending}
-      onChange={(e) => handleChange(e.target.value)}
-      className="rounded-md border border-foreground/20 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-foreground/50"
-    />
+    <>
+      <input
+        type="date"
+        value={line.value}
+        disabled={line.pending}
+        onChange={(e) => line.change(e.target.value)}
+        className="rounded-md border border-foreground/20 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-foreground/50"
+      />
+      {line.errorText}
+      {line.dialog}
+    </>
   );
 }

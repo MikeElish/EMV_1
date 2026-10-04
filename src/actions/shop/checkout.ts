@@ -6,6 +6,7 @@ import { getAdminSession } from "@/lib/session";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { aggregateOrderStatus, initialLineStatuses } from "@/lib/order-status";
+import { deliveryMethodFromNote } from "@/lib/delivery";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -86,7 +87,14 @@ export async function createOrder(
       userId,
       deferred,
       status: aggregateOrderStatus(statuses),
-      items: { create: orderItemsData.map((item, i) => ({ ...item, status: statuses[i] })) },
+      items: {
+        create: orderItemsData.map((item, i) => ({
+          ...item,
+          status: statuses[i],
+          deferred,
+          deliveryMethod: deliveryMethodFromNote(deliveryNote),
+        })),
+      },
     },
   });
 

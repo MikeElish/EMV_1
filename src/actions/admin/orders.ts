@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
-import { OrderStatus, OrderDocumentCategory } from "@prisma/client";
+import { OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
 import {
   uploadOrderDocumentFile,
   deleteOrderDocumentFile,
 } from "@/lib/order-document-storage";
-import { applyPaymentTerms, setLineStatuses } from "@/lib/order-status";
+import { applyPaymentTerms, refreshOrder, setLineStatuses, targetLines } from "@/lib/order-status";
+import { sendDeliveryChangeLetter } from "@/lib/order-notifications";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -31,19 +32,11 @@ export async function updateOrderItemStatus(
   if (!Object.values(OrderStatus).includes(status)) {
     return { ok: false, error: "Некорректный статус" };
   }
-  const item = await prisma.orderItem.findUnique({
-    where: { id: itemId },
-    select: { id: true, orderId: true, order: { select: { items: { select: { id: true, status: true } } } } },
-  });
-  if (!item) return { ok: false, error: "Позиция не найдена" };
-
-  const targets =
-    scope === "order"
-      ? item.order.items.filter((i) => i.id === item.id || i.status !== "CANCELLED").map((i) => i.id)
-      : [item.id];
+  const target = await targetLines(itemId, scope);
+  if (!target) return { ok: false, error: "Позиция не найдена" };
   await setLineStatuses(
-    item.orderId,
-    targets.map((id) => ({ itemId: id, status })),
+    target.orderId,
+    target.ids.map((id) => ({ itemId: id, status })),
     { notify: true }
   );
   revalidateOrders();
@@ -51,33 +44,84 @@ export async function updateOrderItemStatus(
 }
 
 export type PaymentState = "paid" | "unpaid" | "deferred";
+export type LineScope = "item" | "order";
 
-export async function updatePaymentState(id: string, state: PaymentState): Promise<ActionResult> {
+/** Оплачено / Не оплачено / Отсрочка of one line, or (scope "order") of every active line. */
+export async function updateLinePayment(
+  itemId: string,
+  state: PaymentState,
+  scope: LineScope = "item"
+): Promise<ActionResult> {
   await verifyAdminSession();
   if (!["paid", "unpaid", "deferred"].includes(state)) return { ok: false, error: "Некорректный статус оплаты" };
+  const target = await targetLines(itemId, scope);
+  if (!target) return { ok: false, error: "Позиция не найдена" };
 
-  await prisma.order.update({
-    where: { id },
-    data:
-      state === "paid"
-        ? { paid: true }
-        : { paid: false, deferred: state === "deferred" },
+  await prisma.orderItem.updateMany({
+    where: { id: { in: target.ids } },
+    data: state === "paid" ? { paid: true } : { paid: false, deferred: state === "deferred" },
   });
-  await applyPaymentTerms(id);
+  await refreshOrder(prisma, target.orderId);
+  await applyPaymentTerms(target.orderId);
   revalidateOrders();
   return { ok: true };
 }
 
-export async function updateDeliveryDate(
-  id: string,
-  deliveryDate: string | null
+export async function updateLineDeliveryDate(
+  itemId: string,
+  deliveryDate: string | null,
+  scope: LineScope = "item"
 ): Promise<ActionResult> {
   await verifyAdminSession();
-  await prisma.order.update({
-    where: { id },
+  const target = await targetLines(itemId, scope);
+  if (!target) return { ok: false, error: "Позиция не найдена" };
+  await prisma.orderItem.updateMany({
+    where: { id: { in: target.ids } },
     data: { deliveryDate: deliveryDate ? new Date(deliveryDate) : null },
   });
-  revalidatePath("/admin/crm/orders");
+  await refreshOrder(prisma, target.orderId);
+  revalidateOrders();
+  return { ok: true };
+}
+
+/**
+ * Delivery type changed in CRM: the customer has to confirm it (letter +
+ * «Требуется подтверждение» in Мои заказы). Setting it back to what the
+ * customer had chosen withdraws the request.
+ */
+export async function updateLineDelivery(
+  itemId: string,
+  method: DeliveryMethod,
+  scope: LineScope = "item"
+): Promise<ActionResult> {
+  await verifyAdminSession();
+  if (!Object.values(DeliveryMethod).includes(method)) return { ok: false, error: "Некорректный тип доставки" };
+  const target = await targetLines(itemId, scope);
+  if (!target) return { ok: false, error: "Позиция не найдена" };
+
+  const lines = await prisma.orderItem.findMany({ where: { id: { in: target.ids } } });
+  const asked: string[] = [];
+  for (const line of lines) {
+    if (line.deliveryMethod === method) continue;
+    // What the customer chose stays the reference until they answer.
+    const chosen = line.deliveryConfirmPending ? line.deliveryPrevMethod : line.deliveryMethod;
+    const back = chosen === method;
+    await prisma.orderItem.update({
+      where: { id: line.id },
+      data: {
+        deliveryMethod: method,
+        deliveryPrevMethod: back ? null : chosen,
+        deliveryConfirmPending: !back,
+      },
+    });
+    if (!back) asked.push(line.id);
+  }
+  if (asked.length) {
+    sendDeliveryChangeLetter(target.orderId, asked).catch((error) =>
+      console.error("[orders] delivery change letter failed", target.orderId, error)
+    );
+  }
+  revalidateOrders();
   return { ok: true };
 }
 

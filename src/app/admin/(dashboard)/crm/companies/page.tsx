@@ -21,7 +21,7 @@ export default async function CrmCompaniesPage() {
         shippedAt: true,
         paid: true,
         totalAmount: true,
-        items: { select: { status: true, priceSnapshot: true, quantity: true } },
+        items: { select: { status: true, priceSnapshot: true, quantity: true, paid: true } },
         user: { select: { companyId: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -33,7 +33,10 @@ export default async function CrmCompaniesPage() {
     const companyId = order.user?.companyId;
     if (!companyId) continue;
 
-    const paidAmount = order.paid ? order.totalAmount : 0;
+    // Payment is per line: only paid, not cancelled lines count.
+    const paidAmount = order.items
+      .filter((i) => i.paid && i.status !== "CANCELLED")
+      .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
     // Lines ship one by one, so only the shipped ones count.
     const shippedAmount = order.items
       .filter((i) => SHIPPED_STATUSES.includes(i.status))

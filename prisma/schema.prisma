@@ -133,7 +133,7 @@ model Order {
   // Derived from the lines: their common status, or the least advanced one
   // while they differ (src/lib/order-status.ts).
   status             OrderStatus     @default(AWAITING_PAYMENT)
-  paid              Boolean         @default(false)
+  paid               Boolean         @default(false)
   // "Отсрочка": payment after shipment is agreed for this order. Taken from
   // the customer company's terms at creation, editable in CRM → Заказы.
   deferred           Boolean         @default(false)
@@ -151,12 +151,46 @@ model Order {
   user               User?           @relation(fields: [userId], references: [id])
   items              OrderItem[]
   documents          OrderDocument[]
+  extraCosts         ExtraCost[]
   payment            Payment?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
   @@index([status])
   @@index([userId])
+}
+
+// Services (delivery, forwarding …) -- CRM → Услуги. Not sold in the shop.
+model Service {
+  id          String      @id @default(cuid())
+  name        String
+  code        String?     @unique
+  unit        String?
+  price       Int         @default(0)
+  description String?
+  isActive    Boolean     @default(true)
+  // Catalog_Номенклатура Ref_Key of the 1С card (Услуга = true).
+  oneCRef     String?     @unique
+  extraCosts  ExtraCost[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Additional costs of an order (delivery etc.) -- CRM → Доп.расходы. Shown
+// in CRM → Заказы as «Доп.расходы», added to «ИТОГО».
+model ExtraCost {
+  id        String   @id @default(cuid())
+  number    String
+  date      DateTime @default(now())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id])
+  amount    Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model OrderDocument {
@@ -172,23 +206,34 @@ model OrderDocument {
 }
 
 model OrderItem {
-  id            String  @id @default(cuid())
-  orderId       String
-  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId     String
-  product       Product @relation(fields: [productId], references: [id])
-  nameSnapshot  String
-  priceSnapshot Int
-  quantity      Int
-  cancelled     Boolean @default(false)
+  id                     String          @id @default(cuid())
+  orderId                String
+  order                  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId              String
+  product                Product         @relation(fields: [productId], references: [id])
+  nameSnapshot           String
+  priceSnapshot          Int
+  quantity               Int
+  cancelled              Boolean         @default(false)
   // Each line moves through the statuses on its own; cancelled mirrors
   // status == CANCELLED.
-  status              OrderStatus @default(AWAITING_PAYMENT)
+  status                 OrderStatus     @default(AWAITING_PAYMENT)
   // Changed while the rest of the order sits in other statuses: the customer
   // gets one summary letter at the next 5-minute mark.
-  statusNotifyPending Boolean     @default(false)
+  statusNotifyPending    Boolean         @default(false)
   // Shipped lines have been taken off Product.stock.
-  stockWrittenOff     Boolean     @default(false)
+  stockWrittenOff        Boolean         @default(false)
+  // Payment and planned delivery per line; Order.paid/deferred/deliveryDate
+  // are derived from these (src/lib/order-status.ts).
+  paid                   Boolean         @default(false)
+  deferred               Boolean         @default(false)
+  deliveryDate           DateTime?
+  // Delivery type chosen at checkout. Changed in CRM, it waits for the
+  // customer's confirmation: deliveryPrevMethod keeps what they had chosen,
+  // to return to if they decline.
+  deliveryMethod         DeliveryMethod?
+  deliveryPrevMethod     DeliveryMethod?
+  deliveryConfirmPending Boolean         @default(false)
 
   @@index([orderId])
   @@index([productId, status])

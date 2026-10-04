@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { aggregateOrderStatus, initialLineStatuses } from "@/lib/order-status";
+import { deliveryMethodFromNote } from "@/lib/delivery";
 import { manualOrderSchema, type ManualOrderInput } from "@/lib/validators/manual-order";
 
 export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false; error: string };
@@ -119,6 +120,8 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
           priceSnapshot: i.price,
           quantity: i.quantity,
           status: statuses[index],
+          deferred,
+          deliveryMethod: deliveryMethodFromNote(deliveryNote),
         })),
       },
     },

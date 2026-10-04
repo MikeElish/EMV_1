@@ -14,6 +14,10 @@ export default async function CrmOrdersPage({
         include: { product: { select: { sku: true, stock: true } } },
         orderBy: { id: "asc" },
       },
+      extraCosts: {
+        select: { id: true, number: true, date: true, amount: true, service: { select: { name: true } } },
+        orderBy: { date: "asc" },
+      },
       user: {
         select: {
           lastName: true,

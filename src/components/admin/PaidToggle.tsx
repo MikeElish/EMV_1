@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { updatePaymentState, type PaymentState } from "@/actions/admin/orders";
+import { updateLinePayment, type PaymentState } from "@/actions/admin/orders";
+import { useLineChange } from "@/components/admin/LineChange";
 
 const OPTIONS: { value: PaymentState; label: string; className: string }[] = [
   {
@@ -21,8 +21,8 @@ const OPTIONS: { value: PaymentState; label: string; className: string }[] = [
   },
 ];
 
-export function paymentStateOf(order: { paid: boolean; deferred: boolean }): PaymentState {
-  return order.paid ? "paid" : order.deferred ? "deferred" : "unpaid";
+export function paymentStateOf(line: { paid: boolean; deferred: boolean }): PaymentState {
+  return line.paid ? "paid" : line.deferred ? "deferred" : "unpaid";
 }
 
 export const PAYMENT_STATE_LABELS: Record<PaymentState, string> = {
@@ -31,40 +31,41 @@ export const PAYMENT_STATE_LABELS: Record<PaymentState, string> = {
   paid: "Оплачено",
 };
 
-/** Оплачено / Не оплачено / Отсрочка. Paid or deferred lets in-stock lines ship. */
-export function PaidToggle({ orderId, state }: { orderId: string; state: PaymentState }) {
-  const [value, setValue] = useState(state);
-  const [pending, startTransition] = useTransition();
+/** Оплачено / Не оплачено / Отсрочка of one line. Paid or deferred lets in-stock lines ship. */
+export function PaidToggle({
+  itemId,
+  state,
+  activeLines,
+}: {
+  itemId: string;
+  state: PaymentState;
+  activeLines: number;
+}) {
+  const line = useLineChange<PaymentState>({
+    current: state,
+    activeLines,
+    apply: (value, scope) => updateLinePayment(itemId, value, scope),
+    question: (v) => `Сменить оплату остальных позиций заказа на «${PAYMENT_STATE_LABELS[v]}»?`,
+  });
 
-  const [synced, setSynced] = useState(state);
-  if (state !== synced) {
-    setSynced(state);
-    setValue(state);
-  }
-
-  function change(next: PaymentState) {
-    const previous = value;
-    setValue(next);
-    startTransition(async () => {
-      const result = await updatePaymentState(orderId, next);
-      if (!result.ok) setValue(previous);
-    });
-  }
-
-  const current = OPTIONS.find((o) => o.value === value)!;
+  const current = OPTIONS.find((o) => o.value === line.value)!;
   return (
-    <select
-      value={value}
-      disabled={pending}
-      onChange={(e) => change(e.target.value as PaymentState)}
-      aria-label="Оплата"
-      className={`rounded-md border px-2 py-1 text-xs outline-none transition-opacity disabled:opacity-50 ${current.className}`}
-    >
-      {OPTIONS.map((o) => (
-        <option key={o.value} value={o.value} className="bg-background text-foreground">
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        value={line.value}
+        disabled={line.pending}
+        onChange={(e) => line.change(e.target.value as PaymentState)}
+        aria-label="Оплата"
+        className={`rounded-md border px-2 py-1 text-xs outline-none transition-opacity disabled:opacity-50 ${current.className}`}
+      >
+        {OPTIONS.map((o) => (
+          <option key={o.value} value={o.value} className="bg-background text-foreground">
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {line.errorText}
+      {line.dialog}
+    </>
   );
 }

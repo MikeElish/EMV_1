@@ -12,7 +12,7 @@ export function DropdownMenu({
   buttonClassName,
   children,
 }: {
-  label: string;
+  label: React.ReactNode;
   buttonClassName?: string;
   children: (close: () => void) => React.ReactNode;
 }) {

@@ -56,6 +56,56 @@ export async function initialLineStatuses(
   });
 }
 
+type SummaryLine = {
+  status: OrderStatus;
+  priceSnapshot: number;
+  quantity: number;
+  paid: boolean;
+  deferred: boolean;
+  deliveryDate: Date | null;
+};
+
+/**
+ * The order-level fields derived from its lines: status, total, paid (every
+ * active line paid), deferred (every unpaid active line on deferral) and the
+ * delivery date (the latest one planned).
+ */
+function orderSummary(lines: SummaryLine[]) {
+  const active = lines.filter((l) => l.status !== "CANCELLED");
+  const unpaid = active.filter((l) => !l.paid);
+  const dates = active.map((l) => l.deliveryDate?.getTime()).filter((t): t is number => t !== undefined);
+  return {
+    status: aggregateOrderStatus(lines.map((l) => l.status)),
+    totalAmount: active.reduce((sum, l) => sum + l.priceSnapshot * l.quantity, 0),
+    paid: active.length > 0 && unpaid.length === 0,
+    deferred: unpaid.length > 0 && unpaid.every((l) => l.deferred),
+    deliveryDate: dates.length ? new Date(Math.max(...dates)) : null,
+  };
+}
+
+/** Recomputes the order-level fields after lines changed outside setLineStatuses. */
+export async function refreshOrder(db: Db, orderId: string) {
+  const lines = await db.orderItem.findMany({ where: { orderId } });
+  await db.order.update({ where: { id: orderId }, data: orderSummary(lines) });
+}
+
+/**
+ * The lines this change applies to: just the one, or (scope "order") it and
+ * every other line of its order that isn't cancelled.
+ */
+export async function targetLines(itemId: string, scope: "item" | "order") {
+  const item = await prisma.orderItem.findUnique({
+    where: { id: itemId },
+    select: { orderId: true, order: { select: { items: { select: { id: true, status: true } } } } },
+  });
+  if (!item) return null;
+  const ids =
+    scope === "order"
+      ? item.order.items.filter((i) => i.id === itemId || i.status !== "CANCELLED").map((i) => i.id)
+      : [itemId];
+  return { orderId: item.orderId, ids };
+}
+
 export type LineStatusChange = { itemId: string; status: OrderStatus };
 
 /**
@@ -108,12 +158,7 @@ export async function setLineStatuses(
     }
     if (!changed.length) return { changed };
 
-    const data: Prisma.OrderUpdateInput = {
-      status: aggregateOrderStatus(lines.map((l) => l.status)),
-      totalAmount: lines
-        .filter((l) => l.status !== "CANCELLED")
-        .reduce((sum, l) => sum + l.priceSnapshot * l.quantity, 0),
-    };
+    const data: Prisma.OrderUpdateInput = orderSummary(lines);
     // Stamped only the first time something ships -- a later re-entry (after
     // a correction) doesn't push the date forward.
     if (shippedNow && !order.shippedAt) {
@@ -137,35 +182,28 @@ export async function setLineStatuses(
 }
 
 /**
- * Payment terms of an order changed (paid / deferral). Lines waiting for
- * payment move on to Готов к отгрузке (in stock) or Ожидание поставки; if
- * the order can no longer ship, those two go back to Требуется оплата.
+ * Payment terms of order lines changed (paid / deferral). Lines that may now
+ * ship and were waiting for payment move on to Готов к отгрузке (in stock) or
+ * Ожидание поставки; lines that no longer may ship go back from those two to
+ * Требуется оплата.
  */
 export async function applyPaymentTerms(orderId: string) {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { paid: true, deferred: true, items: { orderBy: { id: "asc" } } },
-  });
-  if (!order) return;
-
+  const items = await prisma.orderItem.findMany({ where: { orderId }, orderBy: { id: "asc" } });
   const changes: LineStatusChange[] = [];
-  if (order.paid || order.deferred) {
-    const waiting = order.items.filter((i) => i.status === "AWAITING_PAYMENT");
-    const left = await freeStock(prisma, waiting.map((i) => i.productId));
-    for (const item of waiting) {
-      const free = left.get(item.productId) ?? 0;
-      if (free >= item.quantity) {
-        left.set(item.productId, free - item.quantity);
-        changes.push({ itemId: item.id, status: "READY_TO_SHIP" });
-      } else {
-        changes.push({ itemId: item.id, status: "AWAITING_SUPPLY" });
-      }
+  const waiting = items.filter((i) => (i.paid || i.deferred) && i.status === "AWAITING_PAYMENT");
+  const left = await freeStock(prisma, waiting.map((i) => i.productId));
+  for (const item of waiting) {
+    const free = left.get(item.productId) ?? 0;
+    if (free >= item.quantity) {
+      left.set(item.productId, free - item.quantity);
+      changes.push({ itemId: item.id, status: "READY_TO_SHIP" });
+    } else {
+      changes.push({ itemId: item.id, status: "AWAITING_SUPPLY" });
     }
-  } else {
-    for (const item of order.items) {
-      if (item.status === "READY_TO_SHIP" || item.status === "AWAITING_SUPPLY") {
-        changes.push({ itemId: item.id, status: "AWAITING_PAYMENT" });
-      }
+  }
+  for (const item of items) {
+    if (!item.paid && !item.deferred && (item.status === "READY_TO_SHIP" || item.status === "AWAITING_SUPPLY")) {
+      changes.push({ itemId: item.id, status: "AWAITING_PAYMENT" });
     }
   }
   if (changes.length) await setLineStatuses(orderId, changes, { notify: true });

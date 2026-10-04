@@ -62,6 +62,31 @@ export async function loadOneCGoods(): Promise<OneCGood[]> {
     }));
 }
 
+export type OneCService = { ref: string; code: string; name: string; group: string; unit: string };
+
+/** Services (Услуга = true) of 1С, not groups, not marked for deletion. */
+export async function loadOneCServices(): Promise<OneCService[]> {
+  const [items, units] = await Promise.all([
+    oneCGetAll<RawItem>("Catalog_Номенклатура", [
+      "Ref_Key", "Parent_Key", "IsFolder", "DeletionMark", "Code", "Description",
+      "НаименованиеПолное", "Артикул", "Услуга", "ЕдиницаИзмерения_Key",
+    ]),
+    oneCGetAll<{ Ref_Key: string; Description: string }>("Catalog_КлассификаторЕдиницИзмерения", ["Ref_Key", "Description"]),
+  ]);
+  const folders = new Map(items.filter((i) => i.IsFolder).map((f) => [f.Ref_Key, f.Description]));
+  const unitName = new Map(units.map((u) => [u.Ref_Key, u.Description]));
+  return items
+    .filter((i) => !i.IsFolder && !i.DeletionMark && i.Услуга)
+    .map((i) => ({
+      ref: i.Ref_Key,
+      code: ((i.Артикул ?? "").trim() || (i.Code ?? "").trim()),
+      name: (i.НаименованиеПолное || i.Description || "").trim(),
+      group: folders.get(i.Parent_Key) ?? "",
+      unit: unitName.get(i.ЕдиницаИзмерения_Key ?? "") ?? "",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+}
+
 /** Same spelling rules for comparing SKUs and names: case, spaces and separators ignored. */
 export const matchKey = (s: string) => s.toUpperCase().replace(/[\s\-_.\/\\]/g, "");
 

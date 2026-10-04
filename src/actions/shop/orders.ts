@@ -37,6 +37,47 @@ export async function cancelMyOrder(orderId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * The customer's answer to a delivery type changed in CRM: «Подтверждаю»
+ * keeps the new type, «Отклонить» returns to the one they chose. Scope
+ * "order" answers for every line of the order still waiting for it.
+ */
+export async function respondDeliveryChange(
+  orderItemId: string,
+  accept: boolean,
+  scope: "item" | "order" = "item"
+): Promise<ActionResult> {
+  const session = await getAdminSession();
+  if (!session?.userId || session.role !== "CUSTOMER") {
+    return { ok: false, error: "Требуется вход в аккаунт" };
+  }
+  const item = await prisma.orderItem.findUnique({
+    where: { id: orderItemId },
+    select: { orderId: true, order: { select: { userId: true } } },
+  });
+  if (!item || item.order.userId !== session.userId) {
+    return { ok: false, error: "Позиция не найдена" };
+  }
+
+  const lines = await prisma.orderItem.findMany({
+    where: scope === "order" ? { orderId: item.orderId } : { id: orderItemId },
+    select: { id: true, deliveryConfirmPending: true, deliveryPrevMethod: true },
+  });
+  for (const line of lines.filter((l) => l.deliveryConfirmPending)) {
+    await prisma.orderItem.update({
+      where: { id: line.id },
+      data: {
+        deliveryConfirmPending: false,
+        deliveryPrevMethod: null,
+        ...(accept ? {} : { deliveryMethod: line.deliveryPrevMethod }),
+      },
+    });
+  }
+  revalidatePath("/shop/orders");
+  revalidatePath("/admin/crm/orders");
+  return { ok: true };
+}
+
 export async function cancelMyOrderItem(orderItemId: string): Promise<ActionResult> {
   const session = await getAdminSession();
   if (!session?.userId || session.role !== "CUSTOMER") {

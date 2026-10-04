@@ -8,10 +8,13 @@ import { OrderActionMenu, type LatestDocs } from "@/components/shop/OrderActionM
 import { OrderStatusBadge } from "@/components/shop/OrderStatusBadge";
 import { PaymentStatusBadge } from "@/components/shop/PaymentStatusBadge";
 import { SuggestField } from "@/components/SuggestField";
+import { DeliveryConfirmCell } from "@/components/shop/DeliveryConfirmCell";
+import { DELIVERY_METHOD_LABELS } from "@/lib/delivery";
 import type { Order, OrderItem } from "@prisma/client";
 
-function paymentStatusText(order: Pick<Order, "paid" | "deferred" | "plannedPaymentDate">): string {
-  const status = getPaymentDisplayStatus(order);
+// Payment is per line; the planned payment date belongs to the order.
+function paymentStatusText(item: Pick<OrderItem, "paid" | "deferred">, order: Pick<Order, "plannedPaymentDate">): string {
+  const status = getPaymentDisplayStatus({ ...item, plannedPaymentDate: order.plannedPaymentDate });
   if (status.kind === "paid") return "Оплачено";
   if (status.kind === "unpaid") return "Не оплачено";
   if (status.kind === "agreed") return "Отсрочка";
@@ -49,12 +52,19 @@ const COLUMNS: {
     accessor: (r) => ORDER_STATUS_LABELS[r.item.status],
   },
   {
+    key: "delivery",
+    label: "Доставка",
+    accessor: (r) =>
+      (r.item.deliveryMethod ? DELIVERY_METHOD_LABELS[r.item.deliveryMethod] : "—") +
+      (r.item.deliveryConfirmPending ? " (требуется подтверждение)" : ""),
+  },
+  {
     key: "deliveryDate",
     label: "Дата поставки",
     accessor: (r) =>
-      r.order.deliveryDate ? new Date(r.order.deliveryDate).toLocaleDateString("ru-RU") : "—",
+      r.item.deliveryDate ? new Date(r.item.deliveryDate).toLocaleDateString("ru-RU") : "—",
   },
-  { key: "paid", label: "Оплата", accessor: (r) => paymentStatusText(r.order) },
+  { key: "paid", label: "Оплата", accessor: (r) => paymentStatusText(r.item, r.order) },
 ];
 
 export function CustomerOrdersTable({
@@ -146,14 +156,22 @@ export function CustomerOrdersTable({
                 <OrderStatusBadge status={item.status} />
               </td>
               <td className="py-2 pr-4">
-                {order.deliveryDate
-                  ? new Date(order.deliveryDate).toLocaleDateString("ru-RU")
+                <DeliveryConfirmCell
+                  itemId={item.id}
+                  method={item.deliveryMethod}
+                  pending={item.deliveryConfirmPending}
+                  otherPending={order.items.filter((i) => i.id !== item.id && i.deliveryConfirmPending).length}
+                />
+              </td>
+              <td className="py-2 pr-4">
+                {item.deliveryDate
+                  ? new Date(item.deliveryDate).toLocaleDateString("ru-RU")
                   : "—"}
               </td>
               <td className="py-2 pr-4">
                 <PaymentStatusBadge
-                  paid={order.paid}
-                  deferred={order.deferred}
+                  paid={item.paid}
+                  deferred={item.deferred}
                   plannedPaymentDate={order.plannedPaymentDate}
                 />
               </td>

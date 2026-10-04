@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendSiteMail } from "@/lib/mailer";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
+import { DELIVERY_METHOD_LABELS } from "@/lib/delivery";
 
 // Letters to the customer when order lines change status:
 // - all (not cancelled) lines now share one status -> "Статус вашего заказа
@@ -48,6 +49,29 @@ export async function sendOrderStatusLetter(orderId: string, status: keyof typeo
     ...letter(recipient.orderNumber, [
       "Статус вашего заказа изменён.",
       `Текущий статус «${ORDER_STATUS_LABELS[status]}»`,
+    ]),
+  });
+}
+
+/** CRM changed the delivery type of these lines -- the customer has to confirm it. */
+export async function sendDeliveryChangeLetter(orderId: string, itemIds: string[]) {
+  const recipient = await recipientOf(orderId);
+  if (!recipient) return;
+  const lines = await prisma.orderItem.findMany({
+    where: { id: { in: itemIds } },
+    select: { nameSnapshot: true, deliveryMethod: true, deliveryPrevMethod: true, product: { select: { sku: true } } },
+    orderBy: { id: "asc" },
+  });
+  const label = (m: keyof typeof DELIVERY_METHOD_LABELS | null) => (m ? DELIVERY_METHOD_LABELS[m] : "не указан");
+  await sendSiteMail({
+    to: recipient.to,
+    ...letter(recipient.orderNumber, [
+      "Изменён тип доставки. Требуется ваше подтверждение:",
+      ...lines.map(
+        (l) =>
+          `${l.nameSnapshot}${l.product?.sku ? ` (арт. ${l.product.sku})` : ""} — ${label(l.deliveryPrevMethod)} → ${label(l.deliveryMethod)}`
+      ),
+      "Подтвердите или отклоните изменение в разделе «Мои заказы».",
     ]),
   });
 }
