@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCart } from "@/components/shop/CartProvider";
+import { cartKey, useCart } from "@/components/shop/CartProvider";
 import { formatRub } from "@/lib/money";
 import { NewArrivalsRotator, type RotatorDirection } from "@/components/shop/NewArrivalsRotator";
 import { EmailVerificationPanel } from "@/components/shop/EmailVerificationPanel";
@@ -35,10 +35,11 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
 
           <ul className="mt-8 divide-y divide-foreground/10">
             {items.map((item) => (
-              <li key={item.productId} className="flex items-center gap-4 py-4">
+              <li key={cartKey(item)} className="flex items-center gap-4 py-4">
                 <div className="flex-1">
                   <Link href={`/shop/product/${item.slug}`} className="font-medium hover:underline">
                     {item.name}
+                    {item.offerLabel && <span className="text-xs text-foreground/50"> · {item.offerLabel}</span>}
                   </Link>
                   <p className="text-sm text-foreground/50">
                     {formatRub(item.price)} · арт. {item.sku}
@@ -48,7 +49,7 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
                 <div className="flex items-center rounded-md border border-foreground/20">
                   <button
                     type="button"
-                    onClick={() => setQuantity(item.productId, item.quantity - 1)}
+                    onClick={() => setQuantity(cartKey(item), item.quantity - 1)}
                     className="px-3 py-1 text-foreground/60 hover:text-foreground"
                     aria-label="Уменьшить количество"
                   >
@@ -57,7 +58,7 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
                   <span className="w-8 text-center text-sm">{item.quantity}</span>
                   <button
                     type="button"
-                    onClick={() => setQuantity(item.productId, item.quantity + 1)}
+                    onClick={() => setQuantity(cartKey(item), item.quantity + 1)}
                     className="px-3 py-1 text-foreground/60 hover:text-foreground"
                     aria-label="Увеличить количество"
                   >
@@ -71,7 +72,7 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
 
                 <button
                   type="button"
-                  onClick={() => removeItem(item.productId)}
+                  onClick={() => removeItem(cartKey(item))}
                   className="text-foreground/40 hover:text-foreground"
                   aria-label="Удалить товар"
                 >

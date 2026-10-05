@@ -15,13 +15,22 @@ export type CartItem = {
   name: string;
   price: number; // kopecks, snapshot at time of adding
   quantity: number;
+  /** A product with several supplier offers: the one picked (its own line). */
+  offerId?: string;
+  /** Shown in the cart next to the name, e.g. «Аналог, 7 дн.». */
+  offerLabel?: string;
 };
+
+/** One cart line = one product + offer. */
+export function cartKey(item: { productId: string; offerId?: string }) {
+  return item.offerId ? `${item.productId}:${item.offerId}` : item.productId;
+}
 
 type CartContextValue = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">, quantity: number) => void;
-  setQuantity: (productId: string, quantity: number) => void;
-  removeItem: (productId: string) => void;
+  setQuantity: (key: string, quantity: number) => void;
+  removeItem: (key: string) => void;
   clear: () => void;
   totalQuantity: number;
   totalAmount: number;
@@ -56,28 +65,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   function addItem(item: Omit<CartItem, "quantity">, quantity: number) {
     setItems((prev) => {
-      const existing = prev.find((i) => i.productId === item.productId);
+      const key = cartKey(item);
+      const existing = prev.find((i) => cartKey(i) === key);
       if (existing) {
-        return prev.map((i) =>
-          i.productId === item.productId
-            ? { ...i, quantity: i.quantity + quantity }
-            : i
-        );
+        return prev.map((i) => (cartKey(i) === key ? { ...i, quantity: i.quantity + quantity } : i));
       }
       return [...prev, { ...item, quantity }];
     });
   }
 
-  function setQuantity(productId: string, quantity: number) {
+  function setQuantity(key: string, quantity: number) {
     setItems((prev) =>
       quantity <= 0
-        ? prev.filter((i) => i.productId !== productId)
-        : prev.map((i) => (i.productId === productId ? { ...i, quantity } : i))
+        ? prev.filter((i) => cartKey(i) !== key)
+        : prev.map((i) => (cartKey(i) === key ? { ...i, quantity } : i))
     );
   }
 
-  function removeItem(productId: string) {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
+  function removeItem(key: string) {
+    setItems((prev) => prev.filter((i) => cartKey(i) !== key));
   }
 
   function clear() {

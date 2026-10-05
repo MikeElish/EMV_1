@@ -1,75 +1,39 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { CrmPage, CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { getSuppliers } from "@/lib/price-settings";
+import { CrmPage } from "@/components/admin/CrmTableFrame";
+import { PriceCheckBoard } from "@/components/admin/PriceCheckBoard";
 
-// Lines in "Проверка заказа": ordered without enough stock. The price-check
-// workflow itself comes later; for now this is the list to work through.
-export default async function CrmPriceCheckPage() {
-  const lines = await prisma.orderItem.findMany({
-    where: { status: "CHECKING" },
-    include: {
-      product: { select: { id: true, sku: true, brand: true, stock: true } },
-      order: {
-        select: {
-          orderNumber: true,
-          createdAt: true,
-          customerName: true,
-          user: { select: { company: { select: { name: true } } } },
-        },
-      },
-    },
-    orderBy: { order: { createdAt: "asc" } },
-  });
+// Проценка: nomenclature on the left, the chosen article's supplier offers on
+// the right.
+export default async function CrmPriceCheckPage({ searchParams }: PageProps<"/admin/crm/price-check">) {
+  const { product } = await searchParams;
+  const [products, updated, checking, suppliers] = await Promise.all([
+    prisma.product.findMany({
+      select: { id: true, brand: true, name: true, sku: true, category: { select: { name: true } } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.supplierOffer.groupBy({ by: ["productId"], _max: { priceUpdatedAt: true } }),
+    prisma.orderItem.groupBy({ by: ["productId"], where: { status: "CHECKING" }, _count: true }),
+    getSuppliers(),
+  ]);
+  const updatedOf = new Map(updated.map((u) => [u.productId, u._max.priceUpdatedAt]));
+  const checkingOf = new Map(checking.map((c) => [c.productId, c._count]));
 
   return (
     <CrmPage>
-      <h1 className="shrink-0 text-lg font-semibold">Проценка</h1>
-      <p className="mt-1 shrink-0 text-sm text-foreground/50">
-        Позиции заказов в статусе «Проверка заказа» — товара нет в наличии в нужном количестве.
-      </p>
-      {lines.length === 0 ? (
-        <p className="mt-6 text-sm text-foreground/40">Нет позиций на проверке.</p>
-      ) : (
-        <CrmTableScroll>
-          <table className="w-full text-sm">
-            <thead className={STICKY_THEAD}>
-              <tr className="text-left text-foreground/50">
-                <th className="py-2 pr-4">Дата</th>
-                <th className="py-2 pr-4">Заказ</th>
-                <th className="py-2 pr-4">Заказчик</th>
-                <th className="py-2 pr-4">Товар</th>
-                <th className="py-2 pr-4">Артикул</th>
-                <th className="py-2 pr-4">Бренд</th>
-                <th className="py-2 pr-4">Заказано</th>
-                <th className="py-2 pr-4">В наличии</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.id} className="border-b border-foreground/10">
-                  <td className="py-2 pr-4 text-foreground/60">
-                    {line.order.createdAt.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" })}
-                  </td>
-                  <td className="whitespace-nowrap py-2 pr-4">
-                    <Link
-                      href={`/admin/crm/orders?orderNumber=${encodeURIComponent(line.order.orderNumber)}`}
-                      className="font-medium underline-offset-4 hover:underline"
-                    >
-                      {line.order.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4">{line.order.user?.company?.name ?? line.order.customerName}</td>
-                  <td className="py-2 pr-4">{line.nameSnapshot}</td>
-                  <td className="py-2 pr-4">{line.product.sku}</td>
-                  <td className="py-2 pr-4 text-foreground/60">{line.product.brand ?? "—"}</td>
-                  <td className="py-2 pr-4">{line.quantity}</td>
-                  <td className="py-2 pr-4">{line.product.stock}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CrmTableScroll>
-      )}
+      <PriceCheckBoard
+        products={products.map((p) => ({
+          id: p.id,
+          brand: p.brand,
+          name: p.name,
+          sku: p.sku,
+          category: p.category.name,
+          updatedAt: updatedOf.get(p.id) ?? null,
+          checking: checkingOf.get(p.id) ?? 0,
+        }))}
+        suppliers={suppliers}
+        initialProductId={typeof product === "string" ? product : undefined}
+      />
     </CrmPage>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCart } from "@/components/shop/CartProvider";
+import { cartKey, useCart } from "@/components/shop/CartProvider";
 import { createOrder } from "@/actions/shop/checkout";
 import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
@@ -176,6 +176,7 @@ export default function CheckoutPage() {
       deliveryNote: deliveryNoteLines.join("\n"),
       items: items.map((i) => ({
         productId: i.productId,
+        offerId: i.offerId,
         quantity: i.quantity,
       })),
     });
@@ -304,9 +305,10 @@ export default function CheckoutPage() {
           <h2 className="text-lg font-semibold">Ваш заказ</h2>
           <div className="mt-3 rounded-lg border border-foreground/10 p-4 text-sm">
             {items.map((item) => (
-              <div key={item.productId} className="flex justify-between py-1">
+              <div key={cartKey(item)} className="flex justify-between py-1">
                 <span>
-                  {item.name} × {item.quantity}
+                  {item.name}
+                  {item.offerLabel && <span className="text-xs text-foreground/50"> · {item.offerLabel}</span>} × {item.quantity}
                 </span>
                 <span>{formatRub(item.price * item.quantity)}</span>
               </div>

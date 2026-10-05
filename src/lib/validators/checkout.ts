@@ -9,6 +9,8 @@ export const checkoutSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1),
+        // A product with several supplier offers: the one picked in the shop.
+        offerId: z.string().optional(),
         quantity: z.number().int().min(1).max(999),
       })
     )

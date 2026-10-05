@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import type { Product } from "@prisma/client";
-import { formatRub } from "@/lib/money";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
+import { OfferPrice, OffersDropdown, useProductOffers } from "@/components/shop/ShopOffers";
 import { BRANDS } from "@/content/brands";
 
 export type BrowserCategory = {
@@ -25,7 +25,10 @@ const NOMINAL_CARD_HEIGHT = 76;
 
 type SortOption = "default" | "price_asc" | "price_desc" | "name_asc" | "name_desc" | "sku";
 
-const SORT_COMPARATORS: Record<Exclude<SortOption, "default">, (a: Product, b: Product) => number> = {
+const SORT_COMPARATORS: Record<
+  Exclude<SortOption, "default">,
+  (a: Product, b: Product) => number
+> = {
   price_asc: (a, b) => a.price - b.price,
   price_desc: (a, b) => b.price - a.price,
   name_asc: (a, b) => a.name.localeCompare(b.name, "ru"),
@@ -113,7 +116,7 @@ export function CategoryBrowser({
 
   const visibleCount = Math.max(
     1,
-    Math.min(categories.length || 1, Math.round(PRODUCT_AREA_HEIGHT / NOMINAL_CARD_HEIGHT))
+    Math.min(categories.length || 1, Math.round(PRODUCT_AREA_HEIGHT / NOMINAL_CARD_HEIGHT)),
   );
   const cardHeight = PRODUCT_AREA_HEIGHT / visibleCount;
 
@@ -320,9 +323,7 @@ export function CategoryBrowser({
                     }`}
                   >
                     <span className="font-medium">{category.name}</span>
-                    <span className="text-xs text-foreground/50">
-                      {category.count} товаров
-                    </span>
+                    <span className="text-xs text-foreground/50">{category.count} товаров</span>
                   </button>
                 );
               })}
@@ -361,50 +362,22 @@ export function CategoryBrowser({
               overscrollBehavior: "contain",
             }}
           >
-          {!hasActiveFilter ? (
-            <div className="flex h-full items-center justify-center">
-              <span className="animate-pulse text-foreground/40">
-                Выберите категорию
-              </span>
-            </div>
-          ) : selectedProducts.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <span className="text-foreground/40">Товар отсутствует</span>
-            </div>
-          ) : (
-            selectedProducts.map((product) => (
-              <div
-                key={product.id}
-                style={{ height: ROW_HEIGHT }}
-                className="flex w-full items-center gap-3 border-b border-foreground/10 px-3 text-sm last:border-b-0 hover:bg-foreground/5"
-              >
-                <button
-                  type="button"
-                  onClick={() => setQuickViewProduct(product)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{product.name}</span>
-                    <span className="block truncate text-xs text-foreground/40">
-                      {product.sku}
-                    </span>
-                  </span>
-                  <span
-                    className={`shrink-0 text-xs ${
-                      product.stock > 0
-                        ? "text-green-700 dark:text-green-500"
-                        : "text-foreground/40"
-                    }`}
-                  >
-                    {product.stock > 0 ? "В наличии" : "Под заказ"}
-                  </span>
-                  <span className="w-24 shrink-0 text-right font-medium">
-                    {formatRub(product.price)}
-                  </span>
-                </button>
-                <RowOrderButton product={product} />
+            {!hasActiveFilter ? (
+              <div className="flex h-full items-center justify-center">
+                <span className="animate-pulse text-foreground/40">Выберите категорию</span>
               </div>
-            ))
+            ) : selectedProducts.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <span className="text-foreground/40">Товар отсутствует</span>
+              </div>
+            ) : (
+              selectedProducts.map((product) => (
+                <BrowserRow
+                  key={product.id}
+                  product={product}
+                  onQuickView={() => setQuickViewProduct(product)}
+                />
+              ))
             )}
           </div>
         </div>
@@ -417,5 +390,49 @@ export function CategoryBrowser({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * One product line. With several supplier offers the price reads «от …» and
+ * a click drops the offers down under the line instead of opening the card.
+ */
+function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: () => void }) {
+  const offers = useProductOffers(product.id);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div
+        style={{ height: ROW_HEIGHT }}
+        className={`flex w-full items-center gap-3 border-b border-foreground/10 px-3 text-sm last:border-b-0 hover:bg-foreground/5 ${
+          open ? "bg-foreground/5" : ""
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => (offers ? setOpen((v) => !v) : onQuickView())}
+          aria-expanded={offers ? open : undefined}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{product.name}</span>
+            <span className="block truncate text-xs text-foreground/40">{product.sku}</span>
+          </span>
+          <span
+            className={`shrink-0 text-xs ${
+              product.stock > 0 ? "text-green-700 dark:text-green-500" : "text-foreground/40"
+            }`}
+          >
+            {product.stock > 0 ? "В наличии" : "Под заказ"}
+          </span>
+          <span className="w-28 shrink-0 text-right font-medium">
+            <OfferPrice product={product} />
+            {offers && <span className="ml-1 text-xs text-foreground/50">{open ? "▴" : "▾"}</span>}
+          </span>
+        </button>
+        <RowOrderButton product={product} />
+      </div>
+      {open && offers && <OffersDropdown product={product} offers={offers} />}
+    </>
   );
 }

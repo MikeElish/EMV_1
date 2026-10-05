@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { ShopOffersProvider } from "@/components/shop/ShopOffers";
+import { getShopOffers } from "@/lib/supplier-offers";
 import { HeroMessageCarousel } from "@/components/shop/HeroMessageCarousel";
 import { CategoryBrowser } from "@/components/shop/CategoryBrowser";
 import { NewArrivalsRotator } from "@/components/shop/NewArrivalsRotator";
@@ -29,43 +31,47 @@ export default async function ShopHomePage() {
   const readyToOfferPool = allActiveProducts.filter((p) => p.stock <= 0);
   const lastUploadAt = allActiveProducts.reduce<Date | null>(
     (max, p) => (!max || p.newArrivalAt > max ? p.newArrivalAt : max),
-    null
+    null,
   );
   const newArrivalsPool = lastUploadAt
     ? inStockPool.filter((p) => p.newArrivalAt.getTime() === lastUploadAt.getTime())
     : [];
 
+  const offers = await getShopOffers(allActiveProducts.map((p) => p.id));
+
   return (
-    <>
-      <section className="relative overflow-hidden">
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          src="/videos/shop-hero-reel.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-        />
-        <div className="absolute inset-0 bg-black/55" />
+    <ShopOffersProvider offers={offers}>
+      <>
+        <section className="relative overflow-hidden">
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src="/videos/shop-hero-reel.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+          <div className="absolute inset-0 bg-black/55" />
 
-        <div className="relative mx-auto flex min-h-[220px] max-w-6xl items-center px-6 pb-16 pt-28 sm:min-h-[240px] sm:pt-32">
-          <HeroMessageCarousel />
-        </div>
-      </section>
+          <div className="relative mx-auto flex min-h-[220px] max-w-6xl items-center px-6 pb-16 pt-28 sm:min-h-[240px] sm:pt-32">
+            <HeroMessageCarousel />
+          </div>
+        </section>
 
-      <section className="mx-auto max-w-6xl px-6 pt-2">
-        <CategoryBrowser categories={browserCategories} products={allActiveProducts} />
-      </section>
+        <section className="mx-auto max-w-6xl px-6 pt-2">
+          <CategoryBrowser categories={browserCategories} products={allActiveProducts} />
+        </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-16 pt-4">
-        <NewArrivalsRotator
-          directions={[
-            { key: "inStock", label: "В наличии", items: inStockPool },
-            { key: "readyToOffer", label: "Готовы предложить", items: readyToOfferPool },
-            { key: "newArrivals", label: "Новое поступление", items: newArrivalsPool },
-          ]}
-        />
-      </section>
-    </>
+        <section className="mx-auto max-w-6xl px-6 pb-16 pt-4">
+          <NewArrivalsRotator
+            directions={[
+              { key: "inStock", label: "В наличии", items: inStockPool },
+              { key: "readyToOffer", label: "Готовы предложить", items: readyToOfferPool },
+              { key: "newArrivals", label: "Новое поступление", items: newArrivalsPool },
+            ]}
+          />
+        </section>
+      </>
+    </ShopOffersProvider>
   );
 }

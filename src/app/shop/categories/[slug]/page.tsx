@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { ShopOffersProvider } from "@/components/shop/ShopOffers";
+import { getShopOffers } from "@/lib/supplier-offers";
 import { prisma } from "@/lib/prisma";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { ShopLink } from "@/components/shop/ShopLink";
@@ -21,28 +23,23 @@ export default async function CategoryPage({
   });
 
   const brand = typeof query.brand === "string" ? query.brand : undefined;
-  const machineType =
-    typeof query.machineType === "string" ? query.machineType : undefined;
+  const machineType = typeof query.machineType === "string" ? query.machineType : undefined;
   const sort = typeof query.sort === "string" ? query.sort : undefined;
 
   const brands = Array.from(
-    new Set(allProducts.map((p) => p.brand).filter((b): b is string => !!b))
+    new Set(allProducts.map((p) => p.brand).filter((b): b is string => !!b)),
   ).sort();
   const machineTypes = Array.from(
     new Set(
       allProducts
         .map((p) => (p.attributes as Attributes)?.machineType)
-        .filter((m): m is string => !!m)
-    )
+        .filter((m): m is string => !!m),
+    ),
   ).sort();
 
   let products = allProducts.filter((p) => {
     if (brand && p.brand !== brand) return false;
-    if (
-      machineType &&
-      (p.attributes as Attributes)?.machineType !== machineType
-    )
-      return false;
+    if (machineType && (p.attributes as Attributes)?.machineType !== machineType) return false;
     return true;
   });
 
@@ -59,101 +56,93 @@ export default async function CategoryPage({
     return `/shop/categories/${slug}${qs ? `?${qs}` : ""}`;
   }
 
+  const offers = await getShopOffers(products.map((p) => p.id));
+
   return (
-    <section className="mx-auto max-w-6xl px-6 py-16">
-      <h1 className="text-3xl font-bold">{category.name}</h1>
+    <ShopOffersProvider offers={offers}>
+      <section className="mx-auto max-w-6xl px-6 py-16">
+        <h1 className="text-3xl font-bold">{category.name}</h1>
 
-      <div className="mt-6 flex flex-wrap gap-6 text-sm">
-        {brands.length > 0 && (
-          <div>
-            <span className="text-foreground/50">Бренд: </span>
+        <div className="mt-6 flex flex-wrap gap-6 text-sm">
+          {brands.length > 0 && (
+            <div>
+              <span className="text-foreground/50">Бренд: </span>
+              <ShopLink
+                href={filterHref({ brand: undefined })}
+                className={!brand ? "font-semibold underline" : "text-foreground/70"}
+              >
+                Все
+              </ShopLink>
+              {brands.map((b) => (
+                <span key={b}>
+                  {" · "}
+                  <ShopLink
+                    href={filterHref({ brand: b })}
+                    className={brand === b ? "font-semibold underline" : "text-foreground/70"}
+                  >
+                    {b}
+                  </ShopLink>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {machineTypes.length > 0 && (
+            <div>
+              <span className="text-foreground/50">Техника: </span>
+              <ShopLink
+                href={filterHref({ machineType: undefined })}
+                className={!machineType ? "font-semibold underline" : "text-foreground/70"}
+              >
+                Все
+              </ShopLink>
+              {machineTypes.map((m) => (
+                <span key={m}>
+                  {" · "}
+                  <ShopLink
+                    href={filterHref({ machineType: m })}
+                    className={machineType === m ? "font-semibold underline" : "text-foreground/70"}
+                  >
+                    {m}
+                  </ShopLink>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="ml-auto">
+            <span className="text-foreground/50">Сортировка: </span>
             <ShopLink
-              href={filterHref({ brand: undefined })}
-              className={!brand ? "font-semibold underline" : "text-foreground/70"}
+              href={filterHref({ sort: undefined })}
+              className={!sort ? "font-semibold underline" : "text-foreground/70"}
             >
-              Все
+              По умолчанию
             </ShopLink>
-            {brands.map((b) => (
-              <span key={b}>
-                {" · "}
-                <ShopLink
-                  href={filterHref({ brand: b })}
-                  className={
-                    brand === b ? "font-semibold underline" : "text-foreground/70"
-                  }
-                >
-                  {b}
-                </ShopLink>
-              </span>
-            ))}
+            {" · "}
+            <ShopLink
+              href={filterHref({ sort: "price_asc" })}
+              className={sort === "price_asc" ? "font-semibold underline" : "text-foreground/70"}
+            >
+              Дешевле
+            </ShopLink>
+            {" · "}
+            <ShopLink
+              href={filterHref({ sort: "price_desc" })}
+              className={sort === "price_desc" ? "font-semibold underline" : "text-foreground/70"}
+            >
+              Дороже
+            </ShopLink>
+          </div>
+        </div>
+
+        {products.length === 0 ? (
+          <p className="mt-10 text-foreground/60">Нет товаров, подходящих под выбранные фильтры.</p>
+        ) : (
+          <div className="mt-8">
+            <ProductGrid products={products} />
           </div>
         )}
-
-        {machineTypes.length > 0 && (
-          <div>
-            <span className="text-foreground/50">Техника: </span>
-            <ShopLink
-              href={filterHref({ machineType: undefined })}
-              className={!machineType ? "font-semibold underline" : "text-foreground/70"}
-            >
-              Все
-            </ShopLink>
-            {machineTypes.map((m) => (
-              <span key={m}>
-                {" · "}
-                <ShopLink
-                  href={filterHref({ machineType: m })}
-                  className={
-                    machineType === m
-                      ? "font-semibold underline"
-                      : "text-foreground/70"
-                  }
-                >
-                  {m}
-                </ShopLink>
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="ml-auto">
-          <span className="text-foreground/50">Сортировка: </span>
-          <ShopLink
-            href={filterHref({ sort: undefined })}
-            className={!sort ? "font-semibold underline" : "text-foreground/70"}
-          >
-            По умолчанию
-          </ShopLink>
-          {" · "}
-          <ShopLink
-            href={filterHref({ sort: "price_asc" })}
-            className={
-              sort === "price_asc" ? "font-semibold underline" : "text-foreground/70"
-            }
-          >
-            Дешевле
-          </ShopLink>
-          {" · "}
-          <ShopLink
-            href={filterHref({ sort: "price_desc" })}
-            className={
-              sort === "price_desc" ? "font-semibold underline" : "text-foreground/70"
-            }
-          >
-            Дороже
-          </ShopLink>
-        </div>
-      </div>
-
-      {products.length === 0 ? (
-        <p className="mt-10 text-foreground/60">
-          Нет товаров, подходящих под выбранные фильтры.
-        </p>
-      ) : (
-        <div className="mt-8">
-          <ProductGrid products={products} />
-        </div>
-      )}
-    </section>
+      </section>
+    </ShopOffersProvider>
   );
 }

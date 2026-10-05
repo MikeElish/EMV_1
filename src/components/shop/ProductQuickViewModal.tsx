@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Product } from "@prisma/client";
-import { formatRub } from "@/lib/money";
 import { AddToCartButton } from "@/components/shop/AddToCartButton";
+import { OfferPrice, ProductOffersBlock } from "@/components/shop/ShopOffers";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
 
 const TRANSITION_MS = 200;
@@ -87,7 +87,7 @@ export function ProductQuickViewModal({
             </p>
 
             <p className="mt-4 text-2xl font-semibold">
-              {formatRub(product.price)}
+              <OfferPrice product={product} />
             </p>
             <p className="mt-1 text-sm">
               {product.stock > 0 ? (
@@ -109,6 +109,7 @@ export function ProductQuickViewModal({
                 stock: product.stock,
               }}
             />
+            <ProductOffersBlock product={product} />
 
             {product.description && (
               <p className="mt-4 text-sm text-foreground/80">

@@ -1,11 +1,11 @@
 import { after } from "next/server";
+import { ShopOffersProvider } from "@/components/shop/ShopOffers";
+import { getShopOffers } from "@/lib/supplier-offers";
 import { prisma } from "@/lib/prisma";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { logProductSearches } from "@/actions/shop/search-log";
 
-export default async function SearchPage({
-  searchParams,
-}: PageProps<"/shop/search">) {
+export default async function SearchPage({ searchParams }: PageProps<"/shop/search">) {
   const query = await searchParams;
   const q = typeof query.q === "string" ? query.q.trim() : "";
 
@@ -34,26 +34,30 @@ export default async function SearchPage({
           sku: p.sku,
           name: p.name,
           inSystem: true,
-        }))
-      )
+        })),
+      ),
     );
   }
 
+  const offers = await getShopOffers(products.map((p) => p.id));
+
   return (
-    <section className="mx-auto max-w-6xl px-6 py-16">
-      <h1 className="text-2xl font-bold">
-        {q ? `Результаты по запросу «${q}»` : "Введите запрос для поиска"}
-      </h1>
+    <ShopOffersProvider offers={offers}>
+      <section className="mx-auto max-w-6xl px-6 py-16">
+        <h1 className="text-2xl font-bold">
+          {q ? `Результаты по запросу «${q}»` : "Введите запрос для поиска"}
+        </h1>
 
-      {q && products.length === 0 && (
-        <p className="mt-6 text-foreground/60">Ничего не найдено.</p>
-      )}
+        {q && products.length === 0 && (
+          <p className="mt-6 text-foreground/60">Ничего не найдено.</p>
+        )}
 
-      {products.length > 0 && (
-        <div className="mt-8">
-          <ProductGrid products={products} />
-        </div>
-      )}
-    </section>
+        {products.length > 0 && (
+          <div className="mt-8">
+            <ProductGrid products={products} />
+          </div>
+        )}
+      </section>
+    </ShopOffersProvider>
   );
 }

@@ -7,6 +7,7 @@ import { formatRub } from "@/lib/money";
 import { useCart } from "@/components/shop/CartProvider";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
+import { OfferPrice, OffersDropdown, useProductOffers } from "@/components/shop/ShopOffers";
 
 type Attributes = { machineType?: string } | null;
 
@@ -24,6 +25,8 @@ function StockBadge({ stock }: { stock: number }) {
 
 function ProductListRow({ product }: { product: Product }) {
   const { addItem } = useCart();
+  const offers = useProductOffers(product.id);
+  const [offersOpen, setOffersOpen] = useState(false);
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const [showQtyInput, setShowQtyInput] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -68,9 +71,20 @@ function ProductListRow({ product }: { product: Product }) {
           {product.name}
         </button>
         <StockBadge stock={product.stock} />
-        <span className="w-28 shrink-0 text-right font-semibold">
-          {formatRub(product.price)}
-        </span>
+        {offers ? (
+          <button
+            type="button"
+            onClick={() => setOffersOpen((v) => !v)}
+            aria-expanded={offersOpen}
+            title="Предложения"
+            className="w-32 shrink-0 text-right font-semibold hover:underline"
+          >
+            <OfferPrice product={product} />
+            <span className="ml-1 text-xs text-foreground/50">{offersOpen ? "▴" : "▾"}</span>
+          </button>
+        ) : (
+          <span className="w-28 shrink-0 text-right font-semibold">{formatRub(product.price)}</span>
+        )}
 
         <div className="flex shrink-0 items-center gap-2">
           {showQtyInput && (
@@ -103,6 +117,11 @@ function ProductListRow({ product }: { product: Product }) {
           </button>
         </div>
       </div>
+      {offersOpen && offers && (
+        <div className="-mt-1 overflow-hidden rounded-lg border border-foreground/10">
+          <OffersDropdown product={product} offers={offers} />
+        </div>
+      )}
 
       {quickViewOpen && (
         <ProductQuickViewModal
@@ -154,7 +173,9 @@ export function ProductCard({
           {product.name}
         </h3>
         <div className="mt-auto flex items-center justify-between pt-3">
-          <span className="font-semibold">{formatRub(product.price)}</span>
+          <span className="font-semibold">
+            <OfferPrice product={product} />
+          </span>
           <StockBadge stock={product.stock} />
         </div>
       </div>

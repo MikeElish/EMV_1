@@ -5,7 +5,8 @@ import { checkoutSchema, type CheckoutInput } from "@/lib/validators/checkout";
 import { getAdminSession } from "@/lib/session";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { needsEmailVerification } from "@/lib/email-verification";
-import { aggregateOrderStatus, initialLineStatuses } from "@/lib/order-status";
+import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
+import { getShopOffers } from "@/lib/supplier-offers";
 import { deliveryMethodFromNote } from "@/lib/delivery";
 
 export type CheckoutResult =
@@ -32,19 +33,37 @@ export async function createOrder(
   }
 
   const productById = new Map(products.map((p) => [p.id, p]));
+  // A picked supplier offer is charged at its own site price -- worked out
+  // here, never taken from the browser.
+  const offers = await getShopOffers(items.filter((i) => i.offerId).map((i) => i.productId));
 
   let totalAmount = 0;
-  const orderItemsData = items.map((item) => {
+  const orderItemsData: {
+    productId: string;
+    nameSnapshot: string;
+    priceSnapshot: number;
+    quantity: number;
+    offerId?: string;
+  }[] = [];
+  for (const item of items) {
     const product = productById.get(item.productId)!;
-    const lineTotal = product.price * item.quantity;
-    totalAmount += lineTotal;
-    return {
+    let price = product.price;
+    let offerId: string | undefined;
+    if (item.offerId) {
+      const offer = offers[item.productId]?.find((o) => o.id === item.offerId);
+      if (!offer) return { ok: false, error: `Предложение по «${product.name}» изменилось — обновите корзину` };
+      price = offer.price;
+      offerId = offer.id;
+    }
+    totalAmount += price * item.quantity;
+    orderItemsData.push({
       productId: product.id,
       nameSnapshot: product.name,
-      priceSnapshot: product.price,
+      priceSnapshot: price,
       quantity: item.quantity,
-    };
-  });
+      ...(offerId ? { offerId } : {}),
+    });
+  }
 
   // Guest checkout stays the default -- if the shopper happens to be logged
   // in as a Покупатель at the moment of checkout, the order is silently
@@ -98,5 +117,6 @@ export async function createOrder(
     },
   });
 
+  await orderMissingFromSuppliers(order.id);
   return { ok: true, orderNumber: order.orderNumber };
 }

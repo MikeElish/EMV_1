@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Product } from "@prisma/client";
-import { formatRub } from "@/lib/money";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
+import { OfferPrice } from "@/components/shop/ShopOffers";
 
 export type RotatorDirection = {
   key: string;
@@ -204,7 +204,9 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
           >
             {product.stock > 0 ? "В наличии" : "Под заказ"}
           </span>
-          <span className="w-24 shrink-0 text-right font-medium">{formatRub(product.price)}</span>
+          <span className="w-28 shrink-0 text-right font-medium">
+            <OfferPrice product={product} />
+          </span>
         </button>
         <RowOrderButton product={product} />
       </div>

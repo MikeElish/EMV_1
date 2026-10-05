@@ -66,7 +66,7 @@ export default async function EditProductPage({
           deliveryDays: o.deliveryDays,
           quality: o.quality,
           selected: o.selected,
-          updatedAt: o.updatedAt,
+          updatedAt: o.priceUpdatedAt,
         }))}
         onSubmit={updateProduct.bind(null, id)}
       />

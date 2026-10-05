@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-dal";
 import { generateOrderNumber } from "@/lib/order-number-db";
-import { aggregateOrderStatus, initialLineStatuses } from "@/lib/order-status";
+import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
 import { deliveryMethodFromNote } from "@/lib/delivery";
 import { manualOrderSchema, type ManualOrderInput } from "@/lib/validators/manual-order";
 
@@ -102,7 +102,7 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
 
   const statuses = await initialLineStatuses(items, deferred);
   const orderNumber = await generateOrderNumber();
-  await prisma.order.create({
+  const created = await prisma.order.create({
     data: {
       orderNumber,
       customerName,
@@ -127,7 +127,9 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
     },
   });
 
+  await orderMissingFromSuppliers(created.id);
   revalidatePath("/admin/crm/orders");
+  revalidatePath("/admin/crm/supplier-orders");
   revalidatePath("/shop/orders");
   return { ok: true, orderNumber };
 }

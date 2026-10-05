@@ -3,8 +3,10 @@
 import { useState } from "react";
 import type { Product } from "@prisma/client";
 import { useCart } from "@/components/shop/CartProvider";
+import type { ShopOffer } from "@/lib/shop-offer";
 
-export function RowOrderButton({ product }: { product: Product }) {
+/** «Заказать» for a product -- or for one of its supplier offers. */
+export function RowOrderButton({ product, offer }: { product: Product; offer?: ShopOffer }) {
   const { addItem } = useCart();
   const [ordering, setOrdering] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -27,7 +29,15 @@ export function RowOrderButton({ product }: { product: Product }) {
         slug: product.slug,
         sku: product.sku,
         name: product.name,
-        price: product.price,
+        price: offer?.price ?? product.price,
+        ...(offer && !offer.main
+          ? {
+              offerId: offer.id,
+              offerLabel: [offer.quality, offer.deliveryDays !== null ? `${offer.deliveryDays} дн.` : null]
+                .filter(Boolean)
+                .join(", "),
+            }
+          : {}),
       },
       quantity
     );

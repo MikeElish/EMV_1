@@ -106,6 +106,41 @@ export async function targetLines(itemId: string, scope: "item" | "order") {
   return { orderId: item.orderId, ids };
 }
 
+/**
+ * Lines of a new order that aren't in stock («Проверка заказа») go to CRM →
+ * Заказ поставщику: the missing quantity, from the offer the customer picked
+ * (or the product's selected one).
+ */
+export async function orderMissingFromSuppliers(orderId: string) {
+  const lines = await prisma.orderItem.findMany({
+    where: { orderId, status: "CHECKING" },
+    select: { id: true, productId: true, quantity: true, offerId: true },
+  });
+  if (!lines.length) return;
+  const left = await freeStock(prisma, lines.map((l) => l.productId));
+  for (const line of lines) {
+    const free = Math.max(0, left.get(line.productId) ?? 0);
+    const missing = line.quantity - Math.min(free, line.quantity);
+    left.set(line.productId, free - (line.quantity - missing));
+    if (missing <= 0) continue;
+    const offer = line.offerId
+      ? await prisma.supplierOffer.findUnique({ where: { id: line.offerId } })
+      : await prisma.supplierOffer.findFirst({ where: { productId: line.productId, selected: true } });
+    await prisma.supplierOrderLine.create({
+      data: {
+        productId: line.productId,
+        supplierId: offer?.supplierId ?? null,
+        offerId: offer?.id ?? null,
+        price: offer?.price ?? 0,
+        quantity: missing,
+        deliveryDays: offer?.deliveryDays ?? null,
+        quality: offer?.quality ?? null,
+        orderItemId: line.id,
+      },
+    });
+  }
+}
+
 export type LineStatusChange = { itemId: string; status: OrderStatus };
 
 /**

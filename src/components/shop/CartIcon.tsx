@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useCart } from "@/components/shop/CartProvider";
+import { cartKey, useCart } from "@/components/shop/CartProvider";
 import { formatRub } from "@/lib/money";
 
 const ROW_HEIGHT = 44; // px
@@ -75,11 +75,14 @@ export function CartIcon({ light = false }: { light?: boolean }) {
           >
             {items.map((item) => (
               <div
-                key={item.productId}
+                key={cartKey(item)}
                 style={{ minHeight: ROW_HEIGHT }}
                 className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-sm last:border-b-0"
               >
-                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {item.name}
+                  {item.offerLabel && <span className="text-xs text-foreground/50"> · {item.offerLabel}</span>}
+                </span>
                 <span className="shrink-0 text-white/60">× {item.quantity}</span>
                 <span className="w-20 shrink-0 text-right font-medium">
                   {formatRub(item.price * item.quantity)}

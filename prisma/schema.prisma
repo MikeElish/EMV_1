@@ -76,9 +76,10 @@ model Product {
   // "Новое поступление" section independently of createdAt/updatedAt.
   newArrivalAt DateTime    @default(now())
 
-  searchLogs SearchLog[]
-  pricing    ProductPricing?
-  offers     SupplierOffer[]
+  searchLogs         SearchLog[]
+  pricing            ProductPricing?
+  offers             SupplierOffer[]
+  supplierOrderLines SupplierOrderLine[]
 
   // Cards in 1С:Бухгалтерия this product stands for (1С often holds the same
   // article on several cards).
@@ -122,22 +123,53 @@ model ProductPricing {
 // purchase price behind the site prices (ProductPricing mirrors it). Entered
 // with a new product; later updates come from «Проценка».
 model SupplierOffer {
-  id           String   @id @default(cuid())
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  supplierId   String?
-  supplier     Company? @relation(fields: [supplierId], references: [id])
+  id                 String              @id @default(cuid())
+  productId          String
+  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId         String?
+  supplier           Company?            @relation(fields: [supplierId], references: [id])
   // Purchase price, kopecks.
-  price        Int
-  deliveryDays Int?
-  quality      String?
-  selected     Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  // «Актуальность»: when the price was last updated.
-  updatedAt    DateTime @updatedAt
+  price              Int
+  deliveryDays       Int?
+  quality            String?
+  selected           Boolean             @default(false)
+  // The supplier's quote / price list behind it (Проценка).
+  fileName           String?
+  fileUrl            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  // «Дата обновления» / «Актуальность»: changes only with the price or the
+  // delivery time.
+  priceUpdatedAt     DateTime            @default(now())
+  supplierOrderLines SupplierOrderLine[]
+  orderItems         OrderItem[]
 
   @@index([productId])
   @@index([supplierId])
+}
+
+// CRM → «Заказ поставщику»: what has to be bought -- from «Заказать» in
+// Проценка, or a customer order line that isn't in stock.
+model SupplierOrderLine {
+  id           String         @id @default(cuid())
+  productId    String
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId   String?
+  supplier     Company?       @relation(fields: [supplierId], references: [id])
+  offerId      String?
+  offer        SupplierOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  // Purchase price per unit, kopecks.
+  price        Int
+  quantity     Int
+  deliveryDays Int?
+  quality      String?
+  // The customer order line it covers, if any.
+  orderItemId  String?
+  orderItem    OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+
+  @@index([productId])
+  @@index([orderItemId])
 }
 
 // Singleton (id is always 1): default markups over the purchase price,
@@ -232,34 +264,38 @@ model OrderDocument {
 }
 
 model OrderItem {
-  id                     String          @id @default(cuid())
+  id                     String              @id @default(cuid())
   orderId                String
-  order                  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order                  Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId              String
-  product                Product         @relation(fields: [productId], references: [id])
+  product                Product             @relation(fields: [productId], references: [id])
   nameSnapshot           String
   priceSnapshot          Int
   quantity               Int
-  cancelled              Boolean         @default(false)
+  cancelled              Boolean             @default(false)
   // Each line moves through the statuses on its own; cancelled mirrors
   // status == CANCELLED.
-  status                 OrderStatus     @default(AWAITING_PAYMENT)
+  status                 OrderStatus         @default(AWAITING_PAYMENT)
   // Changed while the rest of the order sits in other statuses: the customer
   // gets one summary letter at the next 5-minute mark.
-  statusNotifyPending    Boolean         @default(false)
+  statusNotifyPending    Boolean             @default(false)
   // Shipped lines have been taken off Product.stock.
-  stockWrittenOff        Boolean         @default(false)
+  stockWrittenOff        Boolean             @default(false)
+  // The supplier offer the customer picked in the shop (several offers).
+  offerId                String?
+  offer                  SupplierOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  supplierOrderLines     SupplierOrderLine[]
   // Payment and planned delivery per line; Order.paid/deferred/deliveryDate
   // are derived from these (src/lib/order-status.ts).
-  paid                   Boolean         @default(false)
-  deferred               Boolean         @default(false)
+  paid                   Boolean             @default(false)
+  deferred               Boolean             @default(false)
   deliveryDate           DateTime?
   // Delivery type chosen at checkout. Changed in CRM, it waits for the
   // customer's confirmation: deliveryPrevMethod keeps what they had chosen,
   // to return to if they decline.
   deliveryMethod         DeliveryMethod?
   deliveryPrevMethod     DeliveryMethod?
-  deliveryConfirmPending Boolean         @default(false)
+  deliveryConfirmPending Boolean             @default(false)
 
   @@index([orderId])
   @@index([productId, status])
@@ -392,33 +428,34 @@ model GlonassSettings {
 }
 
 model Company {
-  id                  String             @id @default(cuid())
+  id                  String              @id @default(cuid())
   name                String
   inn                 String?
   ogrn                String?
   address             String?
   contract            String?
   type                String?
-  users               User[]             @relation("CompanyUsers")
+  users               User[]              @relation("CompanyUsers")
   managerId           String?
-  manager             User?              @relation("CompanyManager", fields: [managerId], references: [id])
+  manager             User?               @relation("CompanyManager", fields: [managerId], references: [id])
   // "Договор" checkbox -- the contract number field is only editable while
   // this is checked.
-  hasContract         Boolean            @default(false)
-  paymentType         CompanyPaymentType @default(PREPAYMENT)
+  hasContract         Boolean             @default(false)
+  paymentType         CompanyPaymentType  @default(PREPAYMENT)
   // Only meaningful when paymentType is DEFERRED.
   paymentDeferralDays Int?
   documents           CompanyDocument[]
   suppliedProducts    ProductPricing[]
   supplierOffers      SupplierOffer[]
+  supplierOrderLines  SupplierOrderLine[]
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
-  oneCRef             String?            @unique
+  oneCRef             String?             @unique
   // The site's own company ("EMV"): every employee belongs to it. Exactly
   // one row has it (src/lib/own-company.ts); it can't be deleted.
-  isOwn               Boolean            @default(false)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  isOwn               Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   @@index([managerId])
 }
