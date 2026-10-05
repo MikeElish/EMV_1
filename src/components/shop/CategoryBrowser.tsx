@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/lib/use-escape";
 import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import type { Product } from "@prisma/client";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
@@ -73,14 +74,9 @@ export function CategoryBrowser({
         setSortMenuOpen(false);
       }
     }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setSortMenuOpen(false);
-    }
     document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
     };
   }, [sortMenuOpen]);
 
@@ -91,16 +87,14 @@ export function CategoryBrowser({
         setBrandMenuOpen(false);
       }
     }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setBrandMenuOpen(false);
-    }
     document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
     };
   }, [brandMenuOpen]);
+
+  useEscape(() => setSortMenuOpen(false), sortMenuOpen);
+  useEscape(() => setBrandMenuOpen(false), brandMenuOpen);
 
   function selectBrand(next: string | null) {
     setBrand(next);
@@ -195,7 +189,8 @@ export function CategoryBrowser({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && brandOptions.length > 0) {
                   selectBrand(brandOptions[0]);
-                } else if (e.key === "Escape") {
+                } else if (e.key === "Escape" && brandMenuOpen) {
+                  e.preventDefault();
                   setBrandMenuOpen(false);
                 }
               }}
@@ -394,8 +389,8 @@ export function CategoryBrowser({
 }
 
 /**
- * One product line. With several supplier offers the price reads «от …» and
- * a click drops the offers down under the line instead of opening the card.
+ * One product line: the name / article open the product card; with several
+ * supplier offers the price reads «от …» and a click on it drops them down.
  */
 function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: () => void }) {
   const offers = useProductOffers(product.id);
@@ -408,16 +403,24 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
           open ? "bg-foreground/5" : ""
         }`}
       >
+        {/* Name / article: the product card. */}
+        <button
+          type="button"
+          onClick={onQuickView}
+          title="Открыть карточку товара"
+          className="group min-w-0 flex-1 text-left"
+        >
+          <span className="block truncate group-hover:underline">{product.name}</span>
+          <span className="block truncate text-xs text-foreground/40 group-hover:underline">{product.sku}</span>
+        </button>
+        {/* Stock / price: the offers drop down when there are several, else the card too. */}
         <button
           type="button"
           onClick={() => (offers ? setOpen((v) => !v) : onQuickView())}
           aria-expanded={offers ? open : undefined}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          title={offers ? "Предложения" : "Открыть карточку товара"}
+          className="flex shrink-0 items-center gap-3 text-left"
         >
-          <span className="min-w-0 flex-1">
-            <span className="block truncate">{product.name}</span>
-            <span className="block truncate text-xs text-foreground/40">{product.sku}</span>
-          </span>
           <span
             className={`shrink-0 text-xs ${
               product.stock > 0 ? "text-green-700 dark:text-green-500" : "text-foreground/40"

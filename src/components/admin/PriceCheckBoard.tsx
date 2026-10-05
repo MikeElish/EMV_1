@@ -37,13 +37,12 @@ const inputClass =
 const filterClass =
   "w-full rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-xs font-normal outline-none focus:border-foreground/50";
 
-type ProductFilters = { brand: string; name: string; sku: string; category: string; updated: string };
-const EMPTY: ProductFilters = { brand: "", name: "", sku: "", category: "", updated: "" };
+type ProductFilters = { brand: string; name: string; sku: string; updated: string };
+const EMPTY: ProductFilters = { brand: "", name: "", sku: "", updated: "" };
 const COLUMNS: { key: keyof ProductFilters; label: string; get: (p: PriceCheckProduct) => string }[] = [
   { key: "brand", label: "Бренд", get: (p) => p.brand ?? "" },
   { key: "name", label: "Наименование", get: (p) => p.name },
   { key: "sku", label: "Артикул", get: (p) => p.sku },
-  { key: "category", label: "Категория", get: (p) => p.category },
   { key: "updated", label: "Дата обновления", get: (p) => day(p.updatedAt) },
 ];
 
@@ -469,6 +468,11 @@ export function PriceCheckBoard({
   const router = useRouter();
   const [filters, setFilters] = useState<ProductFilters>(EMPTY);
   const [onlyChecking, setOnlyChecking] = useState(false);
+  const [category, setCategory] = useState("");
+  const categories = useMemo(
+    () => [...new Set(products.map((p) => p.category))].sort((a, b) => a.localeCompare(b, "ru")),
+    [products]
+  );
   const [selectedId, setSelectedId] = useState<string | null>(initialProductId ?? null);
   const [offers, setOffers] = useState<OfferView[] | null>(null);
   const [editing, setEditing] = useState<OfferView | "new" | null>(null);
@@ -480,9 +484,10 @@ export function PriceCheckBoard({
     return products.filter(
       (p) =>
         (!onlyChecking || p.checking > 0) &&
+        (!category || p.category === category) &&
         active.every((c) => c.get(p).toLowerCase().includes(filters[c.key].trim().toLowerCase()))
     );
-  }, [products, filters, onlyChecking]);
+  }, [products, filters, onlyChecking, category]);
 
   const selected = products.find((p) => p.id === selectedId) ?? null;
 
@@ -516,11 +521,24 @@ export function PriceCheckBoard({
 
   return (
     <div className="flex min-h-0 flex-1 gap-6">
-      {/* Nomenclature, about a third of the screen */}
-      <section className="flex min-h-0 w-1/3 min-w-0 flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-3">
+      {/* Nomenclature: half of the screen */}
+      <section className="flex min-h-0 w-1/2 min-w-0 flex-col">
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold">Номенклатура</h1>
-          <label className="flex items-center gap-1.5 text-xs text-foreground/70">
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            aria-label="Категория"
+            className="min-w-0 max-w-64 flex-1 rounded-md border border-foreground/20 bg-background px-2 py-1 text-sm outline-none focus:border-foreground/50"
+          >
+            <option value="">Все категории</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <label className="ml-auto flex items-center gap-1.5 text-xs text-foreground/70">
             <input type="checkbox" checked={onlyChecking} onChange={(e) => setOnlyChecking(e.target.checked)} />
             Только на проверке
           </label>
@@ -578,7 +596,6 @@ export function PriceCheckBoard({
                       )}
                     </td>
                     <td className="whitespace-nowrap py-2 pr-3">{p.sku}</td>
-                    <td className="py-2 pr-3 text-foreground/60">{p.category}</td>
                     <td className="whitespace-nowrap py-2 pr-3 text-foreground/60">{day(p.updatedAt)}</td>
                   </tr>
                 ))
@@ -588,8 +605,8 @@ export function PriceCheckBoard({
         </CrmTableScroll>
       </section>
 
-      {/* Offers of the chosen article, about two thirds */}
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {/* Offers of the chosen article: the other half */}
+      <section className="flex min-h-0 w-1/2 min-w-0 flex-col">
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/lib/use-escape";
 import { cssZoomOf } from "@/lib/css-zoom";
 import { useEffect, useRef, useState } from "react";
 
@@ -21,6 +22,7 @@ export function DropdownMenu({
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  useEscape(() => setOpen(false), open);
 
   function toggle() {
     if (!open && buttonRef.current) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/lib/use-escape";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Form from "next/form";
 import { utils, write } from "xlsx";
@@ -118,6 +119,8 @@ export function HeaderSearchBar({ isHome }: { isHome: boolean }) {
       if (result && "fileError" in result) setInvalidFileDialog(true);
     });
   }
+
+  useEscape(() => setInvalidFileDialog(false), !!invalidFileDialog);
 
   return (
     <>

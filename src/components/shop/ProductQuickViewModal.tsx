@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/lib/use-escape";
 import { useEffect, useState } from "react";
 import type { Product } from "@prisma/client";
 import { AddToCartButton } from "@/components/shop/AddToCartButton";
@@ -30,14 +31,8 @@ export function ProductQuickViewModal({
     setTimeout(onRequestClose, TRANSITION_MS);
   }
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") close();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Esc closes the window on top (see useEscape).
+  useEscape(close);
 
   return (
     <div

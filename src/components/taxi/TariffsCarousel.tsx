@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/lib/use-escape";
 import { useEffect, useState } from "react";
 import { taxiContent } from "@/content/taxi";
 
@@ -51,15 +52,7 @@ export function TariffsCarousel({ tariffs }: { tariffs: Tariff[] }) {
     setTimeout(() => setExpanded(null), TRANSITION_MS);
   }
 
-  useEffect(() => {
-    if (!expanded) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") close();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded]);
+  useEscape(close, !!expanded);
 
   return (
     <div className="relative mx-auto mt-8 max-w-sm">

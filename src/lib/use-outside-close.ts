@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useEscape } from "@/lib/use-escape";
 
 export function useOutsideClose(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -7,15 +8,9 @@ export function useOutsideClose(open: boolean, onClose: () => void) {
     function onPointerDown(e: PointerEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
     document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open, onClose]);
+  useEscape(onClose, open);
   return ref;
 }

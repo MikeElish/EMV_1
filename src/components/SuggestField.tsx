@@ -70,7 +70,9 @@ export function SuggestField({
             e.preventDefault();
             onChange(options[0]);
             setOpen(false);
-          } else if (e.key === "Escape") {
+          } else if (e.key === "Escape" && open) {
+            // Only the list closes, not the window the field sits in.
+            e.preventDefault();
             setOpen(false);
           }
         }}

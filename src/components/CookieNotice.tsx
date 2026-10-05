@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/lib/use-escape";
 import { useEffect, useState } from "react";
 import { USER_AGREEMENT_URL } from "@/lib/legal-docs";
 
@@ -34,6 +35,9 @@ export function CookieNotice() {
     const timer = setTimeout(() => setVisible(true), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  // Esc = ✕: hidden until the next visit.
+  useEscape(() => close(), visible);
 
   if (!visible) return null;
 
