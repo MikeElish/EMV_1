@@ -16,6 +16,8 @@ import {
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { QUALITY_SUGGESTIONS } from "@/components/admin/ProductPricesPanel";
 import { Modal } from "@/components/Modal";
+import { exportPriceCheck } from "@/actions/admin/supplier-orders";
+import { SheetExportButton } from "@/components/admin/SheetExportButton";
 
 export type PriceCheckProduct = {
   id: string;
@@ -481,12 +483,19 @@ export function PriceCheckBoard({
 
   const filtered = useMemo(() => {
     const active = COLUMNS.filter((c) => filters[c.key].trim());
-    return products.filter(
+    const list = products.filter(
       (p) =>
         (!onlyChecking || p.checking > 0) &&
         (!category || p.category === category) &&
         active.every((c) => c.get(p).toLowerCase().includes(filters[c.key].trim().toLowerCase()))
     );
+    // What is on check: by brand, then by name.
+    if (onlyChecking) {
+      list.sort(
+        (a, b) => (a.brand ?? "").localeCompare(b.brand ?? "", "ru") || a.name.localeCompare(b.name, "ru")
+      );
+    }
+    return list;
   }, [products, filters, onlyChecking, category]);
 
   const selected = products.find((p) => p.id === selectedId) ?? null;
@@ -538,6 +547,10 @@ export function PriceCheckBoard({
               </option>
             ))}
           </select>
+          <SheetExportButton
+            count={filtered.length}
+            run={() => exportPriceCheck(filtered.map((p) => p.id))}
+          />
           <label className="ml-auto flex items-center gap-1.5 text-xs text-foreground/70">
             <input type="checkbox" checked={onlyChecking} onChange={(e) => setOnlyChecking(e.target.checked)} />
             Только на проверке

@@ -150,6 +150,17 @@ model SupplierOffer {
 
 // CRM → «Заказ поставщику»: what has to be bought -- from «Заказать» in
 // Проценка, or a customer order line that isn't in stock.
+// Проверить / В запросе / Проверено ↔ the customer line's «Проверка заказа»;
+// Требуется оплата / Заказано ↔ «Ожидание поставки»; Поставлено ↔ «Готов к отгрузке».
+enum SupplierOrderStatus {
+  TO_CHECK
+  REQUESTED
+  CHECKED
+  AWAITING_PAYMENT
+  ORDERED
+  DELIVERED
+}
+
 model SupplierOrderLine {
   id           String         @id @default(cuid())
   productId    String
@@ -163,6 +174,7 @@ model SupplierOrderLine {
   quantity     Int
   deliveryDays Int?
   quality      String?
+  status       SupplierOrderStatus @default(TO_CHECK)
   // The customer order line it covers, if any.
   orderItemId  String?
   orderItem    OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)

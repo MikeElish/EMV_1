@@ -193,10 +193,30 @@ async function fileRows(file: File): Promise<unknown[][]> {
   return parse(await file.text(), { columns: false, skip_empty_lines: true, trim: true });
 }
 
+const IMPORT_COLUMNS: RegExp[] = [
+  /^бренд|^производител/,
+  /^наименование/,
+  /^артикул/,
+  /^цена/,
+  /^итого|^всего|^сумма/,
+  /^срок/,
+];
+
 /**
- * Reads a supplier price file -- columns in this order: Бренд, Наименование,
- * Артикул, Цена, Итого, Срок поставки (first row = headers) -- and matches
- * it with the catalogue. Writes nothing.
+ * Where Бренд, Наименование, Артикул, Цена, Итого, Срок поставки are: found
+ * by the header row (so a file from «Выгрузка», with «Количество», loads
+ * too), or in this order when the headers aren't recognised.
+ */
+function columnPositions(header: unknown[]): number[] {
+  const names = header.map((h) => String(h ?? "").trim().toLowerCase());
+  const found = IMPORT_COLUMNS.map((re) => names.findIndex((n) => re.test(n)));
+  return found[2] >= 0 && (found[3] >= 0 || found[4] >= 0) ? found : IMPORT_COLUMNS.map((_, i) => i);
+}
+
+/**
+ * Reads a supplier price file -- columns Бренд, Наименование, Артикул, Цена,
+ * Итого, Срок поставки (first row = headers) -- and matches it with the
+ * catalogue. Writes nothing.
  */
 export async function analyzeOfferImport(formData: FormData): Promise<OfferImportAnalysis> {
   await verifyAdminSession();
@@ -215,10 +235,11 @@ export async function analyzeOfferImport(formData: FormData): Promise<OfferImpor
 
   const errors: { row: number; message: string }[] = [];
   const parsed: Omit<OfferImportRow, "productId" | "productName" | "kind" | "oldPrice">[] = [];
+  const at = columnPositions(raw[0] ?? []);
   raw.slice(1).forEach((cells, i) => {
     const row = i + 2;
     if (cells.every((c) => c === "" || c == null)) return;
-    const [brandRaw, nameRaw, skuRaw, priceRaw, totalRaw, daysRaw] = cells;
+    const [brandRaw, nameRaw, skuRaw, priceRaw, totalRaw, daysRaw] = at.map((p) => (p < 0 ? "" : cells[p]));
     const sku = String(skuRaw ?? "").trim();
     const name = String(nameRaw ?? "").trim();
     const brand = String(brandRaw ?? "").trim();

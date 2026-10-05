@@ -6,6 +6,7 @@ import {
   STOCK_HOLDING_STATUSES,
 } from "@/lib/validators/orders";
 import { noticeLineStatusChanges } from "@/lib/order-notifications";
+import { supplierStatusFor } from "@/lib/validators/supplier-orders";
 
 // Order lines carry their own status; the order's status is derived from
 // them. Every status change goes through setLineStatuses so stock, totals,
@@ -207,6 +208,16 @@ export async function setLineStatuses(
       }
     }
     await tx.order.update({ where: { id: orderId }, data });
+
+    // CRM → Заказ поставщику follows its customer lines.
+    const supplierLines = await tx.supplierOrderLine.findMany({
+      where: { orderItemId: { in: changed } },
+      select: { id: true, status: true, orderItemId: true },
+    });
+    for (const s of supplierLines) {
+      const next = supplierStatusFor(wanted.get(s.orderItemId!)!, s.status);
+      if (next) await tx.supplierOrderLine.update({ where: { id: s.id }, data: { status: next } });
+    }
     return { changed };
   });
 

@@ -19,6 +19,8 @@ function revalidateOrders() {
   revalidatePath("/admin/crm/orders");
   revalidatePath("/admin/crm/products");
   revalidatePath("/shop/orders");
+  revalidatePath("/admin/crm/supplier-orders");
+  revalidatePath("/admin/crm/price-check");
 }
 
 /** Status of one line, or (scope "order") of every line of its order that isn't cancelled. */
