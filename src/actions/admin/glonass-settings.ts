@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 import { glonassSettingsSchema, type GlonassSettingsInput } from "@/lib/validators/glonass";
 
@@ -11,7 +11,8 @@ export type ActionResult = { ok: true; message: string } | { ok: false; error: s
 const GLONASS_PATH = "/admin/settings/glonass";
 
 export async function saveGlonassSettings(input: GlonassSettingsInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.glonass");
+  if (denied) return denied;
 
   const parsed = glonassSettingsSchema.safeParse(input);
   if (!parsed.success) {
@@ -41,7 +42,8 @@ export async function saveGlonassSettings(input: GlonassSettingsInput): Promise<
  * Диспетчерская map relies on it.
  */
 export async function testGlonassConnection(): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.glonass");
+  if (denied) return denied;
 
   const settings = await prisma.glonassSettings.findUnique({ where: { id: 1 } });
   if (!settings) return { ok: false, error: "Сначала сохраните настройки" };

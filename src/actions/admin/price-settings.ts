@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { getMarkups } from "@/lib/price-settings";
 import type { Markups } from "@/lib/pricing";
 
@@ -19,7 +19,8 @@ function revalidatePrices() {
 }
 
 export async function savePriceSettings(input: Markups): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.prices");
+  if (denied) return denied;
 
   const parsed = markupsSchema.safeParse(input);
   if (!parsed.success) {
@@ -38,7 +39,8 @@ export async function savePriceSettings(input: Markups): Promise<ActionResult> {
 
 /** Re-derives every product's sale prices from its purchase price and the current base markups. */
 export async function recalculateAllPrices(): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.prices");
+  if (denied) return denied;
 
   const { retailMarkup, wholesaleMarkup, dealerMarkup } = await getMarkups();
   const factor = (pct: number) => 1 + pct / 100;

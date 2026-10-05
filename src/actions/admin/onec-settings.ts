@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { decryptSecret, encryptSecret } from "@/lib/secret-box";
 import { listOneCObjects, OneCError } from "@/lib/onec";
 import { oneCSettingsSchema, ONEC_REQUIRED_OBJECTS, type OneCSettingsInput } from "@/lib/validators/onec";
@@ -10,7 +10,8 @@ import { oneCSettingsSchema, ONEC_REQUIRED_OBJECTS, type OneCSettingsInput } fro
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
 export async function saveOneCSettings(input: OneCSettingsInput): Promise<SaveResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   const parsed = oneCSettingsSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   const { password, ...rest } = parsed.data;
@@ -30,7 +31,8 @@ export async function saveOneCSettings(input: OneCSettingsInput): Promise<SaveRe
 
 /** Shows the stored password to the owner on request («Показать»). */
 export async function revealOneCPassword(): Promise<{ ok: true; password: string } | { ok: false; error: string }> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   const settings = await prisma.oneCSettings.findUnique({ where: { id: 1 } });
   if (!settings) return { ok: false, error: "Пароль не сохранён" };
   try {
@@ -41,7 +43,8 @@ export async function revealOneCPassword(): Promise<{ ok: true; password: string
 }
 
 export async function deleteOneCSettings(): Promise<SaveResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   await prisma.oneCSettings.deleteMany({});
   revalidatePath("/admin/settings/1c");
   return { ok: true };
@@ -58,7 +61,7 @@ export type OneCCheck =
 
 /** Logs in and lists what the OData user can see -- read-only. */
 export async function checkOneCConnection(): Promise<OneCCheck> {
-  await verifyAdminSession();
+  await requireSection("settings.1c", "edit");
   try {
     const objects = await listOneCObjects();
     const available = new Set(objects);

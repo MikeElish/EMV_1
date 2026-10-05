@@ -1,6 +1,6 @@
 "use server";
 
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { applyWatermark } from "@/lib/watermark";
 import { uploadWatermarkedImage, deleteImage } from "@/lib/image-storage";
 
@@ -9,7 +9,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 export type UploadImageResult = { ok: true; url: string } | { ok: false; error: string };
 
 export async function uploadProductImage(formData: FormData): Promise<UploadImageResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.products");
+  if (denied) return denied;
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -33,6 +34,6 @@ export async function uploadProductImage(formData: FormData): Promise<UploadImag
 }
 
 export async function removeProductImage(url: string): Promise<void> {
-  await verifyAdminSession();
+  await requireSection("crm.products", "edit");
   await deleteImage(url);
 }

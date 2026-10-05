@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { vehicleSchema, type VehicleInput } from "@/lib/validators/taxi-fleet";
 import {
   uploadVehicleDocumentFile,
@@ -47,7 +47,8 @@ function toVehicleData(data: VehicleInput) {
 }
 
 export async function createVehicle(formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.tech");
+  if (denied) return denied;
 
   const parsed = parseVehicleFormData(formData);
   if (!parsed.success) {
@@ -81,7 +82,8 @@ export async function createVehicle(formData: FormData): Promise<ActionResult> {
 }
 
 export async function updateVehicle(id: string, formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.tech");
+  if (denied) return denied;
 
   const parsed = parseVehicleFormData(formData);
   if (!parsed.success) {
@@ -102,14 +104,15 @@ export async function updateVehicle(id: string, formData: FormData): Promise<Act
 }
 
 export async function deleteVehicle(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.tech");
+  if (denied) return denied;
   await prisma.vehicle.delete({ where: { id } });
   revalidatePath("/admin/taxi-fleet/tech");
   return { ok: true };
 }
 
 export async function listVehicleDocuments(vehicleId: string) {
-  await verifyAdminSession();
+  await requireSection("taxi.tech", "view");
   return prisma.vehicleDocument.findMany({
     where: { vehicleId },
     orderBy: { uploadedAt: "desc" },
@@ -117,7 +120,8 @@ export async function listVehicleDocuments(vehicleId: string) {
 }
 
 export async function uploadVehicleDocument(formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.tech");
+  if (denied) return denied;
 
   const vehicleId = String(formData.get("vehicleId") ?? "");
   const file = formData.get("file");
@@ -142,7 +146,8 @@ export async function uploadVehicleDocument(formData: FormData): Promise<ActionR
 }
 
 export async function deleteVehicleDocument(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.tech");
+  if (denied) return denied;
 
   const doc = await prisma.vehicleDocument.findUnique({ where: { id } });
   if (!doc) return { ok: false, error: "Файл не найден" };

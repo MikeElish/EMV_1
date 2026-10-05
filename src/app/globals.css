@@ -570,3 +570,12 @@ body {
     opacity: 0;
   }
 }
+
+/* Карточка пользователя → Доступ = «Просмотр»: no create / upload / delete
+   controls (the server refuses those changes anyway). */
+[data-access="view"] :is(button, a)[aria-label^="Добавить"],
+[data-access="view"] :is(button, a)[aria-label^="Создать"],
+[data-access="view"] [aria-label="Загрузить файл"],
+[data-access="view"] [data-edit-only] {
+  display: none !important;
+}

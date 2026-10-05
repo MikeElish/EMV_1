@@ -5,6 +5,7 @@ export const SUPPLIER_ORDER_STATUS_LABELS: Record<SupplierOrderStatus, string> =
   TO_CHECK: "Проверить",
   REQUESTED: "В запросе",
   CHECKED: "Проверено",
+  TO_ORDER: "Заказать",
   AWAITING_PAYMENT: "Требуется оплата",
   ORDERED: "Заказано",
   DELIVERED: "Поставлено",
@@ -14,23 +15,27 @@ export const SUPPLIER_ORDER_STATUS_LABELS: Record<SupplierOrderStatus, string> =
 export const ORDER_STATUS_OF_SUPPLIER: Record<SupplierOrderStatus, OrderStatus> = {
   TO_CHECK: "CHECKING",
   REQUESTED: "CHECKING",
-  CHECKED: "CHECKING",
+  CHECKED: "AWAITING_PAYMENT",
+  TO_ORDER: "AWAITING_SUPPLY",
   AWAITING_PAYMENT: "AWAITING_SUPPLY",
   ORDERED: "AWAITING_SUPPLY",
   DELIVERED: "READY_TO_SHIP",
 };
 
 /**
- * The supplier order status a line takes when its customer line was moved in
- * CRM → Заказы to a status outside the current group (null: leave it be).
+ * The supplier order status a line takes when its customer line moved (in
+ * CRM → Заказы, or on payment) to a status outside the current group --
+ * e.g. paid and now «Ожидание поставки» → «Заказать». Null: leave it be.
  */
 export function supplierStatusFor(orderStatus: OrderStatus, current: SupplierOrderStatus): SupplierOrderStatus | null {
   if (ORDER_STATUS_OF_SUPPLIER[current] === orderStatus) return null;
   switch (orderStatus) {
     case "CHECKING":
       return "TO_CHECK";
+    case "AWAITING_PAYMENT":
+      return "CHECKED";
     case "AWAITING_SUPPLY":
-      return "AWAITING_PAYMENT";
+      return "TO_ORDER";
     case "READY_TO_SHIP":
     case "SHIPPED_AWAITING_PAYMENT":
     case "DONE":

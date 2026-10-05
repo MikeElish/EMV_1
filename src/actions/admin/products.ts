@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma, type OrderStatus } from "@prisma/client";
 import { RESERVE_STATUSES } from "@/lib/validators/orders";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { releaseAwaitingSupply } from "@/lib/order-status";
 import { selectOffer } from "@/lib/supplier-offers";
 import { productSchema, type ProductInput } from "@/lib/validators/product";
@@ -56,7 +56,8 @@ function toPricingData(data: ProductInput) {
 }
 
 export async function createProduct(input: ProductInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.products");
+  if (denied) return denied;
 
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
@@ -96,7 +97,8 @@ export async function updateProduct(
   id: string,
   input: ProductInput
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.products");
+  if (denied) return denied;
 
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
@@ -158,7 +160,8 @@ export async function toggleProductActive(
   id: string,
   isActive: boolean
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.products");
+  if (denied) return denied;
   if (isActive) {
     // Products imported from 1С arrive with price 0 -- they must not go on sale for free.
     const product = await prisma.product.findUnique({
@@ -188,7 +191,7 @@ export type ProductDocumentLine = {
 
 /** Customer orders holding this product in reserve (CRM → Товары, "Резерв"). */
 export async function listProductReserve(productId: string): Promise<ProductDocumentLine[]> {
-  await verifyAdminSession();
+  await requireSection("crm.products", "view");
   const lines = await prisma.orderItem.findMany({
     where: { productId, status: { in: RESERVE_STATUSES } },
     select: { quantity: true, status: true, order: { select: { orderNumber: true, createdAt: true } } },
@@ -203,7 +206,8 @@ export async function listProductReserve(productId: string): Promise<ProductDocu
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.products");
+  if (denied) return denied;
 
   const orderItemCount = await prisma.orderItem.count({ where: { productId: id } });
   if (orderItemCount > 0) {

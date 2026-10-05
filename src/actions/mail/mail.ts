@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getStaffSession } from "@/lib/staff-dal";
+import type { AccessLevel } from "@/lib/access";
 import { getMailAccount, type MailAccount } from "@/lib/mail/account";
 import { withFolder, withImap, folderByRole, MailError, type FolderRole } from "@/lib/mail/imap";
 import { getFoldersWithCounts, invalidateUnread, type UnreadCounts } from "@/lib/mail/unread";
@@ -10,9 +11,9 @@ import { parseRecipients, folderNameSchema, MAX_ATTACHMENTS_BYTES } from "@/lib/
 
 export type MailActionResult = { ok: true } | { ok: false; error: string };
 
-async function requireAccount(): Promise<{ account: MailAccount } | { error: string }> {
-  const session = await getStaffSession();
-  if (!session) return { error: "Требуется вход" };
+async function requireAccount(level: AccessLevel = "edit"): Promise<{ account: MailAccount } | { error: string }> {
+  const session = await getStaffSession(level);
+  if (!session) return { error: level === "edit" ? "Нет прав на изменения в Почте — только просмотр" : "Требуется вход" };
   const account = await getMailAccount(session.userId);
   if (!account) return { error: "Почта не настроена" };
   return { account };
@@ -40,7 +41,7 @@ export type MailUnreadResult =
   | { configured: true; ok: false };
 
 export async function getMailUnread(): Promise<MailUnreadResult> {
-  const session = await getStaffSession();
+  const session = await getStaffSession("view");
   if (!session) return { configured: false };
   const account = await getMailAccount(session.userId);
   if (!account) return { configured: false };
@@ -55,7 +56,8 @@ export async function getMailUnread(): Promise<MailUnreadResult> {
 // ---- Message operations ----------------------------------------------------
 
 export async function setMessagesSeen(path: string, uids: number[], seen: boolean): Promise<MailActionResult> {
-  const r = await requireAccount();
+  // Opening a letter marks it read -- allowed with «Просмотр».
+  const r = await requireAccount("view");
   if ("error" in r) return { ok: false, error: r.error };
   const range = uidList(uids);
   if (!range) return { ok: false, error: "Не выбраны письма" };

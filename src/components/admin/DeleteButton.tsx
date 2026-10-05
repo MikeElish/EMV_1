@@ -27,6 +27,7 @@ export function DeleteButton({
     <div className="inline-flex flex-col items-end gap-1">
       <button
         type="button"
+        data-edit-only
         onClick={handleClick}
         disabled={pending}
         className={className ?? "text-red-600 hover:underline disabled:opacity-50"}

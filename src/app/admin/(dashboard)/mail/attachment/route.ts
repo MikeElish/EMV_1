@@ -6,7 +6,7 @@ import { decodeText, detectPreview } from "@/lib/mail/preview";
 
 /** Downloads one attachment of a letter in the employee's own mailbox. */
 export async function GET(request: Request) {
-  const session = await getStaffSession();
+  const session = await getStaffSession("view");
   if (!session) return new Response("Требуется вход", { status: 401 });
   const account = await getMailAccount(session.userId);
   if (!account) return new Response("Почта не настроена", { status: 404 });

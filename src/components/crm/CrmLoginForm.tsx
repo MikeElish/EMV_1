@@ -33,7 +33,7 @@ export function CrmLoginForm({ customerNext }: { customerNext?: string }) {
         ? "/admin"
         : result.role === "CUSTOMER"
           ? (customerNext ?? "/shop")
-          : "/crm/cabinet"
+          : "/admin" /* the first section open to them (src/proxy.ts) */
     );
     router.refresh();
   }

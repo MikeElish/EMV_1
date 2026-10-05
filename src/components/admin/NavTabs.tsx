@@ -3,6 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { FitWidth } from "@/components/FitWidth";
+import { useVisible } from "@/components/admin/AccessContext";
 
 export type NavTab = { href: string; label: string };
 
@@ -34,13 +35,14 @@ export function NavTabs({
   fill?: boolean;
 }) {
   const pathname = usePathname();
+  const visible = useVisible();
 
   return (
     <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
       {/* A row of tabs wider than the window is scaled down like the tables. */}
       <FitWidth className="shrink-0">
         <div className="flex gap-6 border-b border-foreground/10">
-          {tabs.map((tab) => {
+          {tabs.filter((tab) => visible(tab.href)).map((tab) => {
             const active = pathname.startsWith(tab.href);
             return (
               <Link

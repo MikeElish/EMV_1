@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
 import { deliveryMethodFromNote } from "@/lib/delivery";
@@ -12,7 +12,7 @@ export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false;
 
 /** Loaded when the "Новый заказ" window opens, not with the orders page itself. */
 export async function getManualOrderFormData() {
-  await verifyAdminSession();
+  await requireSection("crm.orders", "view");
 
   const [customers, products] = await Promise.all([
     prisma.user.findMany({
@@ -72,7 +72,8 @@ export async function getManualOrderFormData() {
 export type ManualOrderFormData = Awaited<ReturnType<typeof getManualOrderFormData>>;
 
 export async function createManualOrder(input: ManualOrderInput): Promise<ManualOrderResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
 
   const parsed = manualOrderSchema.safeParse(input);
   if (!parsed.success) {

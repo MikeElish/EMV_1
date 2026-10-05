@@ -5,7 +5,7 @@ import { read, utils } from "xlsx";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { requireSection } from "@/lib/access-server";
 import { releaseAwaitingSupply } from "@/lib/order-status";
 import { recordOffer } from "@/lib/supplier-offers";
 import {
@@ -111,7 +111,7 @@ async function parseFileToRows(file: File): Promise<unknown[][]> {
  * stock-decrease review steps before anything is committed.
  */
 export async function analyzeImportFile(formData: FormData): Promise<ImportAnalysis | { fileError: string }> {
-  await verifyAdminSession();
+  await requireSection("crm.products", "edit");
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -219,7 +219,7 @@ export async function analyzeImportFile(formData: FormData): Promise<ImportAnaly
  * stock-decrease decisions from analyzeImportFile's result.
  */
 export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSummary> {
-  await verifyAdminSession();
+  await requireSection("crm.products", "edit");
 
   let created = 0;
   let updated = 0;

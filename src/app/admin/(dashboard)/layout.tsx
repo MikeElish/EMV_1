@@ -4,19 +4,26 @@ import { logout } from "@/actions/admin/auth";
 import { SidebarNav } from "@/components/admin/SidebarNav";
 import { ThemeToggle } from "@/components/shop/ThemeToggle";
 import { themeInitScript } from "@/lib/theme";
+import { getMyAccess } from "@/lib/access-server";
+import { resolveAccess } from "@/lib/access";
+import { AccessProvider, ViewOnlyBanner } from "@/components/admin/AccessContext";
 
 export default async function AdminDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Every employee gets in (for Почта); the owner-only sections are guarded
-  // by src/proxy.ts and verifyAdminSession in their actions.
+  // Every employee gets in; the sections open to them (Карточка пользователя
+  // → Доступ) are guarded by src/proxy.ts and by each server action.
   const session = await verifyStaffSession();
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { email: true, login: true },
-  });
+  const [user, me] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { email: true, login: true },
+    }),
+    getMyAccess(),
+  ]);
+  const access = me?.access ?? resolveAccess(session.role, null);
 
   // The window is split in fixed parts: the sidebar and the top bar never
   // move, only <main> scrolls (CRM tables scroll inside their own frame).
@@ -30,7 +37,7 @@ export default async function AdminDashboardLayout({
 
       <aside className="w-56 shrink-0 overflow-y-auto border-r border-foreground/10 p-6">
         <p className="font-semibold">EMV Админка</p>
-        <SidebarNav isOwner={session.role === "OWNER"} />
+        <SidebarNav access={access} />
 
         <div className="mt-10 border-t border-foreground/10 pt-4 text-xs text-foreground/50">
           <p className="truncate">{user?.email ?? user?.login}</p>
@@ -46,7 +53,12 @@ export default async function AdminDashboardLayout({
         <header className="flex h-14 shrink-0 items-center justify-end border-b border-foreground/10 px-8">
           <ThemeToggle scope="admin" />
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-8 pt-6 [scrollbar-gutter:stable]">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-8 pt-6 [scrollbar-gutter:stable]">
+          <AccessProvider access={access}>
+            <ViewOnlyBanner />
+            {children}
+          </AccessProvider>
+        </main>
       </div>
     </div>
   );

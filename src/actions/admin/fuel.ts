@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { FuelType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { uploadFuelReceiptFile, deleteFuelReceiptFile } from "@/lib/fuel-receipt-storage";
 import { VAT_RATES } from "@/lib/fuel";
 
@@ -16,7 +16,8 @@ const num = (value: FormDataEntryValue | null) => Number(String(value ?? "").rep
 
 /** Новая заправка: one receipt with its scan (required). */
 export async function createFuelReceipt(formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.fuel");
+  if (denied) return denied;
 
   const date = new Date(String(formData.get("date") ?? ""));
   const driverName = String(formData.get("driverName") ?? "").trim();
@@ -68,7 +69,8 @@ export async function createFuelReceipt(formData: FormData): Promise<ActionResul
 }
 
 export async function deleteFuelReceipt(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.fuel");
+  if (denied) return denied;
   const receipt = await prisma.fuelReceipt.findUnique({ where: { id } });
   if (!receipt) return { ok: false, error: "Запись не найдена" };
   await prisma.fuelReceipt.delete({ where: { id } });

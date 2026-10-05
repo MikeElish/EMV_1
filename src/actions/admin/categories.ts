@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { categorySchema, type CategoryInput } from "@/lib/validators/category";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function createCategory(input: CategoryInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.categories");
+  if (denied) return denied;
 
   const parsed = categorySchema.safeParse(input);
   if (!parsed.success) {
@@ -34,7 +35,8 @@ export async function updateCategory(
   id: string,
   input: CategoryInput
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.categories");
+  if (denied) return denied;
 
   const parsed = categorySchema.safeParse(input);
   if (!parsed.success) {
@@ -66,7 +68,8 @@ export type CategoryActiveResult =
  * `skipped`.
  */
 export async function setCategoryActive(id: string, isActive: boolean): Promise<CategoryActiveResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.categories");
+  if (denied) return denied;
 
   const all = await prisma.category.findMany({ select: { id: true, parentId: true } });
   if (!all.some((c) => c.id === id)) return { ok: false, error: "Категория не найдена" };
@@ -91,7 +94,8 @@ export async function setCategoryActive(id: string, isActive: boolean): Promise<
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.categories");
+  if (denied) return denied;
 
   const productCount = await prisma.product.count({ where: { categoryId: id } });
   if (productCount > 0) {

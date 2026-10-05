@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyStaffSession } from "@/lib/staff-dal";
+import { accessDenied } from "@/lib/access-server";
 import { MailError } from "@/lib/mail/imap";
 import { applyRuleToInbox } from "@/lib/mail/rules";
 import { describeConditions, mailRuleSchema, type MailRuleInput } from "@/lib/validators/mail-rules";
@@ -29,6 +30,8 @@ export async function saveMailRule(
   applyToInbox: boolean
 ): Promise<RuleActionResult> {
   const { userId } = await verifyStaffSession();
+  const denied = await accessDenied("mail");
+  if (denied) return denied;
   const parsed = mailRuleSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректное правило" };
   const data = parsed.data;
@@ -82,6 +85,8 @@ export async function saveMailRule(
 
 export async function setMailRuleEnabled(id: string, enabled: boolean): Promise<RuleActionResult> {
   const { userId } = await verifyStaffSession();
+  const denied = await accessDenied("mail");
+  if (denied) return denied;
   const rule = await prisma.mailRule.findUnique({ where: { id } });
   if (!rule || rule.userId !== userId) return { ok: false, error: "Правило не найдено" };
   const hadEnabled = await hasEnabled(userId);
@@ -93,6 +98,8 @@ export async function setMailRuleEnabled(id: string, enabled: boolean): Promise<
 
 export async function deleteMailRule(id: string): Promise<RuleActionResult> {
   const { userId } = await verifyStaffSession();
+  const denied = await accessDenied("mail");
+  if (denied) return denied;
   const rule = await prisma.mailRule.findUnique({ where: { id } });
   if (!rule || rule.userId !== userId) return { ok: false, error: "Правило не найдено" };
   await prisma.mailRule.delete({ where: { id } });
@@ -103,6 +110,8 @@ export async function deleteMailRule(id: string): Promise<RuleActionResult> {
 /** Rules apply top to bottom (matters with «Не применять остальные правила»). */
 export async function moveMailRule(id: string, direction: -1 | 1): Promise<RuleActionResult> {
   const { userId } = await verifyStaffSession();
+  const denied = await accessDenied("mail");
+  if (denied) return denied;
   const rules = await prisma.mailRule.findMany({ where: { userId }, orderBy: { position: "asc" } });
   const index = rules.findIndex((r) => r.id === id);
   const other = rules[index + direction];

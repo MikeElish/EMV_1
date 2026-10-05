@@ -257,7 +257,8 @@ export function OrdersTable({
         return false;
       if (filters.inStock && !has(String(item.product?.stock ?? ""), filters.inStock)) return false;
       if (filters.price && !has(String(item.priceSnapshot / 100), filters.price)) return false;
-      if (filters.total && !has(String(order.totalAmount / 100), filters.total)) return false;
+      if (filters.total && !has(String((grouped ? order.totalAmount : item.priceSnapshot * item.quantity) / 100), filters.total))
+        return false;
       if (filters.extra && !has(String(extra / 100), filters.extra)) return false;
       if (filters.grand && !has(String((order.totalAmount + extra) / 100), filters.grand))
         return false;
@@ -506,8 +507,9 @@ export function OrdersTable({
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
                           {formatRub(item.priceSnapshot)}
                         </td>
-                        <td className="whitespace-nowrap py-2 pr-4">
-                          {formatRub(order.totalAmount)}
+                        <td className={`whitespace-nowrap py-2 pr-4 ${cancelledCellClass}`}>
+                          {/* Всего = Количество × Цена */}
+                          {formatRub(item.priceSnapshot * item.quantity)}
                         </td>
                         <td className="whitespace-nowrap py-2 pr-4">
                           <ExtraCostsButton

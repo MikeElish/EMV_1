@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { requireSection } from "@/lib/access-server";
 import { getGlonassVehicles, GlonassError, type GlonassVehicle } from "@/lib/glonass";
 import { normalizePlate } from "@/lib/plate";
 
@@ -15,7 +15,7 @@ export type GlonassMapResult =
   | { ok: false; error: string; notConfigured?: boolean };
 
 export async function getGlonassMapData(): Promise<GlonassMapResult> {
-  await verifyAdminSession();
+  await requireSection("taxi.glonass", "view");
 
   try {
     const [vehicles, fleet] = await Promise.all([

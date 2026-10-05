@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { encryptSecret } from "@/lib/secret-box";
 import {
   siteMailSchema,
@@ -16,7 +16,8 @@ export type ActionResult = { ok: true } | { ok: false; error: string };
 const MAIL_PATH = "/admin/settings/mail";
 
 export async function saveSiteMailSettings(input: SiteMailInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.mail");
+  if (denied) return denied;
 
   const parsed = siteMailSchema.safeParse(input);
   if (!parsed.success) {
@@ -43,7 +44,8 @@ export async function saveSiteMailSettings(input: SiteMailInput): Promise<Action
 }
 
 export async function saveUserMailbox(userId: string, input: UserMailboxInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.mail");
+  if (denied) return denied;
 
   const parsed = userMailboxSchema.safeParse(input);
   if (!parsed.success) {
@@ -77,7 +79,8 @@ export async function saveUserMailbox(userId: string, input: UserMailboxInput): 
 }
 
 export async function clearUserMailbox(userId: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.mail");
+  if (denied) return denied;
 
   await prisma.user.update({
     where: { id: userId },

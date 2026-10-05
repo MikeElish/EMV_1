@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { SupplierOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
-import { setLineStatuses } from "@/lib/order-status";
+import { accessDenied } from "@/lib/access-server";
+import { applyPaymentTerms, setLineStatuses } from "@/lib/order-status";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 import { ORDER_STATUS_OF_SUPPLIER } from "@/lib/validators/supplier-orders";
 import { orderSheetBase64, orderSheetFileName } from "@/lib/order-sheet";
@@ -19,7 +19,8 @@ const MAX_SHEET_ROWS = 20000;
  * the matching status in CRM → Заказы (unless cancelled or already shipped).
  */
 export async function updateSupplierOrderStatus(id: string, status: SupplierOrderStatus): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.supplier-orders");
+  if (denied) return denied;
   if (!Object.values(SupplierOrderStatus).includes(status)) return { ok: false, error: "Некорректный статус" };
   const line = await prisma.supplierOrderLine.findUnique({
     where: { id },
@@ -32,6 +33,9 @@ export async function updateSupplierOrderStatus(id: string, status: SupplierOrde
   const next = ORDER_STATUS_OF_SUPPLIER[status];
   if (item && item.status !== next && item.status !== "CANCELLED" && !SHIPPED_STATUSES.includes(item.status)) {
     await setLineStatuses(item.orderId, [{ itemId: item.id, status: next }], { notify: true });
+    // Проверено on a line already paid (or on deferral) goes straight on to
+    // «Ожидание поставки» -- and this line to «Заказать».
+    if (next === "AWAITING_PAYMENT") await applyPaymentTerms(item.orderId);
   }
   revalidatePath("/admin/crm/supplier-orders");
   revalidatePath("/admin/crm/price-check");
@@ -43,7 +47,8 @@ export async function updateSupplierOrderStatus(id: string, status: SupplierOrde
 
 /** «Выгрузка» in Заказ поставщику: the listed lines as an Excel request. */
 export async function exportSupplierOrders(ids: string[]): Promise<SheetResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.supplier-orders", "view");
+  if (denied) return denied;
   if (!ids.length) return { ok: false, error: "Нет позиций для выгрузки" };
   if (ids.length > MAX_SHEET_ROWS) return { ok: false, error: "Слишком много позиций" };
   const lines = await prisma.supplierOrderLine.findMany({
@@ -64,7 +69,8 @@ export async function exportSupplierOrders(ids: string[]): Promise<SheetResult> 
  * -- of the selected offer.
  */
 export async function exportPriceCheck(productIds: string[]): Promise<SheetResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.price-check", "view");
+  if (denied) return denied;
   if (!productIds.length) return { ok: false, error: "Нет позиций для выгрузки" };
   if (productIds.length > MAX_SHEET_ROWS) return { ok: false, error: "Слишком много позиций" };
   const [products, checking, offers] = await Promise.all([

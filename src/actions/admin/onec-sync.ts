@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { OneCError } from "@/lib/onec";
 import {
   applyCounterparties,
@@ -43,7 +43,7 @@ export type MatchingOverview =
   | { ok: false; error: string };
 
 export async function getMatchingOverview(): Promise<MatchingOverview> {
-  await verifyAdminSession();
+  await requireSection("settings.1c", "view");
   try {
     const all = await goods();
     const [products, counterparties] = await Promise.all([computeProductMatching(all), planCounterparties()]);
@@ -57,7 +57,8 @@ export type SyncResult = { ok: true; message: string } | { ok: false; error: str
 
 /** Links every product whose SKU matches exactly one free 1С card. */
 export async function linkAutomatically(): Promise<SyncResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   try {
     const { auto } = await computeProductMatching(await goods());
     let linked = 0;
@@ -73,7 +74,8 @@ export async function linkAutomatically(): Promise<SyncResult> {
 
 /** Manual decision: link to the chosen 1С card(s), or «нет в 1С» (refs = null). */
 export async function resolveProduct(productId: string, refs: string[] | null): Promise<SyncResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   try {
     if (refs?.length) {
       const known = new Set((await goods()).map((g) => g.ref));
@@ -97,7 +99,8 @@ export async function resolveProduct(productId: string, refs: string[] | null): 
 
 /** 1С goods with no site product become inactive products (after all decisions are made). */
 export async function importOneCGoods(): Promise<SyncResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   try {
     const matching = await computeProductMatching(await goods());
     const pending = matching.auto.length + matching.ambiguous.length + matching.byName.length;
@@ -117,7 +120,8 @@ export async function importOneCGoods(): Promise<SyncResult> {
 }
 
 export async function importCounterparties(): Promise<SyncResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
   try {
     const result = await applyCounterparties(await planCounterparties());
     revalidatePath(PAGE);

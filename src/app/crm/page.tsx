@@ -18,7 +18,7 @@ export default async function CrmLoginPage({ searchParams }: PageProps<"/crm">) 
         ? "/admin"
         : session.role === "CUSTOMER"
           ? (customerNext ?? "/shop")
-          : "/crm/cabinet"
+          : "/admin" /* the first section open to them (src/proxy.ts) */
     );
   }
 

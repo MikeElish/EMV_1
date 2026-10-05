@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { companySchema, type CompanyInput } from "@/lib/validators/crm";
 import {
   uploadCompanyDocumentFile,
@@ -30,7 +30,8 @@ function toCompanyData(data: CompanyInput) {
 }
 
 export async function createCompany(input: CompanyInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.companies");
+  if (denied) return denied;
 
   const parsed = companySchema.safeParse(input);
   if (!parsed.success) {
@@ -43,7 +44,8 @@ export async function createCompany(input: CompanyInput): Promise<ActionResult> 
 }
 
 export async function updateCompany(id: string, input: CompanyInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.companies");
+  if (denied) return denied;
 
   const parsed = companySchema.safeParse(input);
   if (!parsed.success) {
@@ -56,7 +58,8 @@ export async function updateCompany(id: string, input: CompanyInput): Promise<Ac
 }
 
 export async function deleteCompany(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.companies");
+  if (denied) return denied;
 
   const company = await prisma.company.findUnique({ where: { id }, select: { isOwn: true } });
   if (company?.isOwn) {
@@ -74,7 +77,7 @@ export async function deleteCompany(id: string): Promise<ActionResult> {
 }
 
 export async function listCompanyDocuments(companyId: string) {
-  await verifyAdminSession();
+  await requireSection("crm.companies", "view");
   return prisma.companyDocument.findMany({
     where: { companyId },
     orderBy: { uploadedAt: "desc" },
@@ -82,7 +85,8 @@ export async function listCompanyDocuments(companyId: string) {
 }
 
 export async function uploadCompanyDocument(formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.companies");
+  if (denied) return denied;
 
   const companyId = String(formData.get("companyId") ?? "");
   const file = formData.get("file");
@@ -107,7 +111,8 @@ export async function uploadCompanyDocument(formData: FormData): Promise<ActionR
 }
 
 export async function deleteCompanyDocument(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.companies");
+  if (denied) return denied;
 
   const doc = await prisma.companyDocument.findUnique({ where: { id } });
   if (!doc) return { ok: false, error: "Файл не найден" };

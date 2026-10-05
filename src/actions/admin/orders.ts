@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
 import {
   uploadOrderDocumentFile,
@@ -29,7 +29,8 @@ export async function updateOrderItemStatus(
   status: OrderStatus,
   scope: "item" | "order" = "item"
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
 
   if (!Object.values(OrderStatus).includes(status)) {
     return { ok: false, error: "Некорректный статус" };
@@ -54,7 +55,8 @@ export async function updateLinePayment(
   state: PaymentState,
   scope: LineScope = "item"
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
   if (!["paid", "unpaid", "deferred"].includes(state)) return { ok: false, error: "Некорректный статус оплаты" };
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
@@ -74,7 +76,8 @@ export async function updateLineDeliveryDate(
   deliveryDate: string | null,
   scope: LineScope = "item"
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
   await prisma.orderItem.updateMany({
@@ -96,7 +99,8 @@ export async function updateLineDelivery(
   method: DeliveryMethod,
   scope: LineScope = "item"
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
   if (!Object.values(DeliveryMethod).includes(method)) return { ok: false, error: "Некорректный тип доставки" };
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
@@ -128,7 +132,8 @@ export async function updateLineDelivery(
 }
 
 export async function cancelOrderAsStaff(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
   const items = await prisma.orderItem.findMany({ where: { orderId: id }, select: { id: true } });
   await setLineStatuses(
     id,
@@ -140,7 +145,7 @@ export async function cancelOrderAsStaff(id: string): Promise<ActionResult> {
 }
 
 export async function listOrderDocuments(orderId: string, category: OrderDocumentCategory) {
-  await verifyAdminSession();
+  await requireSection("crm.orders", "view");
   return prisma.orderDocument.findMany({
     where: { orderId, category },
     orderBy: { uploadedAt: "desc" },
@@ -148,7 +153,8 @@ export async function listOrderDocuments(orderId: string, category: OrderDocumen
 }
 
 export async function uploadOrderDocument(formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
 
   const orderId = String(formData.get("orderId") ?? "");
   const category = String(formData.get("category") ?? "");
@@ -177,7 +183,8 @@ export async function uploadOrderDocument(formData: FormData): Promise<ActionRes
 }
 
 export async function deleteOrderDocument(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
 
   const doc = await prisma.orderDocument.findUnique({ where: { id } });
   if (!doc) return { ok: false, error: "Файл не найден" };

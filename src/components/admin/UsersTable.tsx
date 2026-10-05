@@ -12,6 +12,8 @@ import { UserForm } from "@/components/admin/UserForm";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
+import { UserAccessTab } from "@/components/admin/UserAccessTab";
+import type { AccessMap } from "@/lib/access";
 
 type Row = {
   id: string;
@@ -24,13 +26,26 @@ type Row = {
   role: Role;
   companyId: string | null;
   company: { name: string } | null;
+  /** Every section's level (Доступ). */
+  access: AccessMap;
 };
+
+type Tab = "info" | "access";
 
 type Company = { id: string; name: string };
 
-export function UsersTable({ users, companies }: { users: Row[]; companies: Company[] }) {
+export function UsersTable({
+  users,
+  companies,
+  canEditAccess,
+}: {
+  users: Row[];
+  companies: Company[];
+  canEditAccess: boolean;
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<Row | null>(null);
+  const [tab, setTab] = useState<Tab>("info");
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -99,7 +114,10 @@ export function UsersTable({ users, companies }: { users: Row[]; companies: Comp
           {filtered.map((user) => (
             <tr
               key={user.id}
-              onClick={() => setSelected(user)}
+              onClick={() => {
+                setSelected(user);
+                setTab("info");
+              }}
               className="cursor-pointer border-b border-foreground/10 hover:bg-foreground/5"
             >
               <td className="py-2 pr-4">{user.lastName ?? "—"}</td>
@@ -121,6 +139,37 @@ export function UsersTable({ users, companies }: { users: Row[]; companies: Comp
       {selected && (
         <Modal onClose={() => setSelected(null)} maxWidthClassName="max-w-2xl">
           <h2 className="text-xl font-bold">Пользователь: {selected.login}</h2>
+
+          {selected.role !== "CUSTOMER" && (
+            <div className="mt-4 flex gap-4 border-b border-foreground/10">
+              {(["info", "access"] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${
+                    tab === t
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-foreground/50 hover:text-foreground"
+                  }`}
+                >
+                  {t === "info" ? "Основная информация" : "Доступ"}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {tab === "access" && selected.role !== "CUSTOMER" ? (
+            <UserAccessTab
+              key={selected.id}
+              userId={selected.id}
+              isOwner={selected.role === "OWNER"}
+              initial={selected.access}
+              canEdit={canEditAccess}
+              onSaved={() => router.refresh()}
+            />
+          ) : (
+          <>
           <UserForm
             companies={companies}
             initial={{
@@ -149,6 +198,8 @@ export function UsersTable({ users, companies }: { users: Row[]; companies: Comp
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               />
             </div>
+          )}
+          </>
           )}
         </Modal>
       )}

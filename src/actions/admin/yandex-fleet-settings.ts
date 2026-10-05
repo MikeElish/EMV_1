@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { encryptSecret } from "@/lib/secret-box";
 import { fleetRequest, YandexFleetError } from "@/lib/yandex-fleet";
 import { yandexFleetSettingsSchema, type YandexFleetSettingsInput } from "@/lib/validators/yandex-fleet";
@@ -10,7 +10,8 @@ import { yandexFleetSettingsSchema, type YandexFleetSettingsInput } from "@/lib/
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
 
 export async function saveYandexFleetSettings(input: YandexFleetSettingsInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.yandex-fleet");
+  if (denied) return denied;
 
   const parsed = yandexFleetSettingsSchema.safeParse(input);
   if (!parsed.success) {
@@ -35,7 +36,8 @@ type ListResponse = { total?: number; parks?: { id: string; name?: string }[] };
 
 /** Read-only check: counts the park's drivers and cars. */
 export async function testYandexFleetConnection(): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("settings.yandex-fleet");
+  if (denied) return denied;
   const settings = await prisma.yandexFleetSettings.findUnique({ where: { id: 1 } });
   if (!settings) return { ok: false, error: "Сначала сохраните настройки" };
 

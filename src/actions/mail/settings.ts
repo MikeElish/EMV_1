@@ -42,7 +42,7 @@ export async function saveMyMailbox(input: { login: string; password?: string })
 }
 
 export async function testMyMailbox(): Promise<SettingsResult> {
-  const session = await getStaffSession();
+  const session = await getStaffSession("view");
   if (!session) return { ok: false, error: "Требуется вход" };
   const account = await getMailAccount(session.userId);
   if (!account) return { ok: false, error: "Почта не настроена" };

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getOwnCompanyId } from "@/lib/own-company";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, getMyAccess } from "@/lib/access-server";
+import { ACCESS_SECTIONS, type AccessMap } from "@/lib/access";
 import { userSchema, type UserInput } from "@/lib/validators/crm";
 import type { Role } from "@prisma/client";
 
@@ -63,7 +64,8 @@ async function assertCompanyExists(companyId: string | undefined) {
 }
 
 export async function createUser(input: UserInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.users");
+  if (denied) return denied;
 
   const parsed = userSchema.safeParse(input);
   if (!parsed.success) {
@@ -102,7 +104,8 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
 }
 
 export async function updateUser(id: string, input: UserInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.users");
+  if (denied) return denied;
 
   const parsed = userSchema.safeParse(input);
   if (!parsed.success) {
@@ -143,7 +146,8 @@ export async function updateUser(id: string, input: UserInput): Promise<ActionRe
 }
 
 export async function deleteUser(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.users");
+  if (denied) return denied;
 
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) return { ok: true };
@@ -152,6 +156,29 @@ export async function deleteUser(id: string): Promise<ActionResult> {
   }
 
   await prisma.user.delete({ where: { id } });
+  revalidatePath("/admin/crm/users");
+  return { ok: true };
+}
+
+/**
+ * Карточка пользователя → Доступ. Only the owner hands out access -- an
+ * employee with «Пользователи» can't widen their own.
+ */
+export async function saveUserAccess(id: string, levels: Record<string, string>): Promise<ActionResult> {
+  const me = await getMyAccess();
+  if (me?.role !== "OWNER") return { ok: false, error: "Доступ настраивает только владелец" };
+  const user = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  if (!user) return { ok: false, error: "Пользователь не найден" };
+  if (user.role === "OWNER" || user.role === "CUSTOMER") {
+    return { ok: false, error: "У этого пользователя доступ не настраивается" };
+  }
+  const access: AccessMap = {};
+  for (const s of ACCESS_SECTIONS) {
+    const v = levels[s.key];
+    if (v !== "edit" && v !== "view" && v !== "hide") return { ok: false, error: `Не задан доступ к разделу «${s.label}»` };
+    access[s.key] = v;
+  }
+  await prisma.user.update({ where: { id }, data: { access } });
   revalidatePath("/admin/crm/users");
   return { ok: true };
 }

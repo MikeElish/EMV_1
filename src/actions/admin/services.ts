@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import { loadOneCServices, type OneCService } from "@/lib/onec-sync";
 import { OneCError } from "@/lib/onec";
 
@@ -38,7 +38,8 @@ function toData(data: ServiceInput) {
 }
 
 export async function saveService(id: string | null, input: ServiceInput): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.services");
+  if (denied) return denied;
   const parsed = serviceSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   if (await codeTaken(parsed.data.code, id ?? undefined)) {
@@ -51,14 +52,16 @@ export async function saveService(id: string | null, input: ServiceInput): Promi
 }
 
 export async function toggleServiceActive(id: string, isActive: boolean): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.services");
+  if (denied) return denied;
   await prisma.service.update({ where: { id }, data: { isActive } });
   revalidatePath("/admin/crm/services");
   return { ok: true };
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.services");
+  if (denied) return denied;
   const used = await prisma.extraCost.count({ where: { serviceId: id } });
   if (used) return { ok: false, error: "Услуга есть в доп.расходах — деактивируйте её вместо удаления." };
   await prisma.service.delete({ where: { id } });
@@ -72,7 +75,8 @@ export type OneCServicesResult =
 
 /** Services from 1С:Бухгалтерия, marking those already on the site. */
 export async function listOneCServices(): Promise<OneCServicesResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.services", "view");
+  if (denied) return denied;
   try {
     const [services, linked] = await Promise.all([
       loadOneCServices(),
@@ -87,7 +91,8 @@ export async function listOneCServices(): Promise<OneCServicesResult> {
 
 /** Copies one 1С service card to the site (price 0 -- set it in the card). */
 export async function importOneCService(ref: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.services");
+  if (denied) return denied;
   if (await prisma.service.findUnique({ where: { oneCRef: ref } })) return { ok: true };
   let card: OneCService | undefined;
   try {

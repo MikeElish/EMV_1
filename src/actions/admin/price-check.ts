@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { parse } from "csv-parse/sync";
 import { read, utils } from "xlsx";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied, requireSection } from "@/lib/access-server";
 import { findCanonicalBrand } from "@/lib/normalize-brand";
 import { buildProductSlug } from "@/lib/slug";
 import { uploadOfferFile, deleteOfferFile } from "@/lib/offer-file-storage";
@@ -47,7 +47,7 @@ export type OfferView = {
 
 /** All supplier offers of a product, cheapest first. */
 export async function listProductOffers(productId: string): Promise<OfferView[]> {
-  await verifyAdminSession();
+  await requireSection("crm.price-check", "view");
   const offers = await prisma.supplierOffer.findMany({
     where: { productId },
     include: { supplier: { select: { name: true } } },
@@ -72,7 +72,8 @@ export async function listProductOffers(productId: string): Promise<OfferView[]>
  * or the delivery time change. The selected offer drags the site prices along.
  */
 export async function saveOffer(formData: FormData): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.price-check");
+  if (denied) return denied;
   const id = String(formData.get("id") ?? "") || null;
   const productId = String(formData.get("productId") ?? "");
   const supplierId = String(formData.get("supplierId") ?? "") || null;
@@ -127,7 +128,8 @@ export async function saveOffer(formData: FormData): Promise<ActionResult> {
 }
 
 export async function deleteOffer(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.price-check");
+  if (denied) return denied;
   const offer = await prisma.supplierOffer.findUnique({ where: { id } });
   if (!offer) return { ok: false, error: "Предложение не найдено" };
   await prisma.supplierOffer.delete({ where: { id } });
@@ -146,7 +148,8 @@ export async function deleteOffer(id: string): Promise<ActionResult> {
 
 /** «Заказать»: the offer goes to CRM → Заказ поставщику. */
 export async function orderFromOffer(offerId: string, quantity: number): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.price-check");
+  if (denied) return denied;
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return { ok: false, error: "Укажите количество" };
   const offer = await prisma.supplierOffer.findUnique({ where: { id: offerId } });
   if (!offer) return { ok: false, error: "Предложение не найдено" };
@@ -219,7 +222,7 @@ function columnPositions(header: unknown[]): number[] {
  * catalogue. Writes nothing.
  */
 export async function analyzeOfferImport(formData: FormData): Promise<OfferImportAnalysis> {
-  await verifyAdminSession();
+  await requireSection("crm.price-check", "edit");
   const supplierId = String(formData.get("supplierId") ?? "");
   const file = formData.get("file");
   if (!supplierId) return { ok: false, error: "Выберите поставщика" };
@@ -291,7 +294,8 @@ export async function commitOfferImport(input: {
   rows: OfferImportRow[];
   createMissing: boolean;
 }): Promise<{ ok: true; updated: number; added: number; created: number; skipped: number } | { ok: false; error: string }> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.price-check");
+  if (denied) return denied;
   const supplier = await prisma.company.findUnique({ where: { id: input.supplierId }, select: { id: true } });
   if (!supplier) return { ok: false, error: "Поставщик не найден" };
 
@@ -340,7 +344,8 @@ export async function commitOfferImport(input: {
 }
 
 export async function deleteSupplierOrderLine(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("crm.supplier-orders");
+  if (denied) return denied;
   await prisma.supplierOrderLine.deleteMany({ where: { id } });
   revalidatePath("/admin/crm/supplier-orders");
   return { ok: true };

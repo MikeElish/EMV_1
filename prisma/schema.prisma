@@ -150,12 +150,14 @@ model SupplierOffer {
 
 // CRM → «Заказ поставщику»: what has to be bought -- from «Заказать» in
 // Проценка, or a customer order line that isn't in stock.
-// Проверить / В запросе / Проверено ↔ the customer line's «Проверка заказа»;
-// Требуется оплата / Заказано ↔ «Ожидание поставки»; Поставлено ↔ «Готов к отгрузке».
+// Проверить / В запросе ↔ the customer line's «Проверка заказа»; Проверено ↔
+// «Требуется оплата»; Заказать / Требуется оплата / Заказано ↔ «Ожидание
+// поставки»; Поставлено ↔ «Готов к отгрузке».
 enum SupplierOrderStatus {
   TO_CHECK
   REQUESTED
   CHECKED
+  TO_ORDER
   AWAITING_PAYMENT
   ORDERED
   DELIVERED
@@ -374,6 +376,9 @@ model User {
   mailSignatureLogo     Bytes?
   mailSignatureLogoType String?
   mailPageSize          Int             @default(30)
+  // Карточка пользователя → Доступ: { "<section key>": "edit" | "view" | "hide" }
+  // (src/lib/access.ts). A missing key takes the section's default.
+  access                Json?
   // E-mail confirmation for self-registered customers. Null = not yet
   // confirmed. The 6-digit code is stored only as a sha256 hash.
   emailVerifiedAt       DateTime?

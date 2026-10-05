@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminSession } from "@/lib/admin-dal";
+import { accessDenied } from "@/lib/access-server";
 import {
   adminDriverApplicationSchema,
   type AdminDriverApplicationInput,
@@ -14,7 +14,8 @@ export async function updateDriverApplication(
   id: string,
   input: AdminDriverApplicationInput
 ): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.driver-applications");
+  if (denied) return denied;
 
   const parsed = adminDriverApplicationSchema.safeParse(input);
   if (!parsed.success) {
@@ -37,7 +38,8 @@ export async function updateDriverApplication(
 }
 
 export async function deleteDriverApplication(id: string): Promise<ActionResult> {
-  await verifyAdminSession();
+  const denied = await accessDenied("taxi.driver-applications");
+  if (denied) return denied;
   await prisma.driverApplication.delete({ where: { id } });
   revalidatePath("/admin/taxi-fleet/driver-applications");
   return { ok: true };
