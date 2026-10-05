@@ -14,7 +14,8 @@ export const getMyAccess = cache(async (): Promise<MyAccess | null> => {
   if (!session?.userId || session.role === "CUSTOMER") return null;
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { role: true, access: true } });
   if (!user || user.role === "CUSTOMER") return null;
-  return { userId: session.userId, role: user.role, access: resolveAccess(user.role, user.access) };
+  const template = await prisma.roleAccess.findUnique({ where: { role: user.role } });
+  return { userId: session.userId, role: user.role, access: resolveAccess(user.role, user.access, template?.access) };
 });
 
 const labelOf = (key: string) => ACCESS_SECTIONS.find((s) => s.key === key)?.label ?? key;

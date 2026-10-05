@@ -10,7 +10,8 @@ const PUBLIC_ADMIN_PATHS = ["/admin/setup"];
 async function staffRedirect(userId: string, pathname: string): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, access: true } });
   if (!user || user.role === "CUSTOMER") return "/crm";
-  const access = resolveAccess(user.role, user.access);
+  const template = await prisma.roleAccess.findUnique({ where: { role: user.role } });
+  const access = resolveAccess(user.role, user.access, template?.access);
   const anywhere = firstVisible(access) ?? "/crm/cabinet";
   const group = groupOfRoot(pathname);
   if (group) return firstVisible(access, group) ?? anywhere;

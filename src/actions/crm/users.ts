@@ -6,9 +6,9 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getOwnCompanyId } from "@/lib/own-company";
 import { accessDenied, getMyAccess } from "@/lib/access-server";
-import { ACCESS_SECTIONS, type AccessMap } from "@/lib/access";
+import { parseAccessMap, resolveAccess, sameAccess } from "@/lib/access";
 import { userSchema, type UserInput } from "@/lib/validators/crm";
-import type { Role } from "@prisma/client";
+import { Prisma, type Role } from "@prisma/client";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -172,13 +172,21 @@ export async function saveUserAccess(id: string, levels: Record<string, string>)
   if (user.role === "OWNER" || user.role === "CUSTOMER") {
     return { ok: false, error: "У этого пользователя доступ не настраивается" };
   }
-  const access: AccessMap = {};
-  for (const s of ACCESS_SECTIONS) {
-    const v = levels[s.key];
-    if (v !== "edit" && v !== "view" && v !== "hide") return { ok: false, error: `Не задан доступ к разделу «${s.label}»` };
-    access[s.key] = v;
-  }
-  await prisma.user.update({ where: { id }, data: { access } });
+  const access = parseAccessMap(levels);
+  if (!access) return { ok: false, error: "Задайте доступ ко всем разделам" };
+  // The same as the role template -- no personal rights, follows the template.
+  const template = await prisma.roleAccess.findUnique({ where: { role: user.role } });
+  const personal = !sameAccess(access, resolveAccess(user.role, null, template?.access));
+  await prisma.user.update({ where: { id }, data: { access: personal ? access : Prisma.DbNull } });
+  revalidatePath("/admin/crm/users");
+  return { ok: true };
+}
+
+/** Карточка пользователя → Доступ → «По шаблону роли». */
+export async function resetUserAccess(id: string): Promise<ActionResult> {
+  const me = await getMyAccess();
+  if (me?.role !== "OWNER") return { ok: false, error: "Доступ настраивает только владелец" };
+  await prisma.user.updateMany({ where: { id }, data: { access: Prisma.DbNull } });
   revalidatePath("/admin/crm/users");
   return { ok: true };
 }

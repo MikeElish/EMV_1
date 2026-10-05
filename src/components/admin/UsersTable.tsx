@@ -28,6 +28,10 @@ type Row = {
   company: { name: string } | null;
   /** Every section's level (Доступ). */
   access: AccessMap;
+  /** The role template (Настройки → Доступ). */
+  template: AccessMap;
+  /** Set apart from the template in the card. */
+  personalAccess: boolean;
 };
 
 type Tab = "info" | "access";
@@ -165,6 +169,8 @@ export function UsersTable({
               userId={selected.id}
               isOwner={selected.role === "OWNER"}
               initial={selected.access}
+              template={selected.template}
+              personal={selected.personalAccess}
               canEdit={canEditAccess}
               onSaved={() => router.refresh()}
             />

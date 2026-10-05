@@ -7,6 +7,7 @@ const TABS = [
   { href: "/admin/settings/glonass", label: "ГЛОНАСС" },
   { href: "/admin/settings/yandex-fleet", label: "Яндекс.Флот" },
   { href: "/admin/settings/1c", label: "1С" },
+  { href: "/admin/settings/access", label: "Доступ" },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

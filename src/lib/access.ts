@@ -57,6 +57,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "settings.glonass", label: "ГЛОНАСС", path: "/admin/settings/glonass" },
       { key: "settings.yandex-fleet", label: "Яндекс.Флот", path: "/admin/settings/yandex-fleet" },
       { key: "settings.1c", label: "1С", path: "/admin/settings/1c" },
+      { key: "settings.access", label: "Доступ", path: "/admin/settings/access" },
     ],
   },
 ];
@@ -71,18 +72,42 @@ export function defaultLevel(key: string): AccessLevel {
 
 const isLevel = (v: unknown): v is AccessLevel => v === "edit" || v === "view" || v === "hide";
 
-/** Every section's level for this user. The owner always has everything. */
-export function resolveAccess(role: Role, stored: unknown): AccessMap {
-  const saved = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
+const asRecord = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
+
+/** Roles whose access is set up (the owner has everything, customers nothing). */
+export const isConfigurableRole = (role: Role) => role !== "OWNER" && role !== "CUSTOMER";
+
+/**
+ * Every section's level for this user: their own card (`stored`), else
+ * the role template (Настройки → Доступ), else the default. The owner always
+ * has everything.
+ */
+export function resolveAccess(role: Role, stored: unknown, template?: unknown): AccessMap {
+  const own = asRecord(stored);
+  const byRole = asRecord(template);
   return Object.fromEntries(
     ACCESS_SECTIONS.map((s) => {
       if (role === "OWNER") return [s.key, "edit"];
       if (role === "CUSTOMER") return [s.key, "hide"];
-      const v = saved[s.key];
+      const v = isLevel(own[s.key]) ? own[s.key] : byRole[s.key];
       return [s.key, isLevel(v) ? v : defaultLevel(s.key)];
     })
   );
 }
+
+/** A full, valid map from what a form sent -- null if anything is off. */
+export function parseAccessMap(input: unknown): AccessMap | null {
+  const raw = asRecord(input);
+  const out: AccessMap = {};
+  for (const s of ACCESS_SECTIONS) {
+    const v = raw[s.key];
+    if (!isLevel(v)) return null;
+    out[s.key] = v;
+  }
+  return out;
+}
+
+export const sameAccess = (a: AccessMap, b: AccessMap) => ACCESS_SECTIONS.every((s) => a[s.key] === b[s.key]);
 
 export const atLeast = (level: AccessLevel, needed: AccessLevel) => RANK[level] >= RANK[needed];
 

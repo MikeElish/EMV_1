@@ -658,3 +658,13 @@ model MailRuleState {
   replied     Json     @default("{}")
   updatedAt   DateTime @updatedAt
 }
+
+// Настройки → Доступ: the access template of a role ({ "<section key>":
+// "edit" | "view" | "hide" }, src/lib/access.ts). Users of the role follow it
+// unless their own card sets them apart (User.access); saving the template
+// drops those personal settings.
+model RoleAccess {
+  role      Role     @id
+  access    Json
+  updatedAt DateTime @updatedAt
+}
