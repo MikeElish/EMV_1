@@ -1,7 +1,5 @@
-export default function CrmReportsPage() {
-  return (
-    <div className="flex h-40 items-center justify-center text-foreground/40">
-      Раздел «Отчёты» в разработке
-    </div>
-  );
+import { redirect } from "next/navigation";
+
+export default function ReportsIndexPage() {
+  redirect("/admin/reports/funds");
 }

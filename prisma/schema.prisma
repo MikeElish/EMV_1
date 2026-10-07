@@ -80,6 +80,7 @@ model Product {
   pricing            ProductPricing?
   offers             SupplierOffer[]
   supplierOrderLines SupplierOrderLine[]
+  repairLines        RepairLine[]
 
   // Cards in 1С:Бухгалтерия this product stands for (1С often holds the same
   // article on several cards).
@@ -164,13 +165,13 @@ enum SupplierOrderStatus {
 }
 
 model SupplierOrderLine {
-  id           String         @id @default(cuid())
+  id           String              @id @default(cuid())
   productId    String
-  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   supplierId   String?
-  supplier     Company?       @relation(fields: [supplierId], references: [id])
+  supplier     Company?            @relation(fields: [supplierId], references: [id])
   offerId      String?
-  offer        SupplierOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  offer        SupplierOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
   // Purchase price per unit, kopecks.
   price        Int
   quantity     Int
@@ -179,8 +180,8 @@ model SupplierOrderLine {
   status       SupplierOrderStatus @default(TO_CHECK)
   // The customer order line it covers, if any.
   orderItemId  String?
-  orderItem    OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  createdAt    DateTime       @default(now())
+  orderItem    OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  createdAt    DateTime            @default(now())
 
   @@index([productId])
   @@index([orderItemId])
@@ -234,18 +235,19 @@ model Order {
 
 // Services (delivery, forwarding …) -- CRM → Услуги. Not sold in the shop.
 model Service {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
-  code        String?     @unique
+  code        String?      @unique
   unit        String?
-  price       Int         @default(0)
+  price       Int          @default(0)
   description String?
-  isActive    Boolean     @default(true)
+  isActive    Boolean      @default(true)
   // Catalog_Номенклатура Ref_Key of the 1С card (Услуга = true).
-  oneCRef     String?     @unique
+  oneCRef     String?      @unique
   extraCosts  ExtraCost[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  repairLines RepairLine[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 // Additional costs of an order (delivery etc.) -- CRM → Доп.расходы. Shown
@@ -523,6 +525,7 @@ model Vehicle {
   status       VehicleStatus     @default(FREE)
   documents    VehicleDocument[]
   fuelReceipts FuelReceipt[]
+  repairs      Repair[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -667,4 +670,80 @@ model RoleAccess {
   role      Role     @id
   access    Json
   updatedAt DateTime @updatedAt
+}
+
+// Таксопарк → Ремонт: a repair card of a park vehicle with its works and materials.
+enum RepairType {
+  SCHEDULED_SERVICE // Плановое ТО
+  BODY // Кузовной
+  UNIT // Агрегатный
+  OPERATIONAL // Оперативный
+  TIRES // Шиномонтаж
+}
+
+enum RepairShop {
+  MECHANIC // Механик (own)
+  THIRD_PARTY // Сторонний
+}
+
+enum RepairStatus {
+  PLANNED
+  IN_REPAIR
+  AWAITING_PARTS
+  DONE
+  CANCELLED
+}
+
+model Repair {
+  id        String           @id @default(cuid())
+  date      DateTime
+  vehicleId String
+  vehicle   Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  type      RepairType
+  shop      RepairShop
+  status    RepairStatus     @default(PLANNED)
+  note      String?
+  lines     RepairLine[]
+  documents RepairDocument[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([vehicleId])
+  @@index([date])
+}
+
+enum RepairLineKind {
+  SERVICE // работа (CRM → Услуги)
+  PRODUCT // материал (CRM → Товары)
+}
+
+// A work or a material of a repair. The name and price are copied when the
+// line is added; the catalogue card stays linked when it was picked from it.
+model RepairLine {
+  id        String         @id @default(cuid())
+  repairId  String
+  repair    Repair         @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  kind      RepairLineKind
+  productId String?
+  product   Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  serviceId String?
+  service   Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  name      String
+  quantity  Float
+  // Per unit, kopecks.
+  price     Int
+  createdAt DateTime       @default(now())
+
+  @@index([repairId])
+}
+
+model RepairDocument {
+  id         String   @id @default(cuid())
+  repairId   String
+  repair     Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+
+  @@index([repairId])
 }

@@ -10,5 +10,5 @@ const TABS = [
 ];
 
 export default function TaxiFleetLayout({ children }: { children: React.ReactNode }) {
-  return <NavTabs tabs={TABS}>{children}</NavTabs>;
+  return <NavTabs tabs={TABS} fill>{children}</NavTabs>;
 }

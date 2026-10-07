@@ -45,7 +45,21 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "taxi.repair", label: "Ремонт", path: "/admin/taxi-fleet/repair" },
     ],
   },
-  { label: "Отчёты", path: "/admin/reports", sections: [{ key: "reports", label: "Отчёты", path: "/admin/reports" }] },
+  {
+    label: "Документооборот",
+    path: "/admin/documents",
+    sections: [{ key: "documents", label: "Документооборот", path: "/admin/documents" }],
+  },
+  {
+    label: "Отчёты",
+    path: "/admin/reports",
+    sections: [
+      { key: "reports.funds", label: "Фонды", path: "/admin/reports/funds" },
+      { key: "reports.salary", label: "Зарплата", path: "/admin/reports/salary" },
+      { key: "reports.execution", label: "Выполнение", path: "/admin/reports/execution" },
+      { key: "reports.analytics", label: "Аналитика", path: "/admin/reports/analytics" },
+    ],
+  },
   { label: "Почта", path: "/admin/mail", sections: [{ key: "mail", label: "Почта", path: "/admin/mail" }] },
   {
     label: "Настройки",
@@ -72,6 +86,12 @@ export function defaultLevel(key: string): AccessLevel {
 
 const isLevel = (v: unknown): v is AccessLevel => v === "edit" || v === "view" || v === "hide";
 
+/** Отчёты was one section before its tabs: what was set for it holds for each tab. */
+function legacy(own: Record<string, unknown>, byRole: Record<string, unknown>, key: string): unknown {
+  if (!key.startsWith("reports.")) return undefined;
+  return isLevel(own.reports) ? own.reports : byRole.reports;
+}
+
 const asRecord = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 
 /** Roles whose access is set up (the owner has everything, customers nothing). */
@@ -89,7 +109,7 @@ export function resolveAccess(role: Role, stored: unknown, template?: unknown): 
     ACCESS_SECTIONS.map((s) => {
       if (role === "OWNER") return [s.key, "edit"];
       if (role === "CUSTOMER") return [s.key, "hide"];
-      const v = isLevel(own[s.key]) ? own[s.key] : byRole[s.key];
+      const v = isLevel(own[s.key]) ? own[s.key] : isLevel(byRole[s.key]) ? byRole[s.key] : legacy(own, byRole, s.key);
       return [s.key, isLevel(v) ? v : defaultLevel(s.key)];
     })
   );
