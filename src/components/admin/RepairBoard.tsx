@@ -446,7 +446,16 @@ function StatusSelect({ id, status }: { id: string; status: RepairStatus }) {
 type Filters = { date: string; vehicle: string; plate: string; type: RepairType | ""; shop: RepairShop | ""; status: RepairStatus | "" };
 const EMPTY: Filters = { date: "", vehicle: "", plate: "", type: "", shop: "", status: "" };
 
-export function RepairBoard({ repairs, vehicles }: { repairs: RepairRow[]; vehicles: VehicleOption[] }) {
+export function RepairBoard({
+  repairs,
+  vehicles,
+  canDelete = false,
+}: {
+  repairs: RepairRow[];
+  vehicles: VehicleOption[];
+  /** Владелец: «Удалить» on every row of the register. */
+  canDelete?: boolean;
+}) {
   const router = useRouter();
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -505,6 +514,7 @@ export function RepairBoard({ repairs, vehicles }: { repairs: RepairRow[]; vehic
                 <th className="py-2 pr-3">Вид ремонта</th>
                 <th className="py-2 pr-3">Цех</th>
                 <th className="py-2 pr-3">Статус</th>
+                {canDelete && <th className="py-2" />}
               </tr>
               <tr className="text-left">
                 {(["date", "vehicle", "plate"] as const).map((k) => (
@@ -542,12 +552,13 @@ export function RepairBoard({ repairs, vehicles }: { repairs: RepairRow[]; vehic
                     ))}
                   </select>
                 </th>
+                {canDelete && <th className="pb-2" />}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-4 text-foreground/40">
+                  <td colSpan={canDelete ? 7 : 6} className="py-4 text-foreground/40">
                     {repairs.length ? "Ничего не найдено." : "Ремонтов пока нет — добавьте кнопкой «+»."}
                   </td>
                 </tr>
@@ -569,6 +580,22 @@ export function RepairBoard({ repairs, vehicles }: { repairs: RepairRow[]; vehic
                     <td className="py-2 pr-3">
                       <StatusSelect id={r.id} status={r.status} />
                     </td>
+                    {canDelete && (
+                      <td className="py-2" onClick={(e) => e.stopPropagation()}>
+                        <DeleteButton
+                          action={async () => {
+                            const result = await deleteRepair(r.id);
+                            if (result.ok) {
+                              if (selectedId === r.id) setSelectedId(null);
+                              router.refresh();
+                            }
+                            return result;
+                          }}
+                          confirmText={`Удалить ремонт ${r.vehicleName} от ${dayLabel(r.date)} со всеми работами, материалами и файлами?`}
+                          className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

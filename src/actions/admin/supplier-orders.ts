@@ -91,3 +91,16 @@ export async function exportPriceCheck(productIds: string[]): Promise<SheetResul
   });
   return { ok: true, base64: orderSheetBase64(rows), fileName: orderSheetFileName("Проценка") };
 }
+
+/** Срок поставки of a supplier order line, days (empty -- not known). */
+export async function updateSupplierOrderDays(id: string, days: number | null): Promise<ActionResult> {
+  const denied = await accessDenied("crm.supplier-orders");
+  if (denied) return denied;
+  if (days !== null && (!Number.isInteger(days) || days < 0 || days > 365)) {
+    return { ok: false, error: "Срок поставки — целое число дней от 0 до 365" };
+  }
+  const updated = await prisma.supplierOrderLine.updateMany({ where: { id }, data: { deliveryDays: days } });
+  if (!updated.count) return { ok: false, error: "Позиция не найдена" };
+  revalidatePath("/admin/crm/supplier-orders");
+  return { ok: true };
+}

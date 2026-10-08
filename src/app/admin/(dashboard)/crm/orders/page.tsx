@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getMyAccess } from "@/lib/access-server";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { OrdersTable } from "@/components/admin/OrdersTable";
 
@@ -31,9 +32,11 @@ export default async function CrmOrdersPage({
     orderBy: { createdAt: "desc" },
   });
 
+  const me = await getMyAccess();
+
   return (
     <CrmPage>
-      <OrdersTable orders={orders} initialOrderNumber={orderNumber} />
+      <OrdersTable orders={orders} initialOrderNumber={orderNumber} canDelete={me?.role === "OWNER"} />
     </CrmPage>
   );
 }

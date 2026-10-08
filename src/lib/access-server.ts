@@ -54,3 +54,9 @@ export async function requireSection(keys: string | string[], level: AccessLevel
   if (!me || !(await hasAccess(keys, level))) redirect("/crm");
   return { userId: me.userId };
 }
+
+/** Deleting journal records is the owner's: null when allowed, otherwise the error. */
+export async function ownerOnly(): Promise<{ ok: false; error: string } | null> {
+  const me = await getMyAccess();
+  return me?.role === "OWNER" ? null : { ok: false, error: "Удалять записи может только владелец" };
+}

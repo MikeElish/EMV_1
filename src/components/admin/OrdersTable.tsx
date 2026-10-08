@@ -7,6 +7,7 @@ import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 import { PaidToggle, PAYMENT_STATE_LABELS, paymentStateOf } from "@/components/admin/PaidToggle";
 import { DeliveryDateInput } from "@/components/admin/DeliveryDateInput";
 import { OrderFilesMenu } from "@/components/admin/OrderFilesMenu";
+import { OrderDeleteButton } from "@/components/admin/OrderDeleteButton";
 import { NewOrderModal } from "@/components/admin/NewOrderModal";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DeliveryMethodCell } from "@/components/admin/DeliveryMethodCell";
@@ -165,9 +166,12 @@ const filterInputClassName =
 export function OrdersTable({
   orders,
   initialOrderNumber,
+  canDelete = false,
 }: {
   orders: OrderRow[];
   initialOrderNumber?: string;
+  /** Владелец: «Удалить» on every row. */
+  canDelete?: boolean;
 }) {
   const [filters, setFilters] = useState<Filters>({
     ...EMPTY_FILTERS,
@@ -357,6 +361,7 @@ export function OrdersTable({
                 <th className="py-2 pr-4">Дата поставки</th>
                 <th className="py-2 pr-4">Оплата</th>
                 {!grouped && <th className="py-2 pr-4">Файлы</th>}
+                {canDelete && <th className="py-2" />}
               </tr>
               <tr className="text-left">
                 {textFilters.map((f) => (
@@ -421,6 +426,7 @@ export function OrdersTable({
                   </select>
                 </th>
                 {!grouped && <th className="pb-2 pr-4" />}
+                {canDelete && <th className="pb-2" />}
               </tr>
             </thead>
             {grouped ? (
@@ -465,6 +471,11 @@ export function OrdersTable({
                       </td>
                       <td className="whitespace-nowrap py-2 pr-4">{g.dates}</td>
                       <td className="py-2 pr-4">{g.payment}</td>
+                      {canDelete && (
+                        <td className="py-2">
+                          <OrderDeleteButton orderId={g.order.id} orderNumber={g.order.orderNumber} lines={g.order.items.length} />
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -553,6 +564,16 @@ export function OrdersTable({
                         <td className="py-2 pr-4">
                           <OrderFilesMenu orderId={order.id} />
                         </td>
+                        {canDelete && (
+                          <td className="py-2">
+                            <OrderDeleteButton
+                              orderId={order.id}
+                              orderNumber={order.orderNumber}
+                              itemId={item.id}
+                              lines={order.items.length}
+                            />
+                          </td>
+                        )}
                       </tr>
                     );
                   })

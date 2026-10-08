@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import type { SupplierOrderStatus } from "@prisma/client";
-import { exportSupplierOrders, updateSupplierOrderStatus } from "@/actions/admin/supplier-orders";
+import { exportSupplierOrders, updateSupplierOrderDays, updateSupplierOrderStatus } from "@/actions/admin/supplier-orders";
 import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
@@ -63,6 +63,55 @@ const STATUSES = Object.keys(SUPPLIER_ORDER_STATUS_LABELS) as SupplierOrderStatu
 
 const filterClass =
   "w-full rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-xs font-normal outline-none focus:border-foreground/50";
+
+/** Срок поставки, editable in place: saved on Enter or when the field is left. */
+function DaysCell({ id, days }: { id: string; days: number | null }) {
+  const initial = days === null ? "" : String(days);
+  const [value, setValue] = useState(initial);
+  const [synced, setSynced] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  if (initial !== synced) {
+    setSynced(initial);
+    setValue(initial);
+  }
+
+  function save() {
+    const text = value.trim();
+    if (text === synced) return;
+    const next = text === "" ? null : Number(text);
+    setError(null);
+    startTransition(async () => {
+      const result = await updateSupplierOrderDays(id, next);
+      if (!result.ok) {
+        setError(result.error);
+        setValue(synced);
+      }
+    });
+  }
+
+  return (
+    <>
+      <span className="inline-flex items-center gap-1">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/D/g, ""))}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          disabled={pending}
+          inputMode="numeric"
+          placeholder="—"
+          aria-label="Срок поставки, дней"
+          className="w-14 rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-right text-sm outline-none focus:border-foreground/50"
+        />
+        <span className="text-foreground/50">дн.</span>
+      </span>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </>
+  );
+}
 
 function StatusSelect({ id, status }: { id: string; status: SupplierOrderStatus }) {
   const [value, setValue] = useState(status);
@@ -240,7 +289,9 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
                     <td className="whitespace-nowrap py-2 pr-4">{r.sku}</td>
                     <td className="py-2 pr-4">{r.quantity}</td>
                     <td className="py-2 pr-4">{r.supplier ?? <span className="text-foreground/40">не выбран</span>}</td>
-                    <td className="whitespace-nowrap py-2 pr-4">{days(r.deliveryDays)}</td>
+                    <td className="whitespace-nowrap py-2 pr-4">
+                      <DaysCell id={r.id} days={r.deliveryDays} />
+                    </td>
                     <td className="py-2 pr-4">{r.quality ?? "—"}</td>
                     <td className="py-2 pr-4">
                       <StatusSelect id={r.id} status={r.status} />

@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { accessDenied, requireSection } from "@/lib/access-server";
+import { accessDenied, ownerOnly, requireSection } from "@/lib/access-server";
 import { OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
 import {
   uploadOrderDocumentFile,
   deleteOrderDocumentFile,
 } from "@/lib/order-document-storage";
-import { applyPaymentTerms, refreshOrder, setLineStatuses, targetLines } from "@/lib/order-status";
+import { applyPaymentTerms, refreshOrder, releaseAwaitingSupply, setLineStatuses, targetLines } from "@/lib/order-status";
 import { sendDeliveryChangeLetter } from "@/lib/order-notifications";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -192,5 +192,64 @@ export async function deleteOrderDocument(id: string): Promise<ActionResult> {
   await deleteOrderDocumentFile(doc.fileUrl);
   await prisma.orderDocument.delete({ where: { id } });
   revalidatePath("/admin/crm/orders");
+  return { ok: true };
+}
+
+// ---- Deleting (owner only) -------------------------------------------------------------
+
+/** Supplier order lines not yet ordered go with the customer line they were for. */
+const UNORDERED_SUPPLIER_STATUSES = ["TO_CHECK", "REQUESTED", "CHECKED", "TO_ORDER"] as const;
+
+/**
+ * Removes order lines as if they had never been there: shipped goods go back
+ * on stock, unordered supplier lines and the order's files go too.
+ */
+async function removeLines(orderId: string, itemIds: string[] | "all") {
+  const items = await prisma.orderItem.findMany({
+    where: { orderId, ...(itemIds === "all" ? {} : { id: { in: itemIds } }) },
+    select: { id: true, productId: true, quantity: true, stockWrittenOff: true },
+  });
+  const ids = items.map((i) => i.id);
+  const remaining = itemIds === "all" ? 0 : await prisma.orderItem.count({ where: { orderId, id: { notIn: ids } } });
+  const wholeOrder = remaining === 0;
+  const docs = wholeOrder ? await prisma.orderDocument.findMany({ where: { orderId }, select: { fileUrl: true } }) : [];
+
+  await prisma.$transaction(async (tx) => {
+    for (const i of items) {
+      if (i.stockWrittenOff) await tx.product.update({ where: { id: i.productId }, data: { stock: { increment: i.quantity } } });
+    }
+    await tx.supplierOrderLine.deleteMany({ where: { orderItemId: { in: ids }, status: { in: [...UNORDERED_SUPPLIER_STATUSES] } } });
+    if (wholeOrder) {
+      await tx.payment.deleteMany({ where: { orderId } });
+      await tx.order.delete({ where: { id: orderId } });
+    } else {
+      await tx.orderItem.deleteMany({ where: { id: { in: ids } } });
+      await refreshOrder(tx, orderId);
+    }
+  });
+  await Promise.all(docs.map((d) => deleteOrderDocumentFile(d.fileUrl)));
+  // Stock that came back (or reserves let go) may serve lines waiting for supply.
+  await releaseAwaitingSupply([...new Set(items.map((i) => i.productId))]);
+  revalidateOrders();
+}
+
+/** Владелец: the whole order. */
+export async function deleteOrderAsOwner(orderId: string): Promise<ActionResult> {
+  const denied = await ownerOnly();
+  if (denied) return denied;
+  if (!(await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } }))) {
+    return { ok: false, error: "Заказ не найден" };
+  }
+  await removeLines(orderId, "all");
+  return { ok: true };
+}
+
+/** Владелец: one line; the last one takes the order with it. */
+export async function deleteOrderLineAsOwner(itemId: string): Promise<ActionResult> {
+  const denied = await ownerOnly();
+  if (denied) return denied;
+  const item = await prisma.orderItem.findUnique({ where: { id: itemId }, select: { orderId: true } });
+  if (!item) return { ok: false, error: "Позиция не найдена" };
+  await removeLines(item.orderId, [itemId]);
   return { ok: true };
 }

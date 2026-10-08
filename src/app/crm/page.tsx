@@ -3,11 +3,7 @@ import Link from "next/link";
 import { getAdminSession } from "@/lib/session";
 import { Logo } from "@/components/Logo";
 import { CrmLoginForm } from "@/components/crm/CrmLoginForm";
-
-// Only the customer's own orders page may be the target of ?next=.
-function customerNextPath(value: unknown): string | undefined {
-  return typeof value === "string" && /^\/shop\/orders(\?|$)/.test(value) ? value : undefined;
-}
+import { customerNextPath } from "@/lib/customer-next";
 
 export default async function CrmLoginPage({ searchParams }: PageProps<"/crm">) {
   const customerNext = customerNextPath((await searchParams).next);
@@ -30,6 +26,15 @@ export default async function CrmLoginPage({ searchParams }: PageProps<"/crm">) 
           <span className="text-lg leading-none text-white/80">crm</span>
         </Link>
         <CrmLoginForm customerNext={customerNext} />
+        <p className="-mt-2 text-sm text-white/60">
+          Нет учётной записи?{" "}
+          <Link
+            href={customerNext ? `/crm/register?next=${encodeURIComponent(customerNext)}` : "/crm/register"}
+            className="font-medium text-white underline underline-offset-4 hover:opacity-80"
+          >
+            Регистрация
+          </Link>
+        </p>
       </div>
     </main>
   );

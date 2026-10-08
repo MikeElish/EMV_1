@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { getMyAccess } from "@/lib/access-server";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { RepairBoard } from "@/components/admin/RepairBoard";
 
 // Ремонт: the register of repair cards on the left, the chosen card's works
 // and materials on the right.
 export default async function RepairPage() {
-  const [repairs, vehicles] = await Promise.all([
+  const [repairs, vehicles, me] = await Promise.all([
     prisma.repair.findMany({
       include: {
         vehicle: { select: { brand: true, model: true, licensePlate: true } },
@@ -18,6 +19,7 @@ export default async function RepairPage() {
       select: { id: true, brand: true, model: true, licensePlate: true },
       orderBy: [{ brand: "asc" }, { model: "asc" }],
     }),
+    getMyAccess(),
   ]);
 
   return (
@@ -45,6 +47,7 @@ export default async function RepairPage() {
           })),
         }))}
         vehicles={vehicles.map((v) => ({ id: v.id, name: `${v.brand} ${v.model}`, plate: v.licensePlate }))}
+        canDelete={me?.role === "OWNER"}
       />
     </CrmPage>
   );
