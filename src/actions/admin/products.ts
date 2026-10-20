@@ -29,7 +29,8 @@ function toProductData(data: ProductInput) {
     price: data.price,
     stock: data.stock,
     categoryId: data.categoryId,
-    brand: data.brand,
+    // «— не указан —» clears it (undefined would keep the old one).
+    brand: data.brand || null,
     images: data.images,
     isActive: data.isActive,
     attributes: Object.keys(attributes).length > 0 ? attributes : undefined,

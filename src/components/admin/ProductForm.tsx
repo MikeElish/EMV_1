@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { BRANDS } from "@/content/brands";
+import { SearchSelect } from "@/components/SearchSelect";
 import type { ProductInput } from "@/lib/validators/product";
 import type { ActionResult } from "@/actions/admin/products";
 import type { Markups } from "@/lib/pricing";
@@ -53,6 +55,13 @@ export function ProductForm({
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [tab, setTab] = useState<Tab>("main");
   const [prices, setPrices] = useState<PricesState>(() => initialPrices(markups, initialPricing, offers));
+  const [brand, setBrand] = useState(initial?.brand ?? "");
+  // The brand directory, plus the card's own brand if it isn't in it.
+  const initialBrand = initial?.brand;
+  const brandOptions = useMemo(() => {
+    const names = initialBrand && !BRANDS.includes(initialBrand) ? [initialBrand, ...BRANDS] : BRANDS;
+    return names.map((b) => ({ value: b, label: b }));
+  }, [initialBrand]);
 
   function failOnPrices(message: string) {
     setError(message);
@@ -93,7 +102,7 @@ export function ProductForm({
       selectedOfferId: prices.selectedOfferId || undefined,
       stock: Number(formData.get("stock") ?? 0),
       categoryId: String(formData.get("categoryId") ?? ""),
-      brand: String(formData.get("brand") ?? "") || undefined,
+      brand: brand || undefined,
       machineType: String(formData.get("machineType") ?? "") || undefined,
       compatibleWith: splitList(String(formData.get("compatibleWith") ?? "")),
       images,
@@ -223,11 +232,14 @@ export function ProductForm({
           <label htmlFor="brand" className="text-sm text-foreground/60">
             Бренд
           </label>
-          <input
+          <SearchSelect
             id="brand"
-            name="brand"
-            defaultValue={initial?.brand}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+            value={brand}
+            onChange={setBrand}
+            options={brandOptions}
+            emptyLabel="— не указан —"
+            placeholder="Начните вводить бренд"
+            className="mt-1"
           />
         </div>
         <div>

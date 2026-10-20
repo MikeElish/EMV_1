@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchSelect } from "@/components/SearchSelect";
 import { FitWidth } from "@/components/FitWidth";
 import { applyMarkup, markupOf, type Markups } from "@/lib/pricing";
 import { rublesToKopecksRoundedUp } from "@/lib/money";
@@ -225,20 +226,15 @@ export function ProductPricesPanel({
             <label htmlFor="supplierId" className="text-sm text-foreground/60">
               Поставщик
             </label>
-            <select
+            <SearchSelect
               id="supplierId"
               value={value.supplierId}
-              onChange={(e) => onChange({ ...value, supplierId: e.target.value })}
-              className={`mt-1 ${inputClassName}`}
-            >
-              <option value="">— не выбран —</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                  {s.inn ? ` (ИНН ${s.inn})` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={(supplierId) => onChange({ ...value, supplierId })}
+              options={suppliers.map((s) => ({ value: s.id, label: s.name, hint: s.inn ? `ИНН ${s.inn}` : undefined }))}
+              emptyLabel="— не выбран —"
+              placeholder="Название или ИНН поставщика"
+              className="mt-1"
+            />
             {suppliers.length === 0 && (
               <p className="mt-1 text-xs text-foreground/50">
                 Поставщиков пока нет — добавьте компанию с ролью «Поставщик» в CRM → Компании.
