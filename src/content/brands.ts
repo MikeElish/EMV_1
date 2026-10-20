@@ -532,7 +532,6 @@ export const BRANDS: string[] = [
   "FAE",
   "FAG",
   "FAHEL",
-  "Fai Filtri",
   "FAIFILTRI",
   "FAIRFIELD",
   "FALCON/MILLENNIUM",
