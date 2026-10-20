@@ -10,7 +10,6 @@ import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { deleteProduct, listProductReserve, type ProductDocumentLine } from "@/actions/admin/products";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { ActiveToggle } from "@/components/admin/ActiveToggle";
-import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { Modal } from "@/components/Modal";
 import {
@@ -139,6 +138,40 @@ function StockCell({
   );
 }
 
+// ---- Column filters (as in Заказы) ---------------------------------------------------
+
+type Filters = {
+  product: string;
+  category: string;
+  supplier: string;
+  purchase: string;
+  retail: string;
+  wholesale: string;
+  dealer: string;
+  stock: string;
+  active: "" | "yes" | "no";
+};
+const EMPTY_FILTERS: Filters = {
+  product: "",
+  category: "",
+  supplier: "",
+  purchase: "",
+  retail: "",
+  wholesale: "",
+  dealer: "",
+  stock: "",
+  active: "",
+};
+type TextFilter = Exclude<keyof Filters, "category" | "active">;
+
+const has = (value: string, query: string) => value.toLowerCase().includes(query.trim().toLowerCase());
+/** A price filter as typed: «1500», «1 500», «1500,5». */
+const priceMatches = (kopecks: number | undefined, query: string) =>
+  kopecks !== undefined && String(kopecks / 100).includes(query.replace(/\s/g, "").replace(",", "."));
+
+const filterInputClassName =
+  "w-full rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-xs font-normal outline-none focus:border-foreground/50";
+
 export function ProductsTable({
   products,
   reserve,
@@ -148,19 +181,18 @@ export function ProductsTable({
   reserve: Record<string, number>;
 }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [reserveOf, setReserveOf] = useState<ProductRow | null>(null);
-  const exportHref = buildExportHref(products);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingScroll = useRef<number | null>(null);
 
-  // Back from a product card: the same search and the same scroll position.
+  // Back from a product card: the same filters and the same scroll position.
   // Runs on a fresh mount and also when Next shows the kept (hidden) page
   // again on «Назад» -- then the rows are still there but the frame's
   // scrollTop was reset while it was hidden.
-  const searchRef = useRef(search);
+  const filtersRef = useRef(filters);
   useLayoutEffect(() => {
-    searchRef.current = search;
+    filtersRef.current = filters;
   });
   useLayoutEffect(() => {
     let saved: ProductsReturnState;
@@ -172,26 +204,41 @@ export function ProductsTable({
     } catch {
       return;
     }
-    if (Date.now() - saved.at > 60 * 60 * 1000) return;
-    if (saved.search === searchRef.current && scrollRef.current) {
+    if (Date.now() - saved.at > 60 * 60 * 1000 || !saved.filters) return;
+    const restored = { ...EMPTY_FILTERS, ...saved.filters } as Filters;
+    if (JSON.stringify(restored) === JSON.stringify(filtersRef.current) && scrollRef.current) {
       scrollRef.current.scrollTop = saved.scrollTop;
       return;
     }
     pendingScroll.current = saved.scrollTop;
-    setSearch(saved.search);
+    setFilters(restored);
   }, []);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return products;
-    return products.filter((product) =>
-      [product.name, product.sku, product.category.name, product.brand]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
-  }, [products, search]);
+  const categories = useMemo(
+    () => [...new Set(products.map((p) => p.category.name))].sort((a, b) => a.localeCompare(b, "ru")),
+    [products]
+  );
+
+  const filtered = useMemo(
+    () =>
+      products.filter((p) => {
+        const f = filters;
+        if (f.product && !has(`${p.name} ${p.sku} ${p.brand ?? ""}`, f.product)) return false;
+        if (f.category && p.category.name !== f.category) return false;
+        if (f.supplier && !has(p.pricing?.supplier?.name ?? "", f.supplier)) return false;
+        if (f.purchase && !priceMatches(p.pricing?.purchasePrice, f.purchase)) return false;
+        if (f.retail && !priceMatches(p.pricing?.retailPrice, f.retail)) return false;
+        if (f.wholesale && !priceMatches(p.price, f.wholesale)) return false;
+        if (f.dealer && !priceMatches(p.pricing?.dealerPrice, f.dealer)) return false;
+        if (f.stock && !has(String(p.stock), f.stock)) return false;
+        if (f.active && p.isActive !== (f.active === "yes")) return false;
+        return true;
+      }),
+    [products, filters]
+  );
+  // «Выгрузить» takes what is on screen.
+  const exportHref = useMemo(() => buildExportHref(filtered), [filtered]);
+  const hasActiveFilters = Object.values(filters).some(Boolean);
 
   useLayoutEffect(() => {
     if (pendingScroll.current === null || !scrollRef.current) return;
@@ -199,8 +246,24 @@ export function ProductsTable({
     pendingScroll.current = null;
   }, [filtered]);
 
+  function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function textFilter(key: TextFilter) {
+    return (
+      <input
+        type="text"
+        value={filters[key]}
+        onChange={(e) => setFilter(key, e.target.value)}
+        placeholder="Поиск..."
+        className={filterInputClassName}
+      />
+    );
+  }
+
   function rememberPlace() {
-    saveProductsPlace(search, scrollRef.current?.scrollTop ?? 0);
+    saveProductsPlace(filters, scrollRef.current?.scrollTop ?? 0);
   }
 
   function openProduct(id: string) {
@@ -213,7 +276,15 @@ export function ProductsTable({
       <div className="flex shrink-0 items-center justify-between">
         <h1 className="text-2xl font-bold">Товары</h1>
         <div className="flex items-center gap-3">
-          <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск по товарам..." />
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="text-sm text-foreground/50 hover:text-foreground"
+            >
+              Сбросить фильтры
+            </button>
+          )}
           <Link
             href="/admin/crm/products/import"
             className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium"
@@ -229,6 +300,7 @@ export function ProductsTable({
           <a
             href={exportHref}
             download="tovary.xlsx"
+            title={hasActiveFilters ? `Выгрузить отфильтрованные товары: ${filtered.length}` : undefined}
             className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
           >
             Выгрузить
@@ -238,26 +310,68 @@ export function ProductsTable({
 
       {products.length === 0 ? (
         <p className="mt-6 text-sm text-foreground/40">Товаров пока нет.</p>
-      ) : filtered.length === 0 ? (
-        <p className="mt-6 text-sm text-foreground/40">Ничего не найдено.</p>
       ) : (
         <CrmTableScroll ref={scrollRef} className="mt-6">
           <table className="w-full text-sm">
             <thead className={STICKY_THEAD}>
               <tr className="text-left text-foreground/50">
-                <th className="py-2">Товар</th>
-                <th className="py-2">Категория</th>
+                <th className="py-2 pr-3">Товар</th>
+                <th className="py-2 pr-3">Категория</th>
                 <th className="py-2 pr-3">Поставщик</th>
                 <th className="py-2 pr-3">Закупка</th>
                 <th className="py-2 pr-3">Розница</th>
                 <th className="py-2 pr-3">Опт</th>
                 <th className="py-2 pr-3">Дилер</th>
                 <th className="py-2 pr-3">Остаток / Резерв / К поступлению</th>
-                <th className="py-2">Активен</th>
+                <th className="py-2 pr-3">Активен</th>
                 <th className="py-2" />
+              </tr>
+              <tr className="text-left">
+                <th className="pb-2 pr-3">{textFilter("product")}</th>
+                <th className="pb-2 pr-3">
+                  <select
+                    value={filters.category}
+                    onChange={(e) => setFilter("category", e.target.value)}
+                    aria-label="Фильтр: категория"
+                    className={`${filterInputClassName} bg-background`}
+                  >
+                    <option value="">Все</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th className="pb-2 pr-3">{textFilter("supplier")}</th>
+                <th className="pb-2 pr-3">{textFilter("purchase")}</th>
+                <th className="pb-2 pr-3">{textFilter("retail")}</th>
+                <th className="pb-2 pr-3">{textFilter("wholesale")}</th>
+                <th className="pb-2 pr-3">{textFilter("dealer")}</th>
+                <th className="pb-2 pr-3">{textFilter("stock")}</th>
+                <th className="pb-2 pr-3">
+                  <select
+                    value={filters.active}
+                    onChange={(e) => setFilter("active", e.target.value as Filters["active"])}
+                    aria-label="Фильтр: активен"
+                    className={`${filterInputClassName} bg-background`}
+                  >
+                    <option value="">Все</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                  </select>
+                </th>
+                <th className="pb-2" />
               </tr>
             </thead>
             <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="py-4 text-sm text-foreground/40">
+                    Ничего не найдено.
+                  </td>
+                </tr>
+              )}
               {filtered.map((product) => (
                 <tr
                   key={product.id}
@@ -268,11 +382,11 @@ export function ProductsTable({
                   }}
                   className="cursor-pointer border-b border-foreground/10 transition-colors hover:bg-foreground/5"
                 >
-                  <td className="py-2">
+                  <td className="py-2 pr-3">
                     <div>{product.name}</div>
                     <div className="text-xs text-foreground/40">{product.sku}</div>
                   </td>
-                  <td className="py-2 text-foreground/60">{product.category.name}</td>
+                  <td className="py-2 pr-3 text-foreground/60">{product.category.name}</td>
                   <td className="py-2 pr-3 text-foreground/60">{product.pricing?.supplier?.name ?? "—"}</td>
                   <td className="py-2 pr-3">{priceOrDash(product.pricing?.purchasePrice)}</td>
                   <td className="py-2 pr-3">{priceOrDash(product.pricing?.retailPrice)}</td>
@@ -285,7 +399,7 @@ export function ProductsTable({
                       onReserve={() => setReserveOf(product)}
                     />
                   </td>
-                  <td className="py-2">
+                  <td className="py-2 pr-3">
                     <ActiveToggle productId={product.id} isActive={product.isActive} />
                   </td>
                   <td className="py-2 pr-2 text-right">
