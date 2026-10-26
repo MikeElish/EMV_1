@@ -1,8 +1,21 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { CartProvider } from "@/components/shop/CartProvider";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { companyInfo } from "@/content/company";
 import { CookieNotice } from "@/components/CookieNotice";
 import { PERSONAL_DATA_CONSENT_URL, USER_AGREEMENT_URL } from "@/lib/legal-docs";
+import { SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: {
+    default: `Запчасти для спецтехники ${SHOP_CITY_IN} — ${SHOP_NAME}`,
+    template: `%s | ${SHOP_NAME}`,
+  },
+  description:
+    "Запчасти для спецтехники: фильтры, уплотнения, подшипники, гидравлика, электрооборудование. Прямые поставки от производителей, подбор по артикулу.",
+  openGraph: { siteName: SHOP_NAME },
+};
 
 // Sets #shop-root's data-shop-theme before paint, from the visitor's saved
 // choice (defaulting to dark when nothing's saved yet) -- avoids a flash of
@@ -30,6 +43,15 @@ export default function ShopLayout({ children }: LayoutProps<"/shop">) {
         <footer className="border-t border-foreground/10">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:px-6 py-8 text-sm text-foreground/60">
             <p>EMV Запчасти — запчасти для спецтехники</p>
+            <p>
+              <Link href="/shop" className="underline-offset-4 hover:text-foreground hover:underline">
+                Каталог
+              </Link>{" "}
+              ·{" "}
+              <Link href="/shop/brands" className="underline-offset-4 hover:text-foreground hover:underline">
+                Бренды
+              </Link>
+            </p>
             <p>
               {companyInfo.legalName} · ИНН {companyInfo.inn}
             </p>

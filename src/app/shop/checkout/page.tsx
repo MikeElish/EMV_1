@@ -8,6 +8,7 @@ import { createOrder } from "@/actions/shop/checkout";
 import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
 import { formatRub, formatRubPrecise } from "@/lib/money";
+import { trackPurchase } from "@/lib/metrika";
 import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
 import { PERSONAL_DATA_CONSENT_URL } from "@/lib/legal-docs";
 import { RU_CITIES } from "@/content/ru-cities";
@@ -205,6 +206,7 @@ export default function CheckoutPage() {
       // ignore storage write failures (private mode, quota, etc.)
     }
 
+    trackPurchase(result.orderNumber, totalAmount, items);
     clear();
     // Order numbers contain a literal "/" (ДДММГГ/N); /shop/order/[...orderNumber]
     // is a catch-all route so this naturally lands as two segments.

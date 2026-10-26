@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { registerCustomer } from "@/actions/shop/auth";
+import { reachGoal } from "@/lib/metrika";
 import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
 import { PERSONAL_DATA_CONSENT_URL } from "@/lib/legal-docs";
 
@@ -39,6 +40,7 @@ export function CrmRegisterForm({ customerNext }: { customerNext?: string }) {
       setError(result.error);
       return;
     }
+    reachGoal("register");
     // Signed in: the shop asks for the e-mail code, then everything works as usual.
     router.push(customerNext ?? "/shop");
     router.refresh();

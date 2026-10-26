@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { ShopOffersProvider } from "@/components/shop/ShopOffers";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { HeroMessageCarousel } from "@/components/shop/HeroMessageCarousel";
 import { CategoryBrowser } from "@/components/shop/CategoryBrowser";
 import { NewArrivalsRotator } from "@/components/shop/NewArrivalsRotator";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/shop" },
+};
 
 export default async function ShopHomePage() {
   const [categories, allActiveProducts] = await Promise.all([

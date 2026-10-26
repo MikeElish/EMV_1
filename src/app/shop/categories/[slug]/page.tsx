@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { positions, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 import { ShopOffersProvider } from "@/components/shop/ShopOffers";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { prisma } from "@/lib/prisma";
@@ -6,6 +8,21 @@ import { ProductGrid } from "@/components/shop/ProductGrid";
 import { ShopLink } from "@/components/shop/ShopLink";
 
 type Attributes = { machineType?: string } | null;
+
+export async function generateMetadata({ params }: PageProps<"/shop/categories/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const category = await prisma.category.findUnique({
+    where: { slug },
+    include: { _count: { select: { products: { where: { isActive: true } } } } },
+  });
+  if (!category || !category.isActive) return {};
+  return {
+    title: `${category.name} для спецтехники — купить ${SHOP_CITY_IN}`,
+    description: `${category.name} для спецтехники: ${positions(category._count.products)} в каталоге ${SHOP_NAME}. Подбор по артикулу, прямые поставки от производителей, цены на сайте.`,
+    // Brand / sort filters are the same page for the search engines.
+    alternates: { canonical: `/shop/categories/${category.slug}` },
+  };
+}
 
 export default async function CategoryPage({
   params,

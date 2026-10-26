@@ -424,16 +424,21 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
           open ? "bg-foreground/5" : ""
         }`}
       >
-        {/* Name / article: the product card. */}
-        <button
-          type="button"
-          onClick={onQuickView}
+        {/* Name / article: the quick view; a real link to the product page for
+            search engines and Ctrl/middle click. */}
+        <a
+          href={`/shop/product/${product.slug}`}
+          onClick={(e) => {
+            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            onQuickView();
+          }}
           title="Открыть карточку товара"
           className="group w-full min-w-0 text-left sm:w-auto sm:flex-1"
         >
           <span className="line-clamp-2 group-hover:underline sm:block sm:truncate">{product.name}</span>
           <span className="block truncate text-xs text-foreground/40 group-hover:underline">{product.sku}</span>
-        </button>
+        </a>
         {/* Stock / price: the offers drop down when there are several, else the card too. */}
         <button
           type="button"

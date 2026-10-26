@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { taxiContent } from "@/content/taxi";
 import { HandwrittenReveal } from "@/components/taxi/HandwrittenReveal";
 import { TariffsCarousel } from "@/components/taxi/TariffsCarousel";
+
+export const metadata: Metadata = {
+  title: `${taxiContent.hero.title} — ${taxiContent.companyName}`,
+  description: `${taxiContent.tagline}. ${taxiContent.hero.subtitle}`,
+};
 
 export default function TaxiHomePage() {
   return (

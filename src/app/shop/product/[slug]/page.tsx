@@ -1,3 +1,5 @@
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -6,26 +8,75 @@ import { OfferPrice, ProductOffersBlock, ShopOffersProvider } from "@/components
 import { getShopOffers } from "@/lib/supplier-offers";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
 import { ShopLink } from "@/components/shop/ShopLink";
+import { absoluteUrl, brandSlug, productHeading, rubText, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
+
+// One query for the page and its <head>.
+const getProduct = cache((slug: string) => prisma.product.findUnique({ where: { slug }, include: { category: true } }));
+
+export async function generateMetadata({ params }: PageProps<"/shop/product/[slug]">): Promise<Metadata> {
+  const product = await getProduct((await params).slug);
+  if (!product || !product.isActive) return {};
+  const heading = productHeading(product);
+  const stock = product.stock > 0 ? "в наличии" : "под заказ";
+  const description = [
+    `${heading}: цена ${rubText(product.price)}, ${stock}. Купить ${SHOP_CITY_IN} в ${SHOP_NAME}.`,
+    product.description,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 300);
+  return {
+    title: `${heading} — купить ${SHOP_CITY_IN}`,
+    description,
+    alternates: { canonical: `/shop/product/${product.slug}` },
+    openGraph: { title: heading, description, url: `/shop/product/${product.slug}`, images: product.images.slice(0, 1) },
+  };
+}
 
 export default async function ProductPage({ params }: PageProps<"/shop/product/[slug]">) {
   const { slug } = await params;
 
-  const product = await prisma.product.findUnique({
-    where: { slug },
-    include: { category: true },
-  });
+  const product = await getProduct(slug);
 
   if (!product || !product.isActive) notFound();
 
   const attributes = product.attributes as Attributes;
 
   const offers = await getShopOffers([product.id]);
+  const prices = [product.price, ...(offers[product.id] ?? []).map((o) => o.price)];
+
+  // schema.org Product: Яндекс and Google show the price and stock in the results.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: productHeading(product),
+    sku: product.sku,
+    mpn: product.sku,
+    description: product.description ?? undefined,
+    category: product.category.name,
+    image: product.images.length > 0 ? product.images.map((i) => absoluteUrl(i)) : undefined,
+    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    offers: {
+      "@type": "AggregateOffer",
+      priceCurrency: "RUB",
+      lowPrice: (Math.min(...prices) / 100).toFixed(2),
+      highPrice: (Math.max(...prices) / 100).toFixed(2),
+      offerCount: prices.length,
+      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/BackOrder",
+      url: absoluteUrl(`/shop/product/${product.slug}`),
+      seller: { "@type": "Organization", name: SHOP_NAME },
+    },
+  };
 
   return (
     <ShopOffersProvider offers={offers}>
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
         <nav className="text-sm text-foreground/50">
           <Link href="/shop" className="hover:underline">
             Каталог
@@ -56,7 +107,13 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
           <div>
             {product.brand && (
               <span className="text-sm text-foreground/50">
-                {product.brand}
+                {brandSlug(product.brand) ? (
+                  <ShopLink href={`/shop/brands/${brandSlug(product.brand)}`} className="hover:underline">
+                    {product.brand}
+                  </ShopLink>
+                ) : (
+                  product.brand
+                )}
                 {attributes?.machineType ? ` · ${attributes.machineType}` : ""}
               </span>
             )}
