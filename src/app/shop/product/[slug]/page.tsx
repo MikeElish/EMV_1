@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { AddToCartButton } from "@/components/shop/AddToCartButton";
 import { OfferPrice, ProductOffersBlock, ShopOffersProvider } from "@/components/shop/ShopOffers";
 import { getShopOffers } from "@/lib/supplier-offers";
-import { ProtectedImage } from "@/components/shop/ProtectedImage";
+import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ShopLink } from "@/components/shop/ShopLink";
 import { absoluteUrl, brandSlug, productHeading, rubText, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 
@@ -92,17 +92,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
         </nav>
 
         <div className="mt-6 grid gap-10 sm:grid-cols-2">
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.03] text-sm text-foreground/30">
-            {product.images.length > 0 ? (
-              <ProtectedImage
-                src={product.images[0]}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              "Фото скоро"
-            )}
-          </div>
+          <ProductGallery images={product.images} alt={product.name} />
 
           <div>
             {product.brand && (

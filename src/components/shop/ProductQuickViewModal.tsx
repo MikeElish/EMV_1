@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { Product } from "@prisma/client";
 import { AddToCartButton } from "@/components/shop/AddToCartButton";
 import { OfferPrice, ProductOffersBlock } from "@/components/shop/ShopOffers";
-import { ProtectedImage } from "@/components/shop/ProtectedImage";
+import { ProductGallery } from "@/components/shop/ProductGallery";
 
 const TRANSITION_MS = 200;
 
@@ -57,17 +57,7 @@ export function ProductQuickViewModal({
         </button>
 
         <div className="grid gap-6 sm:grid-cols-2">
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.03] text-sm text-foreground/30">
-            {product.images.length > 0 ? (
-              <ProtectedImage
-                src={product.images[0]}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              "Фото скоро"
-            )}
-          </div>
+          <ProductGallery images={product.images} alt={product.name} />
 
           <div>
             {product.brand && (

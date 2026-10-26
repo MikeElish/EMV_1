@@ -1,33 +1,35 @@
+import { readFile } from "fs/promises";
+import path from "path";
 import sharp from "sharp";
 
-const TILE_SIZE = 220;
 const MAX_WIDTH = 1600;
+// assets/watermark-tile.png is 640 px wide (2×2 marks) and is sized for a
+// 1600 px photo; smaller photos get a smaller tile, so about five marks fit across.
+const TILE_WIDTH = 640;
+const MIN_TILE_WIDTH = 360;
 
-// Tiled (not single-corner) so the mark can't be cropped out: the EMV
-// logo square + "emv.one", repeated at an angle across the whole photo.
-function buildWatermarkTileSvg(): Buffer {
-  return Buffer.from(`
-<svg width="${TILE_SIZE}" height="${TILE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <g opacity="0.3" transform="rotate(-25 ${TILE_SIZE / 2} ${TILE_SIZE / 2})">
-    <rect x="78" y="18" width="30" height="30" fill="none" stroke="#ffffff" stroke-width="3"/>
-    <text x="83" y="40" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="10" letter-spacing="0.5" fill="#ffffff">EMV</text>
-    <text x="25" y="75" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="14" fill="#ffffff">emv.one</text>
-  </g>
-</svg>`);
-}
+// Tiled (not single-corner) so the mark can't be cropped out: the EMV logo
+// alternating with «www.emv.one», tilted, across the whole photo. The tile is
+// a ready PNG (scripts/build-watermark.mjs) -- the server has no fonts to draw text.
+let tilePng: Promise<Buffer> | null = null;
+const loadTile = () => (tilePng ??= readFile(path.join(process.cwd(), "assets", "watermark-tile.png")));
 
 /**
- * Resizes, flattens onto white, and tiles a semi-transparent EMV/emv.one
- * mark across the whole photo. There is never an unwatermarked copy stored
- * anywhere -- this is the only version that ever reaches Blob storage.
+ * Resizes, flattens onto white, and tiles the semi-transparent EMV /
+ * www.emv.one mark across the whole photo. There is never an unwatermarked
+ * copy stored anywhere -- this is the only version that is ever saved.
  */
 export async function applyWatermark(input: Buffer): Promise<Buffer> {
-  const tile = await sharp(buildWatermarkTileSvg()).png().toBuffer();
-
-  return sharp(input)
+  const photo = await sharp(input)
     .rotate() // apply EXIF orientation before anything else
     .resize({ width: MAX_WIDTH, withoutEnlargement: true })
     .flatten({ background: "#ffffff" })
+    .toBuffer({ resolveWithObject: true });
+
+  const tileWidth = Math.max(MIN_TILE_WIDTH, Math.round((TILE_WIDTH * photo.info.width) / MAX_WIDTH));
+  const tile = await sharp(await loadTile()).resize({ width: tileWidth }).png().toBuffer();
+
+  return sharp(photo.data)
     .composite([{ input: tile, tile: true, blend: "over" }])
     .jpeg({ quality: 85 })
     .toBuffer();
