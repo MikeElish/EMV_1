@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   // Codes from Яндекс.Вебмастер / Google Search Console (public by design).
   verification: {
     yandex: "d7469e368887bcdd",
-    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    google: "Tv581ZLLFR3PdqvSN3mIxwYX4E6olCz5tMjMqZLsqHI",
   },
 };
 
