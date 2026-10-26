@@ -56,6 +56,8 @@ export function ProductForm({
   const [tab, setTab] = useState<Tab>("main");
   const [prices, setPrices] = useState<PricesState>(() => initialPrices(markups, initialPricing, offers));
   const [brand, setBrand] = useState(initial?.brand ?? "");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
+  const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   // The brand directory, plus the card's own brand if it isn't in it.
   const initialBrand = initial?.brand;
   const brandOptions = useMemo(() => {
@@ -71,6 +73,11 @@ export function ProductForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (!categoryId) {
+      setError("Выберите категорию");
+      setTab("main");
+      return;
+    }
 
     const formData = new FormData(event.currentTarget);
     // An inactive product (e.g. imported from 1С, still being sorted out) can
@@ -101,7 +108,7 @@ export function ProductForm({
       quality: prices.quality.trim() || undefined,
       selectedOfferId: prices.selectedOfferId || undefined,
       stock: Number(formData.get("stock") ?? 0),
-      categoryId: String(formData.get("categoryId") ?? ""),
+      categoryId,
       brand: brand || undefined,
       machineType: String(formData.get("machineType") ?? "") || undefined,
       compatibleWith: splitList(String(formData.get("compatibleWith") ?? "")),
@@ -208,22 +215,14 @@ export function ProductForm({
           <label htmlFor="categoryId" className="text-sm text-foreground/60">
             Категория
           </label>
-          <select
+          <SearchSelect
             id="categoryId"
-            name="categoryId"
-            required
-            defaultValue={initial?.categoryId}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          >
-            <option value="" disabled>
-              Выберите
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            value={categoryId}
+            onChange={setCategoryId}
+            options={categoryOptions}
+            placeholder="Начните вводить категорию"
+            className="mt-1"
+          />
         </div>
       </div>
 
