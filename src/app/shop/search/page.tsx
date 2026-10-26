@@ -43,7 +43,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/shop/sear
 
   return (
     <ShopOffersProvider offers={offers}>
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 py-16">
         <h1 className="text-2xl font-bold">
           {q ? `Результаты по запросу «${q}»` : "Введите запрос для поиска"}
         </h1>

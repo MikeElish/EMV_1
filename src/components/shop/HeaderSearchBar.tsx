@@ -36,7 +36,7 @@ function buildInvoiceTemplateHref(): string {
   return `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
 }
 
-export function HeaderSearchBar({ isHome }: { isHome: boolean }) {
+export function HeaderSearchBar({ isHome, className = "" }: { isHome: boolean; className?: string }) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -131,7 +131,7 @@ export function HeaderSearchBar({ isHome }: { isHome: boolean }) {
       <div
         ref={barRef}
         style={{ height: ROW_HEIGHT }}
-        className={`relative z-50 flex min-w-0 flex-1 overflow-hidden rounded-md border transition-colors ${
+        className={`relative z-50 flex min-w-0 flex-1 overflow-hidden rounded-md border transition-colors ${className} ${
           isHome
             ? `border-white/30 bg-white/5 ${focused ? "border-white/60" : ""}`
             : `border-foreground/20 bg-transparent ${focused ? "border-foreground/50" : ""}`

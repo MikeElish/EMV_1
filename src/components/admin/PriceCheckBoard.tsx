@@ -531,7 +531,8 @@ export function PriceCheckBoard({
   return (
     <div className="flex min-h-0 flex-1 gap-6">
       {/* Nomenclature: half of the screen */}
-      <section className="flex min-h-0 w-1/2 min-w-0 flex-col">
+      {/* Phones and tablets: the list, or -- once a row is picked -- its card full width. */}
+      <section className={`${selected ? "hidden lg:flex" : "flex"} min-h-0 w-full min-w-0 flex-col lg:w-1/2`}>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold">Номенклатура</h1>
           <select
@@ -619,7 +620,14 @@ export function PriceCheckBoard({
       </section>
 
       {/* Offers of the chosen article: the other half */}
-      <section className="flex min-h-0 w-1/2 min-w-0 flex-col">
+      <section className={`${selected ? "flex" : "hidden lg:flex"} min-h-0 w-full min-w-0 flex-col lg:w-1/2`}>
+        <button
+          type="button"
+          onClick={() => setSelectedId(null)}
+          className="mb-3 inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5 lg:hidden"
+        >
+          <span aria-hidden>←</span> К списку
+        </button>
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
@@ -627,14 +635,14 @@ export function PriceCheckBoard({
             disabled={!selected}
             aria-label="Добавить предложение"
             title={selected ? "Добавить предложение" : "Сначала выберите номенклатуру"}
-            className="flex h-8 w-8 items-center justify-center rounded-md bg-green-600 text-lg font-bold leading-none text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-600 text-lg font-bold leading-none text-white transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             +
           </button>
           <button
             type="button"
             onClick={() => setImporting(true)}
-            className="rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5"
+            className="shrink-0 whitespace-nowrap rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5"
           >
             Загрузить из Excel
           </button>

@@ -16,7 +16,7 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
 
   if (items.length === 0) {
     return (
-      <section className="mx-auto max-w-2xl px-6 py-16 text-center">
+      <section className="mx-auto max-w-2xl px-4 sm:px-6 py-16 text-center">
         <h1 className="text-2xl font-bold">Корзина пуста</h1>
         <Link href="/shop" className="mt-6 inline-block text-sm underline underline-offset-4">
           Перейти в каталог

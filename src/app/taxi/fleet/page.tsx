@@ -19,7 +19,7 @@ export default function FleetPage() {
       />
       <div className="fixed inset-0 -z-10 bg-black/45" />
 
-      <section className="mx-auto max-w-5xl px-6 py-16">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16">
         <h1 className="text-3xl font-bold text-white">Парк и тарифы</h1>
         <div className="mt-10 flex flex-col gap-4">
           {taxiContent.fleet.map((tariff) => (

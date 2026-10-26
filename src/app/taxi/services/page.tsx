@@ -18,7 +18,7 @@ export default function ServicesPage() {
       />
       <div className="fixed inset-0 -z-10 bg-black/45" />
 
-      <section className="mx-auto max-w-5xl px-6 py-16 text-white">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-white">
         <h1 className="text-3xl font-bold">Услуги</h1>
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
           {taxiContent.services.map((service) => (

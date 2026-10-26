@@ -287,7 +287,7 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <section className="mx-auto max-w-2xl px-6 py-16 text-center">
+      <section className="mx-auto max-w-2xl px-4 sm:px-6 py-16 text-center">
         <h1 className="text-2xl font-bold">Корзина пуста</h1>
         <Link href="/shop" className="mt-6 inline-block text-sm underline underline-offset-4">
           Перейти в каталог
@@ -297,7 +297,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <section className="mx-auto max-w-5xl px-6 py-16">
+    <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16">
       <h1 className="text-2xl font-bold">Оформление заказа</h1>
 
       <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-2">

@@ -18,7 +18,7 @@ export default async function BulkSearchResultPage({
   const matched = matchRows(rows, products);
 
   return (
-    <section className="mx-auto max-w-6xl px-6 py-16">
+    <section className="mx-auto max-w-6xl px-4 sm:px-6 py-16">
       <BulkSearchResultsTable rows={matched} />
     </section>
   );

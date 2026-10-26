@@ -94,6 +94,16 @@ export function CustomerOrdersTable({
     return map;
   }, [rows]);
 
+  // Phones: one search over every column instead of a filter per column.
+  const [query, setQuery] = useState("");
+  const found = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q ? rows.filter((row) => COLUMNS.some((c) => c.accessor(row).toLowerCase().includes(q))) : rows;
+    const byOrder = new Map<string, Row[]>();
+    for (const row of list) byOrder.set(row.order.id, [...(byOrder.get(row.order.id) ?? []), row]);
+    return [...byOrder.values()];
+  }, [rows, query]);
+
   const filtered = useMemo(() => {
     const activeFilters = COLUMNS.filter((c) => filters[c.key]?.trim());
     if (activeFilters.length === 0) return rows;
@@ -109,7 +119,67 @@ export function CustomerOrdersTable({
   }
 
   return (
-    <table className="w-full text-sm">
+    <>
+    <div className="space-y-4 sm:hidden">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Поиск: номер заказа, товар, артикул, статус"
+        className="w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-foreground/50"
+      />
+      {found.length === 0 && <p className="py-6 text-center text-sm text-foreground/40">Ничего не найдено.</p>}
+      {found.map((lines) => {
+        const order = lines[0].order;
+        return (
+          <section key={order.id} className="rounded-lg border border-foreground/15">
+            <h2 className="flex items-baseline justify-between gap-3 border-b border-foreground/10 px-4 py-3">
+              <span className="font-semibold">Заказ {order.orderNumber}</span>
+              <span className="text-xs text-foreground/50">
+                {new Date(order.createdAt).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" })}
+              </span>
+            </h2>
+            {lines.map(({ item }) => (
+              <div key={item.id} className="space-y-2 border-b border-foreground/10 px-4 py-3 text-sm last:border-b-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={item.cancelled ? "text-foreground/40 line-through" : "font-medium"}>{item.nameSnapshot}</p>
+                    <p className="text-xs text-foreground/50">{item.product?.sku ?? "—"}</p>
+                  </div>
+                  <OrderActionMenu
+                    orderId={order.id}
+                    orderItemId={item.id}
+                    itemsCount={order.items.length}
+                    itemCancelled={item.cancelled}
+                    latestDocs={order.latestDocs}
+                  />
+                </div>
+                <p className="text-foreground/70">
+                  {item.quantity} × {formatRub(item.priceSnapshot)} ={" "}
+                  <span className="font-medium text-foreground">{formatRub(item.priceSnapshot * item.quantity)}</span>
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <OrderStatusBadge status={item.status} />
+                  <PaymentStatusBadge paid={item.paid} deferred={item.deferred} plannedPaymentDate={order.plannedPaymentDate} />
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-foreground/70">
+                  <span className="text-foreground/50">Доставка</span>
+                  <DeliveryConfirmCell
+                    itemId={item.id}
+                    method={item.deliveryMethod}
+                    pending={item.deliveryConfirmPending}
+                    otherPending={order.items.filter((i) => i.id !== item.id && i.deliveryConfirmPending).length}
+                  />
+                  <span className="text-foreground/50">Дата поставки</span>
+                  <span>{item.deliveryDate ? new Date(item.deliveryDate).toLocaleDateString("ru-RU") : "—"}</span>
+                </div>
+              </div>
+            ))}
+          </section>
+        );
+      })}
+    </div>
+    <table className="hidden w-full text-sm sm:table">
       <thead>
         <tr className="border-b border-foreground/10 text-left text-foreground/50">
           {COLUMNS.map((column) => (
@@ -189,5 +259,6 @@ export function CustomerOrdersTable({
         )}
       </tbody>
     </table>
+    </>
   );
 }

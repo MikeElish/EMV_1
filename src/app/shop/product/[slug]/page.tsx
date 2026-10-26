@@ -25,7 +25,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
 
   return (
     <ShopOffersProvider offers={offers}>
-      <section className="mx-auto max-w-4xl px-6 py-16">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16">
         <nav className="text-sm text-foreground/50">
           <Link href="/shop" className="hover:underline">
             Каталог

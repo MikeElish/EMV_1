@@ -28,7 +28,7 @@ export default function ShopLayout({ children }: LayoutProps<"/shop">) {
         <main className="flex-1">{children}</main>
 
         <footer className="border-t border-foreground/10">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-8 text-sm text-foreground/60">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:px-6 py-8 text-sm text-foreground/60">
             <p>EMV Запчасти — запчасти для спецтехники</p>
             <p>
               {companyInfo.legalName} · ИНН {companyInfo.inn}

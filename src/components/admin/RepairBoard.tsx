@@ -483,7 +483,8 @@ export function RepairBoard({
   return (
     <div className="flex min-h-0 flex-1 gap-6">
       {/* The register of repair cards: half of the screen */}
-      <section className="flex min-h-0 w-1/2 min-w-0 flex-col">
+      {/* Phones and tablets: the list, or -- once a row is picked -- its card full width. */}
+      <section className={`${selected ? "hidden lg:flex" : "flex"} min-h-0 w-full min-w-0 flex-col lg:w-1/2`}>
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
@@ -605,7 +606,14 @@ export function RepairBoard({
       </section>
 
       {/* The chosen card: works and materials */}
-      <section className="flex min-h-0 w-1/2 min-w-0 flex-col">
+      <section className={`${selected ? "flex" : "hidden lg:flex"} min-h-0 w-full min-w-0 flex-col lg:w-1/2`}>
+        <button
+          type="button"
+          onClick={() => setSelectedId(null)}
+          className="mb-3 inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5 lg:hidden"
+        >
+          <span aria-hidden>←</span> К списку
+        </button>
         {!selected ? (
           <>
             <h2 className="shrink-0 text-lg font-semibold">Карточка ремонта</h2>

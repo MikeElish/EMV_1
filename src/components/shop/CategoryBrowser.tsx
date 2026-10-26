@@ -246,7 +246,7 @@ export function CategoryBrowser({
               onClick={() => setSortMenuOpen((v) => !v)}
               aria-haspopup="listbox"
               aria-expanded={sortMenuOpen}
-              className="flex items-center gap-1.5 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-foreground/50"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-foreground/50"
             >
               {SORT_LABELS[sortOption]}
               <span className="text-foreground/40">▾</span>
@@ -284,13 +284,33 @@ export function CategoryBrowser({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск по списку"
-            className="w-56 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-right text-sm outline-none focus:border-foreground/50"
+            className="min-w-0 flex-1 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-right text-sm outline-none focus:border-foreground/50 sm:w-56 sm:flex-none"
           />
         </div>
       </div>
 
+      {/* Phones: the categories as a row of chips to swipe through. */}
+      <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:hidden" role="group" aria-label="Категории">
+        {categories.map((category) => {
+          const isSelected = selectedId === category.id;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => toggleSelect(category.id)}
+              aria-pressed={isSelected}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm transition-colors ${
+                isSelected ? "border-green-400 bg-green-400/10 font-medium" : "border-foreground/20"
+              }`}
+            >
+              {category.name} <span className="text-foreground/50">{category.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-6 sm:flex-row">
-        <div className="sm:w-1/3">
+        <div className="hidden sm:block sm:w-1/3">
           <div
             onWheel={handleWheel}
             onClick={(e) => {
@@ -397,9 +417,10 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
   const [open, setOpen] = useState(false);
   return (
     <>
+      {/* Phones: the name on its own line, stock / price / «Заказать» under it. */}
       <div
-        style={{ height: ROW_HEIGHT }}
-        className={`flex w-full items-center gap-3 border-b border-foreground/10 px-3 text-sm last:border-b-0 hover:bg-foreground/5 ${
+        style={{ minHeight: ROW_HEIGHT }}
+        className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-foreground/10 px-3 py-2 text-sm last:border-b-0 hover:bg-foreground/5 sm:flex-nowrap sm:py-0 ${
           open ? "bg-foreground/5" : ""
         }`}
       >
@@ -408,9 +429,9 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
           type="button"
           onClick={onQuickView}
           title="Открыть карточку товара"
-          className="group min-w-0 flex-1 text-left"
+          className="group w-full min-w-0 text-left sm:w-auto sm:flex-1"
         >
-          <span className="block truncate group-hover:underline">{product.name}</span>
+          <span className="line-clamp-2 group-hover:underline sm:block sm:truncate">{product.name}</span>
           <span className="block truncate text-xs text-foreground/40 group-hover:underline">{product.sku}</span>
         </button>
         {/* Stock / price: the offers drop down when there are several, else the card too. */}
@@ -419,7 +440,7 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
           onClick={() => (offers ? setOpen((v) => !v) : onQuickView())}
           aria-expanded={offers ? open : undefined}
           title={offers ? "Предложения" : "Открыть карточку товара"}
-          className="flex shrink-0 items-center gap-3 text-left"
+          className="mr-auto flex shrink-0 items-center gap-3 text-left sm:mr-0"
         >
           <span
             className={`shrink-0 text-xs ${
@@ -428,7 +449,7 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
           >
             {product.stock > 0 ? "В наличии" : "Под заказ"}
           </span>
-          <span className="w-28 shrink-0 text-right font-medium">
+          <span className="shrink-0 text-right font-medium sm:w-28">
             <OfferPrice product={product} />
             {offers && <span className="ml-1 text-xs text-foreground/50">{open ? "▴" : "▾"}</span>}
           </span>

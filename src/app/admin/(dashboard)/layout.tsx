@@ -7,6 +7,7 @@ import { themeInitScript } from "@/lib/theme";
 import { getMyAccess } from "@/lib/access-server";
 import { resolveAccess } from "@/lib/access";
 import { AccessProvider, ViewOnlyBanner } from "@/components/admin/AccessContext";
+import { AdminLocation, AdminMobileMenu } from "@/components/admin/AdminMobileMenu";
 
 export default async function AdminDashboardLayout({
   children,
@@ -35,7 +36,8 @@ export default async function AdminDashboardLayout({
     >
       <script dangerouslySetInnerHTML={{ __html: themeInitScript("admin") }} />
 
-      <aside className="w-56 shrink-0 overflow-y-auto border-r border-foreground/10 p-6">
+      {/* Phones and tablets: no sidebar -- the menu is behind ☰ in the top bar. */}
+      <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-foreground/10 p-6 lg:block">
         <p className="font-semibold">EMV Админка</p>
         <SidebarNav access={access} />
 
@@ -50,10 +52,14 @@ export default async function AdminDashboardLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-end border-b border-foreground/10 px-8">
-          <ThemeToggle scope="admin" />
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-foreground/10 px-4 lg:justify-end lg:px-8">
+          <AdminMobileMenu access={access} userLabel={user?.email ?? user?.login ?? ""} />
+          <AdminLocation />
+          <div className="ml-auto lg:ml-0">
+            <ThemeToggle scope="admin" />
+          </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-8 pt-6 [scrollbar-gutter:stable]">
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-4 pb-6 pt-4 [scrollbar-gutter:stable] lg:px-8 lg:pb-8 lg:pt-6">
           <AccessProvider access={access}>
             <ViewOnlyBanner />
             {children}

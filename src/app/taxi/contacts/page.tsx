@@ -9,7 +9,7 @@ export default function ContactsPage() {
   const { contacts } = taxiContent;
 
   return (
-    <section className="mx-auto max-w-5xl px-6 py-16">
+    <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16">
       <div className="grid gap-10 sm:grid-cols-2 sm:items-center">
         <div>
           <h1 className="text-3xl font-bold">Контакты</h1>

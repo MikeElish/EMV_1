@@ -60,7 +60,7 @@ export default async function CategoryPage({
 
   return (
     <ShopOffersProvider offers={offers}>
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 py-16">
         <h1 className="text-3xl font-bold">{category.name}</h1>
 
         <div className="mt-6 flex flex-wrap gap-6 text-sm">

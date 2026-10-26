@@ -2,6 +2,11 @@
 
 import { useLayoutEffect, useRef } from "react";
 
+// Phones and tablets: a table shrinks only this far, the rest scrolls
+// sideways -- text at 45% can't be read on a small screen.
+const NARROW_SCREEN_PX = 1024;
+const NARROW_MIN_ZOOM = 0.8;
+
 // A full recalculation only when the frame width changes by more than this:
 // a vertical scrollbar appearing/disappearing (≈17px on Windows) must not
 // rock the scale.
@@ -37,6 +42,7 @@ export function FitWidth({
     let zoom = 1;
     let fittedFor = 0; // frame width the current zoom was worked out for
     let frame = 0;
+    const floor = () => (window.innerWidth < NARROW_SCREEN_PX ? Math.max(minZoom, NARROW_MIN_ZOOM) : minZoom);
 
     // Straight to the DOM -- no React re-render.
     const apply = (next: number, available: number) => {
@@ -48,10 +54,10 @@ export function FitWidth({
     // Squeeze a little more while something still sticks out (small text is
     // relatively wider than full-size text).
     const squeeze = (available: number) => {
-      for (let i = 0; i < 4 && zoom > minZoom; i++) {
+      for (let i = 0; i < 4 && zoom > floor(); i++) {
         const overflow = inner.scrollWidth / inner.clientWidth;
         if (overflow <= 1.001) break;
-        apply(Math.max(minZoom, zoom / overflow), available);
+        apply(Math.max(floor(), zoom / overflow), available);
       }
     };
 
@@ -61,7 +67,7 @@ export function FitWidth({
       inner.style.zoom = "";
       inner.style.width = "min-content";
       const needed = inner.getBoundingClientRect().width;
-      apply(needed ? Math.max(minZoom, Math.min(1, available / needed)) : 1, available);
+      apply(needed ? Math.max(floor(), Math.min(1, available / needed)) : 1, available);
       squeeze(available);
       fittedFor = available;
     };

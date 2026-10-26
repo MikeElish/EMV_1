@@ -21,7 +21,7 @@ export default function JobsPage() {
       />
       <div className="fixed inset-0 -z-10 bg-black/45" />
 
-      <section className="mx-auto max-w-5xl px-6 py-16 text-center text-white">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-center text-white">
         <h1 className="text-4xl font-bold tracking-tight">{jobs.title}</h1>
         <p className="mx-auto mt-4 max-w-2xl text-white/70">
           {jobs.location}
@@ -30,7 +30,7 @@ export default function JobsPage() {
       </section>
 
       <section className="border-y border-white/10 bg-black/45 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-white">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-white">
           <h2 className="text-2xl font-semibold">{jobs.intro}</h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {jobs.benefits.map((benefit) => (
@@ -48,7 +48,7 @@ export default function JobsPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 py-16 text-white">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-white">
         <h2 className="text-2xl font-semibold">{jobs.valuesTitle}</h2>
         <div className="mt-8 grid gap-6 sm:grid-cols-3">
           {jobs.values.map((value) => (
@@ -71,7 +71,7 @@ export default function JobsPage() {
       </section>
 
       <section className="border-y border-white/10 bg-black/45 backdrop-blur-md">
-        <div className="mx-auto max-w-md px-6 py-16 text-white">
+        <div className="mx-auto max-w-md px-4 sm:px-6 py-16 text-white">
           <h2 className="text-2xl font-semibold">{jobs.formTitle}</h2>
           <p className="mt-2 text-sm text-white/60">{jobs.formSubtitle}</p>
           <div className="mt-8 rounded-xl bg-white/95 p-6 text-foreground shadow-lg">

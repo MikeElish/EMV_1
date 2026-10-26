@@ -197,14 +197,15 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
             <span className="block truncate">{product.name}</span>
             <span className="block truncate text-xs text-foreground/40">{product.sku}</span>
           </span>
+          {/* Phones: the name gets the room; the section title already tells the stock. */}
           <span
-            className={`shrink-0 text-xs ${
+            className={`hidden shrink-0 text-xs sm:inline ${
               product.stock > 0 ? "text-green-700 dark:text-green-500" : "text-foreground/40"
             }`}
           >
             {product.stock > 0 ? "В наличии" : "Под заказ"}
           </span>
-          <span className="w-28 shrink-0 text-right font-medium">
+          <span className="shrink-0 text-right font-medium sm:w-28">
             <OfferPrice product={product} />
           </span>
         </button>

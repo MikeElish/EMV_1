@@ -18,7 +18,7 @@ export default function AboutPage() {
       />
       <div className="fixed inset-0 -z-10 bg-black/45" />
 
-      <section className="mx-auto max-w-3xl px-6 py-16">
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
         <div className="rounded-xl border border-white/15 bg-black/45 p-8 text-white backdrop-blur-md">
           <h1 className="text-3xl font-bold">{taxiContent.about.title}</h1>
           <div className="mt-6 space-y-4 text-white/80">

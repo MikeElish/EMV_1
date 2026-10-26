@@ -19,7 +19,7 @@ export default function TaxiHomePage() {
       <div className="fixed inset-0 -z-10 bg-black/45" />
 
       <section className="relative py-20 text-center">
-        <div className="relative mx-auto max-w-5xl px-6">
+        <div className="relative mx-auto max-w-5xl px-4 sm:px-6">
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
             {taxiContent.hero.title}
           </h1>
@@ -54,7 +54,7 @@ export default function TaxiHomePage() {
       </section>
 
       <section className="border-y border-white/10 bg-black/45 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-white">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-white">
           <h2 className="text-2xl font-semibold">Наши услуги</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-2">
             {taxiContent.services.map((service) => (
@@ -78,7 +78,7 @@ export default function TaxiHomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 py-16 text-center text-white">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-center text-white">
         <h2 className="text-2xl font-semibold">Тарифы</h2>
         <TariffsCarousel tariffs={taxiContent.fleet} />
         <Link
@@ -89,7 +89,7 @@ export default function TaxiHomePage() {
         </Link>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 py-16 text-center text-white">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-center text-white">
         <h2 className="text-2xl font-semibold">Официальный перевозчик</h2>
         <div className="mt-8 flex justify-center">
           <a
@@ -113,7 +113,7 @@ export default function TaxiHomePage() {
       </section>
 
       <section className="border-y border-white/10 bg-black/45 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-center text-white">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 py-16 text-center text-white">
           <h2 className="text-2xl font-semibold">
             {taxiContent.jobs.homeHeadline}
           </h2>

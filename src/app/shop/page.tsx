@@ -53,16 +53,16 @@ export default async function ShopHomePage() {
           />
           <div className="absolute inset-0 bg-black/55" />
 
-          <div className="relative mx-auto flex min-h-[220px] max-w-6xl items-center px-6 pb-16 pt-28 sm:min-h-[240px] sm:pt-32">
+          <div className="relative mx-auto flex min-h-[220px] max-w-6xl items-center px-4 pb-12 pt-36 sm:min-h-[240px] sm:px-6 sm:pb-16 sm:pt-32">
             <HeroMessageCarousel />
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 pt-2">
+        <section className="mx-auto max-w-6xl px-4 pt-2 sm:px-6">
           <CategoryBrowser categories={browserCategories} products={allActiveProducts} />
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 pb-16 pt-4">
+        <section className="mx-auto max-w-6xl px-4 pb-16 pt-4 sm:px-6">
           <NewArrivalsRotator
             directions={[
               { key: "inStock", label: "В наличии", items: inStockPool },

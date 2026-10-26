@@ -20,7 +20,7 @@ export default async function OrderConfirmationPage({
   if (!order) notFound();
 
   return (
-    <section className="mx-auto max-w-2xl px-6 py-16">
+    <section className="mx-auto max-w-2xl px-4 sm:px-6 py-16">
       <h1 className="text-2xl font-bold">Спасибо за заказ!</h1>
       <p className="mt-2 text-foreground/70">
         Номер заказа: <span className="font-medium">{order.orderNumber}</span>

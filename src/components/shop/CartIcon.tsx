@@ -39,13 +39,20 @@ export function CartIcon({ light = false }: { light?: boolean }) {
     >
       <Link
         href="/shop/cart"
-        className={`relative flex items-center gap-1 text-sm transition-colors ${
+        aria-label="Корзина"
+        className={`relative flex min-h-10 items-center gap-1 text-sm transition-colors ${
           light
             ? "text-white/80 hover:text-white"
             : "text-foreground/70 hover:text-foreground"
         }`}
       >
-        Корзина
+        {/* Phones: the icon only. */}
+        <svg aria-hidden viewBox="0 0 24 24" className="h-6 w-6 sm:hidden" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6.2" />
+          <circle cx="9.5" cy="20" r="1.3" />
+          <circle cx="17" cy="20" r="1.3" />
+        </svg>
+        <span className="hidden sm:inline">Корзина</span>
         {totalQuantity > 0 && (
           <span
             className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-medium ${

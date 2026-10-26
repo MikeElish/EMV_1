@@ -6,7 +6,7 @@ import { useMailUnread, useRefreshMailUnreadOn } from "@/components/mail/useMail
 import { UnreadLabel } from "@/components/mail/UnreadLabel";
 import type { UnreadCounts } from "@/lib/mail/unread";
 
-const TABS: { href: string; label: string; count?: keyof UnreadCounts }[] = [
+export const MAIL_TABS: { href: string; label: string; count?: keyof UnreadCounts }[] = [
   { href: "/admin/mail/inbox", label: "Входящие", count: "inbox" },
   { href: "/admin/mail/folders", label: "Мои папки", count: "folders" },
   { href: "/admin/mail/sent", label: "Отправленные", count: "sent" },
@@ -49,16 +49,17 @@ export function MailShell({ configured, children }: { configured: boolean; child
   // and toolbars stay put, only the letter / folder lists scroll.
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-end gap-6 border-b border-foreground/10">
+      <div className="flex shrink-0 items-end gap-6 border-foreground/10 lg:border-b">
         {/* Each tab is an IMAP round-trip, so no background prefetch here. */}
-        {TABS.map((tab) => {
+        {/* Phones and tablets: the folders live in ☰ (Почта → Входящие). */}
+        {MAIL_TABS.map((tab) => {
           const active = pathname.startsWith(tab.href);
           return (
             <Link
               key={tab.href}
               href={tab.href}
               prefetch={false}
-              className={`relative px-1 pb-3 text-sm font-medium transition-colors ${
+              className={`relative hidden px-1 pb-3 text-sm font-medium transition-colors lg:block ${
                 active ? "text-foreground" : "text-foreground/50 hover:text-foreground"
               }`}
             >
@@ -77,7 +78,7 @@ export function MailShell({ configured, children }: { configured: boolean; child
           </Link>
         )}
       </div>
-      <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+      <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto lg:mt-6">{children}</div>
     </div>
   );
 }

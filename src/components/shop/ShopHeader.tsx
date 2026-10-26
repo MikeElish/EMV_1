@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/shop/ThemeToggle";
 import { HeaderSearchBar } from "@/components/shop/HeaderSearchBar";
 import { ShopLink } from "@/components/shop/ShopLink";
 import { getCrmBadge } from "@/actions/crm/session-badge";
+import { ShopMobileMenu } from "@/components/shop/ShopMobileMenu";
 
 export function ShopHeader() {
   // На главной странице фон — видео в баннере, поэтому шапка там
@@ -36,19 +37,20 @@ export function ShopHeader() {
           : "relative border-b border-foreground/10 bg-background"
       }
     >
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-4">
+      {/* Phones: logo, cart, theme and ☰ in a row, the search below. */}
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
         <div
-          className={`flex items-center gap-2 ${isHome ? "text-white" : ""}`}
+          className={`mr-auto flex min-w-0 items-center gap-2 sm:mr-0 ${isHome ? "text-white" : ""}`}
         >
           <Link href="/" aria-label="На начальную страницу EMV">
             <Logo className="h-8 w-8" />
           </Link>
-          <Link href="/shop" className="font-semibold">
+          <Link href="/shop" className="truncate font-semibold">
             EMV Запчасти
           </Link>
         </div>
 
-        <HeaderSearchBar isHome={isHome} />
+        <HeaderSearchBar isHome={isHome} className="order-last basis-full sm:order-none sm:basis-auto" />
 
         <CartIcon light={isHome} />
         <ThemeToggle light={isHome} />
@@ -56,7 +58,7 @@ export function ShopHeader() {
           <ShopLink
             eager
             href="/shop/orders"
-            className={`rounded-md border px-3 py-1.5 text-xs transition-opacity hover:opacity-80 ${
+            className={`hidden rounded-md border sm:inline-block px-3 py-1.5 text-xs transition-opacity hover:opacity-80 ${
               isHome
                 ? "border-white/30 bg-white/5 text-white"
                 : "border-foreground/20 bg-foreground/5 text-foreground/70"
@@ -65,7 +67,10 @@ export function ShopHeader() {
             Мои заказы
           </ShopLink>
         )}
-        <CustomerAccountMenu variant={isHome ? "dark" : "light"} />
+        <div className="hidden sm:block">
+          <CustomerAccountMenu variant={isHome ? "dark" : "light"} />
+        </div>
+        <ShopMobileMenu light={isHome} />
       </div>
     </header>
   );

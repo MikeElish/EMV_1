@@ -40,7 +40,8 @@ export function NavTabs({
   return (
     <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
       {/* A row of tabs wider than the window is scaled down like the tables. */}
-      <FitWidth className="shrink-0">
+      {/* Phones and tablets: the tabs live in ☰ (CRM → Заказы). */}
+      <FitWidth className="hidden shrink-0 lg:block">
         <div className="flex gap-6 border-b border-foreground/10">
           {tabs.filter((tab) => visible(tab.href)).map((tab) => {
             const active = pathname.startsWith(tab.href);
@@ -60,7 +61,7 @@ export function NavTabs({
           })}
         </div>
       </FitWidth>
-      <div className={fill ? "mt-6 flex min-h-0 flex-1 flex-col overflow-auto [scrollbar-gutter:stable]" : "mt-6"}>
+      <div className={fill ? "flex min-h-0 flex-1 flex-col overflow-auto [scrollbar-gutter:stable] lg:mt-6" : "lg:mt-6"}>
         {children}
       </div>
     </div>

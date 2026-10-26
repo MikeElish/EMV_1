@@ -22,6 +22,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /* Nothing may push the page sideways on a phone (tables scroll in their own frames). */
+  overflow-x: clip;
+}
+
+html {
+  overflow-x: clip;
 }
 
 /* Manual light/dark switch for "Магазин запчастей" (#shop-root) and the
@@ -489,6 +495,14 @@ body {
   position: relative;
   display: inline-block;
   transform: rotate(-18deg);
+}
+
+/* Phones: smaller and less tilted, so the line fits the screen. */
+@media (max-width: 639px) {
+  .taxi-handwrite-wrap {
+    transform: rotate(-10deg);
+    font-size: 0.8rem;
+  }
 }
 
 .taxi-handwrite-text {
