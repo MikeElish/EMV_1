@@ -21,7 +21,15 @@ export const productSchema = z.object({
   brand: z.string().trim().max(80).optional(),
   machineType: z.string().trim().max(80).optional(),
   compatibleWith: z.array(z.string().trim().min(1)).default([]),
-  images: z.array(z.string().trim().url()).default([]),
+  // Uploaded photos live at /uploads/products/…; a full link is fine too.
+  images: z
+    .array(
+      z
+        .string()
+        .trim()
+        .refine((v) => (/^\/uploads\/[\w./-]+$/.test(v) && !v.includes("..")) || /^https?:\/\/\S+$/.test(v), "Неверная ссылка на фото")
+    )
+    .default([]),
   isActive: z.boolean().default(true),
 });
 
