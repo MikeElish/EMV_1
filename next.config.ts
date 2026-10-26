@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The old «Магазин запчастей» stub page: old links land in the shop.
+  async redirects() {
+    return [{ source: "/p", destination: "/shop", permanent: true }];
+  },
   experimental: {
     // Mail attachments go through a server action; Nginx caps requests at 20 MB.
     serverActions: {
