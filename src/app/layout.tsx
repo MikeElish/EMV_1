@@ -18,9 +18,9 @@ export const metadata: Metadata = {
   title: "EMV",
   description: "EMV — такси и запчасти для спецтехники",
   openGraph: { siteName: "EMV", locale: "ru_RU", type: "website" },
-  // Codes from Яндекс.Вебмастер / Google Search Console, set in .env on the server.
+  // Codes from Яндекс.Вебмастер / Google Search Console (public by design).
   verification: {
-    yandex: process.env.YANDEX_VERIFICATION || undefined,
+    yandex: "d7469e368887bcdd",
     google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
   },
 };
