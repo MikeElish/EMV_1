@@ -27,11 +27,18 @@ const getBrand = cache(async (slug: string) => {
   return { name, products };
 });
 
+/** «Фильтры» → «фильтры» in a sentence; «ДВС» stays as it is. */
+const lowerFirst = (name: string) =>
+  name
+    .split(" / ")
+    .map((word) => (/^.\p{Lu}/u.test(word) ? word : word[0].toLowerCase() + word.slice(1)))
+    .join(" / ");
+
 export async function generateMetadata({ params }: PageProps<"/shop/brands/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const brand = await getBrand(slug);
   if (!brand) return {};
-  const categories = [...new Set(brand.products.map((p) => p.category.name.toLowerCase()))].slice(0, 5).join(", ");
+  const categories = [...new Set(brand.products.map((p) => lowerFirst(p.category.name)))].slice(0, 5).join(", ");
   return {
     title: `Запчасти ${brand.name} — купить ${SHOP_CITY_IN}`,
     description: `Запчасти для техники ${brand.name}: ${positions(brand.products.length)} — ${categories}. Подбор по артикулу, прямые поставки, цены на сайте ${SHOP_NAME}.`,
