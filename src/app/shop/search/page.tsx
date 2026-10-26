@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { ShopOffersProvider } from "@/components/shop/ShopOffers";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { prisma } from "@/lib/prisma";
+import { productSearchWhere } from "@/lib/product-search";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { logProductSearches } from "@/actions/shop/search-log";
 
@@ -11,14 +12,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/shop/sear
 
   const products = q
     ? await prisma.product.findMany({
-        where: {
-          isActive: true,
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { sku: { contains: q, mode: "insensitive" } },
-            { brand: { contains: q, mode: "insensitive" } },
-          ],
-        },
+        where: productSearchWhere(q),
         orderBy: { createdAt: "desc" },
       })
     : [];

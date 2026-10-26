@@ -3,9 +3,11 @@
 import { useEscape } from "@/lib/use-escape";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Form from "next/form";
+import { useRouter } from "next/navigation";
 import { utils, write } from "xlsx";
 import { BRANDS } from "@/content/brands";
 import { bulkSearchProducts } from "@/actions/shop/bulk-search";
+import { SearchSuggestionsList, suggestionOptionId, useSearchSuggestions } from "@/components/shop/SearchSuggestions";
 
 const ROW_HEIGHT = 40; // px
 const CYCLE_MS = 4000;
@@ -43,6 +45,12 @@ export function HeaderSearchBar({ isHome, className = "" }: { isHome: boolean; c
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [invalidFileDialog, setInvalidFileDialog] = useState(false);
   const [, startTransition] = useTransition();
+  const router = useRouter();
+  const suggestions = useSearchSuggestions(query);
+  const [active, setActive] = useState(-1);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const showSuggestions = focused && suggestOpen && !!suggestions;
+  const items = suggestions?.items ?? [];
 
   const barRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,16 +130,34 @@ export function HeaderSearchBar({ isHome, className = "" }: { isHome: boolean; c
 
   useEscape(() => setInvalidFileDialog(false), !!invalidFileDialog);
 
+  function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") {
+      setSuggestOpen(false);
+      return;
+    }
+    if (!showSuggestions || items.length === 0) return;
+    if (e.key === "ArrowDown") setActive((i) => (i + 1) % items.length);
+    else if (e.key === "ArrowUp") setActive((i) => (i <= 0 ? items.length - 1 : i - 1));
+    else if (e.key === "Enter" && active >= 0 && items[active]) {
+      router.push(`/shop/product/${items[active].slug}`);
+      setSuggestOpen(false);
+      (e.target as HTMLInputElement).blur();
+    } else return;
+    e.preventDefault();
+  }
+
   return (
     <>
       {isDraggingFile && (
         <div className="pointer-events-none fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
       )}
 
+      {/* The bar and the matches dropping down under it. */}
+      <div className={`relative z-50 flex min-w-0 flex-1 ${className}`}>
       <div
         ref={barRef}
         style={{ height: ROW_HEIGHT }}
-        className={`relative z-50 flex min-w-0 flex-1 overflow-hidden rounded-md border transition-colors ${className} ${
+        className={`relative flex w-full min-w-0 overflow-hidden rounded-md border transition-colors ${
           isHome
             ? `border-white/30 bg-white/5 ${focused ? "border-white/60" : ""}`
             : `border-foreground/20 bg-transparent ${focused ? "border-foreground/50" : ""}`
@@ -155,9 +181,23 @@ export function HeaderSearchBar({ isHome, className = "" }: { isHome: boolean; c
                   type="search"
                   name="q"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onFocus={() => setFocused(true)}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setActive(-1);
+                    setSuggestOpen(true);
+                  }}
+                  onFocus={() => {
+                    setFocused(true);
+                    setSuggestOpen(true);
+                  }}
                   onBlur={() => setFocused(false)}
+                  onKeyDown={onSearchKeyDown}
+                  autoComplete="off"
+                  role="combobox"
+                  aria-expanded={showSuggestions}
+                  aria-controls="search-suggestions"
+                  aria-autocomplete="list"
+                  aria-activedescendant={showSuggestions && active >= 0 ? suggestionOptionId(active) : undefined}
                   placeholder="Поиск по названию, артикулу или бренду"
                   className={`w-full border-0 bg-transparent px-3 py-2 text-sm outline-none ${
                     isHome ? "text-white placeholder:text-white/60" : ""
@@ -198,6 +238,21 @@ export function HeaderSearchBar({ isHome, className = "" }: { isHome: boolean; c
             </div>
           </div>
         )}
+      </div>
+      {showSuggestions && suggestions && (
+        <SearchSuggestionsList
+          query={suggestions.q}
+          items={items}
+          total={suggestions.total}
+          loading={suggestions.loading}
+          active={active}
+          onHover={setActive}
+          onPick={() => {
+            setSuggestOpen(false);
+            (document.activeElement as HTMLElement | null)?.blur();
+          }}
+        />
+      )}
       </div>
 
       <input
