@@ -4,9 +4,11 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { useCustomerPriceList } from "@/components/shop/CustomerPrices";
 
 export type CartItem = {
   productId: string;
@@ -90,13 +92,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems([]);
   }
 
-  const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  // A client with its own «Тип цен» sees its prices in the cart too (the
+  // stored price is the one shown when the item was added).
+  const priceOf = useCustomerPriceList(items.map((i) => i.productId));
+  const priced = useMemo(() => items.map((i) => ({ ...i, price: priceOf(i.productId, i.offerId, i.price) })), [items, priceOf]);
+
+  const totalQuantity = priced.reduce((sum, i) => sum + i.quantity, 0);
+  const totalAmount = priced.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
     <CartContext.Provider
       value={{
-        items,
+        items: priced,
         addItem,
         setQuantity,
         removeItem,

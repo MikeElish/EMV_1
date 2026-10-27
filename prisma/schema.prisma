@@ -471,6 +471,10 @@ model Company {
   paymentType         CompanyPaymentType  @default(PREPAYMENT)
   // Only meaningful when paymentType is DEFERRED.
   paymentDeferralDays Int?
+  // The prices its people see in the shop and get in CRM orders.
+  priceType           CompanyPriceType    @default(WHOLESALE)
+  // INDIVIDUAL only: % over the purchase price.
+  individualMarkup    Float?
   documents           CompanyDocument[]
   suppliedProducts    ProductPricing[]
   supplierOffers      SupplierOffer[]
@@ -501,6 +505,14 @@ model CompanyDocument {
 enum CompanyPaymentType {
   PREPAYMENT
   DEFERRED
+}
+
+// Розница / Опт (the shop's own prices) / Дилер, or the company's own markup.
+enum CompanyPriceType {
+  RETAIL
+  WHOLESALE
+  DEALER
+  INDIVIDUAL
 }
 
 enum DriverApplicationStatus {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CartProvider } from "@/components/shop/CartProvider";
+import { CustomerPricesProvider } from "@/components/shop/CustomerPrices";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { companyInfo } from "@/content/company";
 import { CookieNotice } from "@/components/CookieNotice";
@@ -27,6 +28,7 @@ const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('shop-them
 
 export default function ShopLayout({ children }: LayoutProps<"/shop">) {
   return (
+    <CustomerPricesProvider>
     <CartProvider>
       <div
         id="shop-root"
@@ -79,5 +81,6 @@ export default function ShopLayout({ children }: LayoutProps<"/shop">) {
         <CookieNotice />
       </div>
     </CartProvider>
+    </CustomerPricesProvider>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
+import { useCustomerEntry } from "@/components/shop/CustomerPrices";
 import type { Product } from "@prisma/client";
 import { formatRub, formatShopPrice, PRICE_ON_REQUEST } from "@/lib/money";
 import type { ShopOffer } from "@/lib/shop-offer";
@@ -30,15 +31,23 @@ export function useProductOffers(productId: string): ShopOffer[] | null {
   return offers && offers.length > 1 ? offers : null;
 }
 
-export const offerDays = (o: ShopOffer) => (o.deliveryDays === null ? "—" : `${o.deliveryDays} дн.`);
+/** The offers at the signed-in client's own prices (its company's «Тип цен»), the shop's otherwise. */
+export function usePricedOffers(productId: string): ShopOffer[] | null {
+  const offers = useProductOffers(productId);
+  const entry = useCustomerEntry(productId);
+  return useMemo(() => (offers && entry ? offers.map((o) => ({ ...o, price: entry.offers[o.id] ?? o.price })) : offers), [offers, entry]);
+}
+
+export const offerDays =(o: ShopOffer) => (o.deliveryDays === null ? "—" : `${o.deliveryDays} дн.`);
 export const offerLabel = (o: ShopOffer) => [o.quality, o.deliveryDays !== null ? `${o.deliveryDays} дн.` : null].filter(Boolean).join(", ");
 
 /** «от 1 200 ₽» for a product with several offers, its own price otherwise; «По запросу» without one. */
 export function OfferPrice({ product }: { product: Product }) {
-  const offers = useProductOffers(product.id);
-  const prices = [product.price, ...(offers ?? []).map((o) => o.price)].filter((p) => p > 0);
+  const offers = usePricedOffers(product.id);
+  const own = useCustomerEntry(product.id)?.price ?? product.price;
+  const prices = [own, ...(offers ?? []).map((o) => o.price)].filter((p) => p > 0);
   if (prices.length === 0) return <span className="font-normal text-foreground/70">{PRICE_ON_REQUEST}</span>;
-  if (!offers) return <>{formatShopPrice(product.price)}</>;
+  if (!offers) return <>{formatShopPrice(own)}</>;
   return (
     <>
       <span className="font-normal text-foreground/60">от </span>
@@ -48,7 +57,9 @@ export function OfferPrice({ product }: { product: Product }) {
 }
 
 /** The list that drops down under a product: Качество, Цена, Срок поставки, Заказать. */
-export function OffersDropdown({ product, offers }: { product: Product; offers: ShopOffer[] }) {
+export function OffersDropdown({ product, offers: shopOffers }: { product: Product; offers: ShopOffer[] }) {
+  const entry = useCustomerEntry(product.id);
+  const offers = entry ? shopOffers.map((o) => ({ ...o, price: entry.offers[o.id] ?? o.price })) : shopOffers;
   return (
     <div className="border-b border-foreground/10 bg-foreground/[0.03] px-3 py-2" role="region" aria-label="Предложения">
       <table className="w-full text-sm">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ShopLink } from "@/components/shop/ShopLink";
 import type { Product } from "@prisma/client";
-import { formatShopPrice } from "@/lib/money";
+import { CustomerPriceText } from "@/components/shop/CustomerPrices";
 import { useCart } from "@/components/shop/CartProvider";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
@@ -83,7 +83,9 @@ function ProductListRow({ product }: { product: Product }) {
             <span className="ml-1 text-xs text-foreground/50">{offersOpen ? "▴" : "▾"}</span>
           </button>
         ) : (
-          <span className="w-28 shrink-0 text-right font-semibold">{formatShopPrice(product.price)}</span>
+          <span className="w-28 shrink-0 text-right font-semibold">
+            <CustomerPriceText productId={product.id} price={product.price} />
+          </span>
         )}
 
         <div className="flex shrink-0 items-center gap-2">

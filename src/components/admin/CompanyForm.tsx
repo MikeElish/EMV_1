@@ -6,6 +6,8 @@ import {
   COMPANY_TYPE_SUGGESTIONS,
   COMPANY_PAYMENT_TYPES,
   COMPANY_PAYMENT_TYPE_LABELS,
+  COMPANY_PRICE_TYPES,
+  COMPANY_PRICE_TYPE_LABELS,
   ROLE_LABELS,
 } from "@/lib/validators/crm";
 import { lookupCompanyByInn, type ActionResult } from "@/actions/crm/companies";
@@ -33,6 +35,7 @@ export function CompanyForm({
   const [submitting, setSubmitting] = useState(false);
   const [hasContract, setHasContract] = useState(initial?.hasContract ?? false);
   const [paymentType, setPaymentType] = useState(initial?.paymentType ?? "PREPAYMENT");
+  const [priceType, setPriceType] = useState(initial?.priceType ?? "WHOLESALE");
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [requisites, setRequisites] = useState({
     name: initial?.name ?? "",
@@ -87,6 +90,7 @@ export function CompanyForm({
 
     const formData = new FormData(event.currentTarget);
     const deferralDaysRaw = String(formData.get("paymentDeferralDays") ?? "");
+    const markupRaw = String(formData.get("individualMarkup") ?? "").trim();
     const result = await onSubmit({
       name: requisites.name,
       inn: requisites.inn || undefined,
@@ -99,6 +103,8 @@ export function CompanyForm({
       managerId: String(formData.get("managerId") ?? "") || undefined,
       paymentType,
       paymentDeferralDays: deferralDaysRaw ? Number(deferralDaysRaw) : undefined,
+      priceType,
+      individualMarkup: markupRaw ? Number(markupRaw.replace(",", ".")) : undefined,
     });
 
     setSubmitting(false);
@@ -265,6 +271,45 @@ export function CompanyForm({
           </div>
         )}
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="priceType" className="text-sm text-foreground/60">
+            Тип цен
+          </label>
+          <select
+            id="priceType"
+            value={priceType}
+            onChange={(e) => setPriceType(e.target.value as CompanyInput["priceType"])}
+            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          >
+            {COMPANY_PRICE_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {COMPANY_PRICE_TYPE_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {priceType === "INDIVIDUAL" && (
+          <div>
+            <label htmlFor="individualMarkup" className="text-sm text-foreground/60">
+              Наценка к закупке, %
+            </label>
+            <input
+              id="individualMarkup"
+              name="individualMarkup"
+              inputMode="decimal"
+              required
+              placeholder="например, 10"
+              defaultValue={initial?.individualMarkup}
+              className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+            />
+          </div>
+        )}
+      </div>
+      <p className="-mt-2 text-xs text-foreground/50">
+        Сотрудники компании видят эти цены в магазине после входа; в CRM тип цен подставляется в новый заказ.
+      </p>
 
       <div>
         <label htmlFor="managerId" className="text-sm text-foreground/60">

@@ -8,6 +8,8 @@ import { needsEmailVerification } from "@/lib/email-verification";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { deliveryMethodFromNote } from "@/lib/delivery";
+import { sessionPriceTier } from "@/lib/customer-pricing";
+import { tierPrice } from "@/lib/pricing";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -26,7 +28,10 @@ export async function createOrder(
   const productIds = items.map((i) => i.productId);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, isActive: true },
+    include: { pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } },
   });
+  // A client company's «Тип цен» (Розница / Дилер / Индивидуальный) is charged here, never taken from the browser.
+  const tier = await sessionPriceTier();
 
   if (products.length !== new Set(productIds).size) {
     return { ok: false, error: "Часть товаров в корзине больше недоступна" };
@@ -35,7 +40,7 @@ export async function createOrder(
   const productById = new Map(products.map((p) => [p.id, p]));
   // A picked supplier offer is charged at its own site price -- worked out
   // here, never taken from the browser.
-  const offers = await getShopOffers(items.filter((i) => i.offerId).map((i) => i.productId));
+  const offers = await getShopOffers(items.filter((i) => i.offerId).map((i) => i.productId), tier);
 
   let totalAmount = 0;
   const orderItemsData: {
@@ -47,7 +52,7 @@ export async function createOrder(
   }[] = [];
   for (const item of items) {
     const product = productById.get(item.productId)!;
-    let price = product.price;
+    let price = tierPrice(product, tier);
     let offerId: string | undefined;
     if (item.offerId) {
       const offer = offers[item.productId]?.find((o) => o.id === item.offerId);

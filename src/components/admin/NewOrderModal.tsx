@@ -18,6 +18,7 @@ import {
   type ManualOrderFormData,
 } from "@/actions/admin/manual-order";
 import { PRICE_TYPES, PRICE_TYPE_LABELS, type PriceType } from "@/lib/validators/manual-order";
+import { applyMarkup } from "@/lib/pricing";
 
 type Customer = ManualOrderFormData["customers"][number];
 type Company = ManualOrderFormData["companies"][number];
@@ -105,6 +106,12 @@ const filterBuyer = (b: Buyer, q: string) =>
     : matches(q, b.company.name, b.company.inn);
 const filterProduct = (p: Product, q: string) => matches(q, p.sku, p.name, p.brand);
 
+/** The product's price for the order's price type; «Индивидуальный» = purchase + the company's markup (the shop price without a purchase). */
+function priceOf(p: Product, type: PriceType, markup: number | null): number {
+  if (type !== "individual") return p.prices[type];
+  return p.purchase > 0 && markup !== null && p.prices.wholesale > 0 ? applyMarkup(p.purchase, markup) : p.prices.wholesale;
+}
+
 let nextKey = 1;
 const emptyLine = (): Line => ({ key: nextKey++, productId: "", quantity: "1", priceRub: "" });
 
@@ -122,6 +129,8 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
   const [customerEmail, setCustomerEmail] = useState("");
 
   const [priceType, setPriceType] = useState<PriceType>("wholesale");
+  // The picked buyer's company «Индивидуальный» markup, %.
+  const [markup, setMarkup] = useState<number | null>(null);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod | null>(null);
@@ -145,6 +154,10 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
   );
 
   function pickBuyer(b: Buyer) {
+    // The company's «Тип цен» (card in CRM → Компании) becomes the order's.
+    const terms = b.customer ?? b.company;
+    setMarkup(terms.markup);
+    changePriceType(terms.priceType === "individual" && terms.markup === null ? "wholesale" : terms.priceType, terms.markup);
     if (b.customer) {
       setCustomer(b.customer);
       setCustomerName(b.customer.name);
@@ -162,12 +175,12 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
-  function changePriceType(next: PriceType) {
+  function changePriceType(next: PriceType, withMarkup: number | null = markup) {
     setPriceType(next);
     setLines((prev) =>
       prev.map((l) => {
         const product = productById.get(l.productId);
-        return product ? { ...l, priceRub: kopecksToRub(product.prices[next]) } : l;
+        return product ? { ...l, priceRub: kopecksToRub(priceOf(product, next, withMarkup)) } : l;
       })
     );
   }
@@ -313,9 +326,10 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                   onChange={(e) => changePriceType(e.target.value as PriceType)}
                   className={`mt-1 ${inputClassName}`}
                 >
-                  {PRICE_TYPES.map((t) => (
+                  {PRICE_TYPES.filter((t) => t !== "individual" || markup !== null).map((t) => (
                     <option key={t} value={t}>
                       {PRICE_TYPE_LABELS[t]}
+                      {t === "individual" ? ` (+${markup}% к закупке)` : ""}
                     </option>
                   ))}
                 </select>
@@ -379,10 +393,10 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                               placeholder="Артикул, наименование или бренд"
                               items={data.products}
                               filter={filterProduct}
-                              onPick={(p) => updateLine(line.key, { productId: p.id, priceRub: kopecksToRub(p.prices[priceType]) })}
+                              onPick={(p) => updateLine(line.key, { productId: p.id, priceRub: kopecksToRub(priceOf(p, priceType, markup)) })}
                               renderItem={(p) => (
                                 <>
-                                  {p.name} <span className="text-foreground/50">· {p.sku} · {formatRub(p.prices[priceType])}</span>
+                                  {p.name} <span className="text-foreground/50">· {p.sku} · {formatRub(priceOf(p, priceType, markup))}</span>
                                 </>
                               )}
                             />

@@ -9,7 +9,7 @@ import { getShopOffers } from "@/lib/supplier-offers";
 import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ShopLink } from "@/components/shop/ShopLink";
 import { absoluteUrl, brandSlug, productHeading, productIntro, rubText, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
-import { formatShopPrice } from "@/lib/money";
+import { CustomerPriceText } from "@/components/shop/CustomerPrices";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
@@ -171,7 +171,9 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
                   <ShopLink href={`/shop/product/${p.slug}`} className="truncate hover:underline">
                     {p.name} <span className="text-foreground/40">{p.sku}</span>
                   </ShopLink>
-                  <span className="shrink-0 text-foreground/60">{formatShopPrice(p.price)}</span>
+                  <span className="shrink-0 text-foreground/60">
+                    <CustomerPriceText productId={p.id} price={p.price} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -184,7 +186,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
 
 /** Same brand and category first, then the rest of the category: internal links for the search engines and the customer. */
 async function relatedProducts(product: { id: string; brand: string | null; categoryId: string }) {
-  const select = { slug: true, name: true, sku: true, price: true } as const;
+  const select = { id: true, slug: true, name: true, sku: true, price: true } as const;
   const where = { isActive: true, categoryId: product.categoryId, id: { not: product.id } };
   const sameBrand = product.brand
     ? await prisma.product.findMany({ where: { ...where, brand: product.brand }, select, orderBy: [{ stock: "desc" }, { name: "asc" }], take: 8 })

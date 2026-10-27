@@ -28,6 +28,8 @@ function toCompanyData(data: CompanyInput) {
     managerId: data.managerId || null,
     paymentType: data.paymentType,
     paymentDeferralDays: data.paymentType === "DEFERRED" ? data.paymentDeferralDays : null,
+    priceType: data.priceType,
+    individualMarkup: data.priceType === "INDIVIDUAL" ? data.individualMarkup ?? null : null,
   };
 }
 

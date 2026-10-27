@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMarkups } from "@/lib/price-settings";
-import { applyMarkup, markupOf, type Markups } from "@/lib/pricing";
+import { applyMarkup, markupOf, tierPrice, type Markups, type PriceTier } from "@/lib/pricing";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -102,21 +102,26 @@ export type { ShopOffer };
 /**
  * Offers of products that have more than one, priced for the site: the
  * selected offer at the product's own price, the others with the same
- * wholesale markup over their purchase price.
+ * markup over their purchase price. With a client company's price type
+ * (`tier`) «the product's own price» is that type's price.
  */
-export async function getShopOffers(productIds: string[]): Promise<Record<string, ShopOffer[]>> {
+export async function getShopOffers(productIds: string[], tier: PriceTier | null = null): Promise<Record<string, ShopOffer[]>> {
   if (!productIds.length) return {};
   const [offers, pricing, products, defaults] = await Promise.all([
     prisma.supplierOffer.findMany({
       where: { productId: { in: productIds } },
       select: { id: true, productId: true, price: true, deliveryDays: true, quality: true, selected: true },
     }),
-    prisma.productPricing.findMany({ where: { productId: { in: productIds } }, select: { productId: true, purchasePrice: true } }),
+    prisma.productPricing.findMany({
+      where: { productId: { in: productIds } },
+      select: { productId: true, purchasePrice: true, retailPrice: true, dealerPrice: true },
+    }),
     prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } }),
     getMarkups(),
   ]);
+  const pricingOf = new Map(pricing.map((p) => [p.productId, p]));
   const purchaseOf = new Map(pricing.map((p) => [p.productId, p.purchasePrice]));
-  const priceOf = new Map(products.map((p) => [p.id, p.price]));
+  const priceOf = new Map(products.map((p) => [p.id, tierPrice({ price: p.price, pricing: pricingOf.get(p.id) ?? null }, tier)]));
   const byProduct = new Map<string, typeof offers>();
   for (const o of offers) byProduct.set(o.productId, [...(byProduct.get(o.productId) ?? []), o]);
 
@@ -142,7 +147,7 @@ export async function getShopOffers(productIds: string[]): Promise<Record<string
 }
 
 /** Site price of one offer -- what the cart and the order are charged. */
-export async function shopOfferPrice(productId: string, offerId: string): Promise<number | null> {
-  const offers = await getShopOffers([productId]);
+export async function shopOfferPrice(productId: string, offerId: string, tier: PriceTier | null = null): Promise<number | null> {
+  const offers = await getShopOffers([productId], tier);
   return offers[productId]?.find((o) => o.id === offerId)?.price ?? null;
 }

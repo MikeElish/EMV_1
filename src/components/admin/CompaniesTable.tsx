@@ -173,6 +173,8 @@ export function CompaniesTable({
                   managerId: selected.managerId ?? undefined,
                   paymentType: selected.paymentType,
                   paymentDeferralDays: selected.paymentDeferralDays ?? undefined,
+                  priceType: selected.priceType,
+                  individualMarkup: selected.individualMarkup ?? undefined,
                 }}
                 onSubmit={(input) => updateCompany(selected.id, input)}
                 onSuccess={close}

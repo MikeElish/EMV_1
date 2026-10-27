@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { productSearchWhere } from "@/lib/product-search";
+import { customerPrices, sessionPriceTier } from "@/lib/customer-pricing";
 
 export type SearchSuggestion = {
   slug: string;
@@ -25,17 +26,20 @@ export async function GET(request: Request) {
       // In stock first, then by name.
       orderBy: [{ stock: "desc" }, { name: "asc" }],
       take: LIMIT,
-      select: { slug: true, name: true, sku: true, brand: true, price: true, stock: true, images: true },
+      select: { id: true, slug: true, name: true, sku: true, brand: true, price: true, stock: true, images: true },
     }),
     prisma.product.count({ where }),
   ]);
+  // A signed-in client with its own «Тип цен» sees its prices here too.
+  const tier = await sessionPriceTier();
+  const own = tier ? await customerPrices(rows.map((p) => p.id), tier) : {};
 
   const items: SearchSuggestion[] = rows.map((p) => ({
     slug: p.slug,
     name: p.name,
     sku: p.sku,
     brand: p.brand,
-    price: p.price,
+    price: own[p.id]?.price ?? p.price,
     inStock: p.stock > 0,
     image: p.images[0] ?? null,
   }));
