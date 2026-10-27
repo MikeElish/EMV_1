@@ -26,7 +26,12 @@ export async function applyWatermark(input: Buffer): Promise<Buffer> {
     .flatten({ background: "#ffffff" })
     .toBuffer({ resolveWithObject: true });
 
-  const tileWidth = Math.max(MIN_TILE_WIDTH, Math.round((TILE_WIDTH * photo.info.width) / MAX_WIDTH));
+  // The tile is square and may not be bigger than the photo (small or long narrow shots).
+  const tileWidth = Math.min(
+    Math.max(MIN_TILE_WIDTH, Math.round((TILE_WIDTH * photo.info.width) / MAX_WIDTH)),
+    photo.info.width,
+    photo.info.height
+  );
   const tile = await sharp(await loadTile()).resize({ width: tileWidth }).png().toBuffer();
 
   return sharp(photo.data)
