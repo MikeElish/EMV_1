@@ -117,6 +117,9 @@ export type MailFolder = {
   role: FolderRole;
   unseen: number;
   messages: number;
+  /** Uid of the newest letter (uidNext − 1) and the folder's uidValidity -- for spotting new mail. */
+  lastUid: number;
+  uidValidity: string;
 };
 
 const SPECIAL_USE: Record<string, FolderRole> = {
@@ -158,7 +161,7 @@ function roleOf(folder: ListResponse): FolderRole {
 
 export async function listFolders(account: MailAccount): Promise<MailFolder[]> {
   return withImap(account, async (client) => {
-    const list = await client.list({ statusQuery: { messages: true, unseen: true } });
+    const list = await client.list({ statusQuery: { messages: true, unseen: true, uidNext: true, uidValidity: true } });
     return list
       .filter((f) => !f.flags?.has("\\Noselect") && !f.flags?.has("\\NonExistent"))
       .map((f) => {
@@ -172,6 +175,8 @@ export async function listFolders(account: MailAccount): Promise<MailFolder[]> {
           role,
           unseen: f.status?.unseen ?? 0,
           messages: f.status?.messages ?? 0,
+          lastUid: Math.max(0, (f.status?.uidNext ?? 1) - 1),
+          uidValidity: String(f.status?.uidValidity ?? ""),
         };
       });
   });

@@ -2,52 +2,83 @@ import { prisma } from "@/lib/prisma";
 import { getMyAccess, hasAccess } from "@/lib/access-server";
 import { getSuppliers } from "@/lib/price-settings";
 import { getMailAccount } from "@/lib/mail/account";
-import { withFolder, folderByRole } from "@/lib/mail/imap";
-import { getFoldersWithCounts } from "@/lib/mail/unread";
+import { withFolder } from "@/lib/mail/imap";
+import { getFoldersWithCounts, isWatchedFolder } from "@/lib/mail/unread";
 import { formatRub } from "@/lib/money";
 
 // Polled once a minute by the Windows program (desktop/): what is new since
 // its last call, for notifications. The cursors come back in the answer --
 // the first call (no cursors) only returns them, so nothing old pops up.
-//   ?ordersSince=<ISO time of the server>  &mailUid=<last inbox uid>&mailValidity=<uidValidity>
+//   ?ordersSince=<ISO time of the server>&mail=<JSON cursor from the previous answer>
 
 const MAX_ITEMS = 5;
 
+/** Mail cursor: folder path → "<uidValidity>:<uid of its newest letter>". Opaque to the program. */
+type MailCursor = Record<string, string>;
+
 type MailPart = {
+  /** Unread in Входящие + Мои папки, as next to «Почта». */
   unread: number;
-  uid: number;
-  validity: string;
-  letters: { uid: number; from: string; subject: string }[];
+  cursor: MailCursor;
+  letters: { folder: string; from: string; subject: string; url: string }[];
 };
 
-async function pollMail(userId: string, sinceUid: number | null, sinceValidity: string | null): Promise<MailPart | null> {
+function parseCursor(raw: string | null): MailCursor | null {
+  if (!raw || raw.length > 20000) return null;
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return Object.fromEntries(Object.entries(value).filter(([, v]) => typeof v === "string")) as MailCursor;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * New unread letters in Входящие and Мои папки (Yandex filters often file
+ * mail straight into a folder). Folder states come from STATUS -- fresh from
+ * the server -- so only folders that really grew are opened.
+ */
+async function pollMail(userId: string, since: MailCursor | null): Promise<MailPart | null> {
   const account = await getMailAccount(userId);
   if (!account) return null;
   const { folders, counts } = await getFoldersWithCounts(account);
-  const inbox = folderByRole(folders, "inbox");
-  if (!inbox) return null;
-  return withFolder(account, inbox.path, async (client) => {
-    const validity = client.mailbox ? String(client.mailbox.uidValidity) : "";
-    const letters: MailPart["letters"] = [];
-    // First call, or a changed uidValidity (the folder was renumbered): only
-    // remember where the inbox ends, without notifying.
-    if (sinceUid === null || sinceValidity !== validity) {
-      const last = client.mailbox && client.mailbox.exists > 0 ? await client.fetchOne("*", { uid: true }) : null;
-      return { unread: counts.inbox, uid: last ? last.uid : 0, validity, letters };
-    }
-    // `n:*` always matches the last letter, even below n -- hence the filter.
-    const fresh = ((await client.search({ uid: `${sinceUid + 1}:*` }, { uid: true })) || []).filter((u) => u > sinceUid);
-    if (fresh.length) {
-      const uids = fresh.slice(-MAX_ITEMS).join(",");
-      for await (const msg of client.fetch(uids, { uid: true, flags: true, envelope: true }, { uid: true })) {
-        if (msg.flags?.has("\\Seen")) continue; // already read elsewhere
-        const from = msg.envelope?.from?.[0];
-        letters.push({ uid: msg.uid, from: from?.name || from?.address || "", subject: msg.envelope?.subject || "(без темы)" });
+  const cursor: MailCursor = {};
+  const found: (MailPart["letters"][number] & { date: number })[] = [];
+
+  for (const f of folders.filter(isWatchedFolder)) {
+    cursor[f.path] = `${f.uidValidity}:${f.lastUid}`;
+    // First call, a new folder or a renumbered one: only remember where it ends.
+    const [validity, uid] = (since?.[f.path] ?? "").split(":");
+    const from = Number(uid);
+    if (!since || validity !== f.uidValidity || !Number.isInteger(from) || f.lastUid <= from) continue;
+
+    await withFolder(account, f.path, async (client) => {
+      await client.noop(); // the pooled connection's view of the folder may be stale
+      const first = Math.max(from + 1, f.lastUid - 50); // a flood: only the newest matter
+      for await (const msg of client.fetch(`${first}:${f.lastUid}`, { uid: true, flags: true, envelope: true, internalDate: true }, { uid: true })) {
+        if (msg.uid <= from || msg.flags?.has("\\Seen")) continue; // already read elsewhere
+        const sender = msg.envelope?.from?.[0];
+        found.push({
+          folder: f.name,
+          from: sender?.name || sender?.address || "",
+          subject: msg.envelope?.subject || "(без темы)",
+          url:
+            f.role === "inbox"
+              ? `/admin/mail/inbox/${msg.uid}`
+              : `/admin/mail/folders/${msg.uid}?path=${encodeURIComponent(f.path)}`,
+          date: new Date((msg.internalDate ?? 0) as Date | string).getTime() || 0,
+        });
       }
-      letters.sort((a, b) => a.uid - b.uid);
-    }
-    return { unread: counts.inbox, uid: Math.max(sinceUid, ...fresh), validity, letters };
-  });
+    });
+  }
+
+  found.sort((a, b) => a.date - b.date);
+  return {
+    unread: counts.total,
+    cursor,
+    letters: found.slice(-MAX_ITEMS).map((l) => ({ folder: l.folder, from: l.from, subject: l.subject, url: l.url })),
+  };
 }
 
 export async function GET(request: Request) {
@@ -58,8 +89,6 @@ export async function GET(request: Request) {
   const now = new Date();
   const sinceRaw = params.get("ordersSince");
   const since = sinceRaw && !Number.isNaN(Date.parse(sinceRaw)) ? new Date(sinceRaw) : null;
-  const mailUidRaw = params.get("mailUid");
-  const mailUid = mailUidRaw && /^\d+$/.test(mailUidRaw) ? Number(mailUidRaw) : null;
 
   const [canOrders, canMail, canPrices] = await Promise.all([
     hasAccess("crm.orders", "view"),
@@ -80,7 +109,7 @@ export async function GET(request: Request) {
   let mail: MailPart | null = null;
   if (canMail) {
     try {
-      mail = await pollMail(me.userId, mailUid, params.get("mailValidity"));
+      mail = await pollMail(me.userId, parseCursor(params.get("mail")));
     } catch {
       // mailbox unreachable for now -- the next poll tries again
     }

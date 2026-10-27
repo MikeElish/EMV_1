@@ -17,11 +17,16 @@ type Entry = { at: number; data: Promise<{ folders: MailFolder[]; counts: Unread
 const globalCache = globalThis as unknown as { __emvMailUnread?: Map<string, Entry> };
 const cache: Map<string, Entry> = (globalCache.__emvMailUnread ??= new Map<string, Entry>());
 
+// Unread letters in Удалённые / Исходящие don't call for attention.
+const attentionFolder = (f: MailFolder) => isMyFolder(f) && f.role !== "trash" && f.role !== "outbox";
+
+/** Where new letters call for attention: Входящие + Мои папки (the «Почта» counter; the Windows program's notifications). */
+export const isWatchedFolder = (f: MailFolder) => f.role === "inbox" || attentionFolder(f);
+
 function countsOf(folders: MailFolder[]): UnreadCounts {
   const sum = (pred: (f: MailFolder) => boolean) => folders.filter(pred).reduce((n, f) => n + f.unseen, 0);
   const inbox = sum((f) => f.role === "inbox");
-  // Unread letters in Удалённые / Исходящие don't call for attention.
-  const folderCount = sum((f) => isMyFolder(f) && f.role !== "trash" && f.role !== "outbox");
+  const folderCount = sum(attentionFolder);
   return {
     inbox,
     folders: folderCount,
