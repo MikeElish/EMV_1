@@ -1,6 +1,7 @@
 import { readFile, stat } from "fs/promises";
 import path from "path";
 import { getMyAccess } from "@/lib/access-server";
+import { DESKTOP_RELEASES_DIR } from "@/lib/desktop-release";
 
 // The Windows program (desktop/) and its auto-updates: `npm run dist` there
 // makes EMV-Setup-<version>.exe, its .blockmap and latest.yml; they are
@@ -8,8 +9,6 @@ import { getMyAccess } from "@/lib/access-server";
 // which `next start` reads only at startup -- see app/uploads).
 // Staff only: a signed-in employee downloads the installer in the browser;
 // the program's updater sends the window's session cookie.
-
-const RELEASES_DIR = path.join(process.cwd(), "desktop-releases");
 
 const TYPES: Record<string, string> = {
   ".yml": "text/yaml; charset=utf-8",
@@ -23,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   const type = TYPES[path.extname(name).toLowerCase()];
   if (!type || name !== path.basename(name)) return new Response("Not found", { status: 404 });
 
-  const file = path.join(RELEASES_DIR, name);
+  const file = path.join(DESKTOP_RELEASES_DIR, name);
   try {
     const info = await stat(file);
     if (!info.isFile()) return new Response("Not found", { status: 404 });
