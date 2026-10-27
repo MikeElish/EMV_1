@@ -10,11 +10,55 @@ import {
   saveOneCSettings,
   type OneCCheck,
 } from "@/actions/admin/onec-settings";
+import { syncStockNow } from "@/actions/admin/onec-sync";
 
 const inputClassName =
   "mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50";
 
 type Saved = { baseUrl: string; login: string; updatedAt: string } | null;
+type StockSync = { at: string; summary: string } | null;
+
+/** Наличие from 1С: the last run (daily at 06:00) and a button to run it now. */
+function StockSyncSection({ last }: { last: StockSync }) {
+  const router = useRouter();
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function run() {
+    setRunning(true);
+    setMessage(null);
+    const result = await syncStockNow();
+    setRunning(false);
+    setMessage(result.ok ? { ok: true, text: result.message } : { ok: false, text: result.error });
+    if (result.ok) router.refresh();
+  }
+
+  return (
+    <section className="mt-8 rounded-lg border border-foreground/10 p-4">
+      <h2 className="text-sm font-semibold">Остатки товаров</h2>
+      <p className="mt-1 text-sm text-foreground/60">
+        Каждый день в 06:00 (МСК) «Наличие» товаров, связанных с 1С, обновляется по остаткам на счетах 41 «Товары».
+        Товары без связи с 1С не меняются.
+      </p>
+      {last ? (
+        <p className={`mt-2 text-sm ${last.summary.startsWith("Ошибка") ? "text-red-600" : "text-foreground/70"}`}>
+          {new Date(last.at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })}: {last.summary}
+        </p>
+      ) : (
+        <p className="mt-2 text-sm text-foreground/50">Ещё не обновлялись.</p>
+      )}
+      <button
+        type="button"
+        onClick={run}
+        disabled={running}
+        className="mt-3 rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium hover:bg-foreground/5 disabled:opacity-50"
+      >
+        {running ? "Обновляем..." : "Обновить остатки сейчас"}
+      </button>
+      {message && <p className={`mt-2 text-sm ${message.ok ? "text-green-600" : "text-red-600"}`}>{message.text}</p>}
+    </section>
+  );
+}
 
 function CheckResult({ check }: { check: OneCCheck }) {
   if (!check.ok) return <p className="text-sm text-red-600">{check.error}</p>;
@@ -54,7 +98,7 @@ function CheckResult({ check }: { check: OneCCheck }) {
   );
 }
 
-export function OneCSettingsForm({ saved }: { saved: Saved }) {
+export function OneCSettingsForm({ saved, stockSync }: { saved: Saved; stockSync: StockSync }) {
   const router = useRouter();
   const [editing, setEditing] = useState(!saved);
   const [saving, setSaving] = useState(false);
@@ -242,6 +286,8 @@ export function OneCSettingsForm({ saved }: { saved: Saved }) {
           </Link>
         </section>
       )}
+
+      {saved && <StockSyncSection last={stockSync} />}
     </div>
   );
 }

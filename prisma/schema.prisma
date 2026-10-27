@@ -432,6 +432,10 @@ model OneCSettings {
   login       String
   passwordEnc String
   updatedAt   DateTime @updatedAt
+  // Daily stock sync (src/lib/onec-stock.ts): when it last ran and its
+  // outcome as shown in Настройки → 1С.
+  stockSyncedAt DateTime?
+  stockSyncSummary String?
 }
 
 // Singleton (id is always 1): Яндекс.Флот (Яндекс Про) park connection for

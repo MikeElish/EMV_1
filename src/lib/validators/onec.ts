@@ -39,6 +39,7 @@ export const ONEC_REQUIRED_OBJECTS: { name: string; label: string }[] = [
   { name: "Catalog_Валюты", label: "Справочник «Валюты»" },
   { name: "Catalog_Патенты", label: "Справочник «Патенты»" },
   { name: "ChartOfAccounts_Хозрасчетный", label: "План счетов «Хозрасчётный»" },
+  { name: "AccountingRegister_Хозрасчетный", label: "Регистр бухгалтерии «Хозрасчётный» (остатки товаров)" },
   { name: "InformationRegister_ЦеныНоменклатуры", label: "Регистр сведений «Цены номенклатуры»" },
   { name: "Document_СчетНаОплатуПокупателю", label: "Документ «Счёт покупателю»" },
   { name: "Document_РеализацияТоваровУслуг", label: "Документ «Реализация (акт, накладная, УПД)»" },

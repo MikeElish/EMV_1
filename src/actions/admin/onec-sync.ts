@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
 import { OneCError } from "@/lib/onec";
+import { syncStockFromOneC } from "@/lib/onec-stock";
 import {
   applyCounterparties,
   computeProductMatching,
@@ -114,6 +115,19 @@ export async function importOneCGoods(): Promise<SyncResult> {
     revalidatePath(PAGE);
     revalidatePath("/admin/crm/products");
     return { ok: true, message: `Добавлено неактивных товаров: ${created}. Они в категории «Из 1С — не распределено».` };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Наличие from today's 1С balances now, without waiting for the 06:00 run. */
+export async function syncStockNow(): Promise<SyncResult> {
+  const denied = await accessDenied("settings.1c");
+  if (denied) return denied;
+  try {
+    const r = await syncStockFromOneC();
+    revalidatePath("/admin/settings/1c");
+    return { ok: true, message: `Остатки обновлены: в наличии ${r.inStock} из ${r.linked} связанных товаров, изменено ${r.changed}` };
   } catch (error) {
     return fail(error);
   }

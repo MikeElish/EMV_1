@@ -13,6 +13,11 @@ export default async function OneCSettingsPage() {
           updatedAt: settings.updatedAt.toISOString(),
         }
       }
+      stockSync={
+        settings?.stockSyncedAt
+          ? { at: settings.stockSyncedAt.toISOString(), summary: settings.stockSyncSummary ?? "" }
+          : null
+      }
     />
   );
 }
