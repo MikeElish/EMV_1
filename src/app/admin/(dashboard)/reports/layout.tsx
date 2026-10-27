@@ -5,8 +5,13 @@ const TABS = [
   { href: "/admin/reports/salary", label: "Зарплата" },
   { href: "/admin/reports/execution", label: "Выполнение" },
   { href: "/admin/reports/analytics", label: "Аналитика" },
+  { href: "/admin/reports/movements", label: "Движение товаров" },
 ];
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
-  return <NavTabs tabs={TABS}>{children}</NavTabs>;
+  return (
+    <NavTabs tabs={TABS} fill>
+      {children}
+    </NavTabs>
+  );
 }

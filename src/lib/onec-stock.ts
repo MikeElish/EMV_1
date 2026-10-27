@@ -9,7 +9,7 @@ import { oneCGet } from "@/lib/onec";
 // 18:00 Moscow time and from Настройки → 1С.
 
 /** Goods for sale: on warehouses, in retail, bought-in items. */
-const GOODS_ACCOUNTS = ["41.01", "41.02", "41.04"];
+export const GOODS_ACCOUNTS = ["41.01", "41.02", "41.04"];
 const ITEM_TYPE = "StandardODATA.Catalog_Номенклатура";
 
 type BalanceRow = { ExtDimension1?: string; ExtDimension1_Type?: string; КоличествоBalance?: number };

@@ -103,6 +103,19 @@ model OneCIgnoredGood {
   createdAt DateTime @default(now())
 }
 
+// Склад: where a 1С item lies on a 1С warehouse (cell, shelf), typed by
+// staff. The quantities come from 1С documents (src/lib/onec-warehouse.ts).
+model StoragePlace {
+  // Catalog_Склады Ref_Key.
+  warehouseRef String
+  // Catalog_Номенклатура Ref_Key.
+  itemRef      String
+  place        String
+  updatedAt    DateTime @updatedAt
+
+  @@id([warehouseRef, itemRef])
+}
+
 model OneCProductLink {
   ref       String   @id
   productId String

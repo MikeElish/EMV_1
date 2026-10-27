@@ -33,6 +33,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "crm.extra-costs", label: "Доп.расходы", path: "/admin/crm/extra-costs" },
     ],
   },
+  { label: "Склад", path: "/admin/warehouse", sections: [{ key: "warehouse", label: "Склад", path: "/admin/warehouse" }] },
   {
     label: "Таксопарк",
     path: "/admin/taxi-fleet",
@@ -58,6 +59,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "reports.salary", label: "Зарплата", path: "/admin/reports/salary" },
       { key: "reports.execution", label: "Выполнение", path: "/admin/reports/execution" },
       { key: "reports.analytics", label: "Аналитика", path: "/admin/reports/analytics" },
+      { key: "reports.movements", label: "Движение товаров", path: "/admin/reports/movements" },
     ],
   },
   { label: "Почта", path: "/admin/mail", sections: [{ key: "mail", label: "Почта", path: "/admin/mail" }] },
