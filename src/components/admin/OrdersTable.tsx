@@ -100,6 +100,9 @@ const TEXT_FILTERS: { key: keyof Filters; label: string }[] = [
 
 // «Группировать по заказам»: one read-only row per order.
 const GROUPED_KEY = "crm-orders-grouped";
+const UNFINISHED_KEY = "crm-orders-unfinished";
+/** «Не завершённые»: everything but Выполнен and Отменён (shipped and still unpaid counts as open). */
+const FINISHED: OrderStatus[] = ["DONE", "CANCELLED"];
 const GROUPED_COLUMNS = new Set<keyof Filters>([
   "orderNumber",
   "customer",
@@ -181,16 +184,27 @@ export function OrdersTable({
   const [syncedOrderNumber, setSyncedOrderNumber] = useState(initialOrderNumber);
   const [creating, setCreating] = useState(false);
   const [grouped, setGrouped] = useState(false);
+  const [unfinished, setUnfinished] = useState(false);
 
   // Remembered per browser.
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after hydration
       if (localStorage.getItem(GROUPED_KEY) === "1") setGrouped(true);
+      if (localStorage.getItem(UNFINISHED_KEY) === "1") setUnfinished(true);
     } catch {
       // storage unavailable
     }
   }, []);
+
+  function toggleUnfinished(next: boolean) {
+    setUnfinished(next);
+    try {
+      localStorage.setItem(UNFINISHED_KEY, next ? "1" : "0");
+    } catch {
+      // storage unavailable
+    }
+  }
 
   function toggleGrouped(next: boolean) {
     setGrouped(next);
@@ -254,6 +268,7 @@ export function OrdersTable({
     const has = (value: string, query: string) =>
       value.toLowerCase().includes(query.trim().toLowerCase());
     return rows.filter(({ order, item, customer, extra }) => {
+      if (unfinished && FINISHED.includes(order.status)) return false;
       if (filters.orderNumber && !has(order.orderNumber, filters.orderNumber)) return false;
       if (filters.customer && !has(customer, filters.customer)) return false;
       if (filters.itemName && !has(item.nameSnapshot, filters.itemName)) return false;
@@ -274,7 +289,7 @@ export function OrdersTable({
       if (filters.paid && paymentStateOf(item) !== filters.paid) return false;
       return true;
     });
-  }, [rows, filters, grouped]);
+  }, [rows, filters, grouped, unfinished]);
 
   // An order is listed when any of its lines passes the filters; the row sums
   // up all of its lines.
@@ -321,6 +336,10 @@ export function OrdersTable({
               }}
             />
             Группировать по заказам
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <input type="checkbox" checked={unfinished} onChange={(e) => toggleUnfinished(e.target.checked)} />
+            Не завершённые
           </label>
           {returnTo && !grouped && (
             <button
