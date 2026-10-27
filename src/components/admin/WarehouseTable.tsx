@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { refreshWarehouseData, setStoragePlace } from "@/actions/admin/warehouse";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { TransferModal } from "@/components/admin/StockDocForms";
 
 type Row = { itemRef: string; name: string; sku: string; qty: number; place: string; productId: string | null };
 type Warehouse = { ref: string; name: string };
@@ -13,7 +14,7 @@ type Warehouse = { ref: string; name: string };
 const qtyText = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits: 3 });
 
 /** Место хранения, saved when the field is left. */
-function PlaceInput({ warehouseRef, row }: { warehouseRef: string; row: Row }) {
+export function PlaceInput({ warehouseRef, row }: { warehouseRef: string; row: Pick<Row, "itemRef" | "name" | "place"> }) {
   const [value, setValue] = useState(row.place);
   const [saved, setSaved] = useState(row.place);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export function WarehouseTable({
   const [search, setSearch] = useState("");
   const [refreshing, startRefresh] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [transfer, setTransfer] = useState(false);
 
   const sorted = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -118,6 +120,19 @@ export function WarehouseTable({
             </select>
           )}
           <TableSearchInput value={search} onChange={setSearch} placeholder="Место, товар, артикул..." />
+          <button
+            type="button"
+            onClick={() => setTransfer(true)}
+            className="rounded-md bg-foreground px-4 py-1.5 text-sm font-medium text-background hover:opacity-90"
+          >
+            Создать перемещение
+          </button>
+          <Link
+            href={`/admin/warehouse/${warehouse.ref}/inventory`}
+            className="rounded-md border border-foreground/20 px-4 py-1.5 text-sm font-medium hover:bg-foreground/5"
+          >
+            Инвентаризация
+          </Link>
           <button
             type="button"
             onClick={refresh}
@@ -173,6 +188,15 @@ export function WarehouseTable({
             </tbody>
           </table>
         </CrmTableScroll>
+      )}
+
+      {transfer && (
+        <TransferModal
+          warehouse={warehouse}
+          warehouses={warehouses}
+          stock={rows.filter((r) => r.qty > 0).map((r) => ({ ref: r.itemRef, name: r.name, sku: r.sku, qty: r.qty }))}
+          onClose={() => setTransfer(false)}
+        />
       )}
     </>
   );

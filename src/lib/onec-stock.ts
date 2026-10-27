@@ -15,7 +15,7 @@ const ITEM_TYPE = "StandardODATA.Catalog_Номенклатура";
 type BalanceRow = { ExtDimension1?: string; ExtDimension1_Type?: string; КоличествоBalance?: number };
 
 /** 1С's datetime literal for a moment, in Moscow time (1С keeps local time). */
-function oneCDateTime(date: Date) {
+export function oneCDateTime(date: Date) {
   return date.toLocaleString("sv-SE", { timeZone: "Europe/Moscow" }).replace(" ", "T");
 }
 

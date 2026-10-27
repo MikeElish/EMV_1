@@ -40,6 +40,48 @@ export async function oneCGet<T>(path: string): Promise<T> {
 }
 
 /**
+ * Writes to 1С (POST creates, PATCH changes, POST …/Post() posts a document).
+ * 1С's own message comes back in the error, so the employee sees why 1С
+ * refused (e.g. what is missing for posting).
+ */
+export async function oneCSend<T>(method: "POST" | "PATCH", path: string, body?: unknown): Promise<T> {
+  const settings = await prisma.oneCSettings.findUnique({ where: { id: 1 } });
+  if (!settings) throw new OneCError("Подключение не настроено: Настройки → 1С");
+  const auth = Buffer.from(`${settings.login}:${decryptSecret(settings.passwordEnc)}`, "utf8").toString("base64");
+  const url = `${settings.baseUrl}/odata/standard.odata${path}${path.includes("?") ? "&" : "?"}$format=json`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: { Authorization: `Basic ${auth}`, Accept: "application/json", "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+      cache: "no-store",
+    });
+  } catch {
+    throw new OneCError("1С не отвечает. Попробуйте ещё раз.");
+  }
+  const text = await response.text();
+  if (response.status === 401 || response.status === 403) {
+    throw new OneCError("1С не разрешает пользователю OData запись — дайте ему права на изменение");
+  }
+  if (!response.ok) {
+    let message = text.replace(/\s+/g, " ").slice(0, 300);
+    try {
+      message = JSON.parse(text)["odata.error"]?.message?.value ?? message;
+    } catch {
+      // not JSON
+    }
+    throw new OneCError(`1С: ${message}`);
+  }
+  try {
+    return (text ? JSON.parse(text) : {}) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
+/**
  * Every row of a catalog/document set, paged ($top/$skip), with the given
  * $select. Pages are ordered by Ref_Key: without $orderby 1С returns pages
  * in no stable order, so rows repeat across pages while others are skipped.

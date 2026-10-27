@@ -18,7 +18,13 @@ export default async function WarehouseLayout({ children }: { children: React.Re
   }
   if (!warehouses.length) return <p className="text-sm text-foreground/50">В 1С нет ни одного склада.</p>;
   return (
-    <NavTabs fill tabs={warehouses.map((w) => ({ href: `/admin/warehouse/${w.ref}`, label: w.name }))}>
+    <NavTabs
+      fill
+      tabs={[
+        ...warehouses.map((w) => ({ href: `/admin/warehouse/${w.ref}`, label: w.name })),
+        { href: "/admin/warehouse/adjustments", label: "Списание/Оприходование" },
+      ]}
+    >
       {children}
     </NavTabs>
   );
