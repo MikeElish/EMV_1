@@ -13,7 +13,12 @@ const DEFAULTS = {
   pricesEnabled: true,
   notifyOrders: true,
   notifyMail: true,
+  /** Page zoom of the program's window, percent. */
+  zoom: 100,
 };
+
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 200;
 
 let current = null;
 const listeners = new Set();
@@ -34,6 +39,7 @@ function set(patch) {
   for (const key of Object.keys(DEFAULTS)) {
     if (key in patch && typeof patch[key] === typeof DEFAULTS[key]) next[key] = patch[key];
   }
+  next.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(Number(next.zoom) || 100)));
   current = next;
   try {
     fs.writeFileSync(FILE, JSON.stringify(current, null, 2));
@@ -48,4 +54,4 @@ function onChange(fn) {
   listeners.add(fn);
 }
 
-module.exports = { get, set, onChange };
+module.exports = { get, set, onChange, ZOOM_MIN, ZOOM_MAX };

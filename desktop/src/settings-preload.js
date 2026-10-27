@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld("emvSettings", {
   pickFolder: () => ipcRenderer.invoke("settings:pick-folder"),
   openFolder: () => ipcRenderer.invoke("settings:open-folder"),
   testPrint: () => ipcRenderer.invoke("settings:test-print"),
+  /** Ctrl+= / Ctrl+- in the main window move the slider too. */
+  onZoom: (callback) => ipcRenderer.on("settings:zoom", (_e, zoom) => callback(zoom)),
 });

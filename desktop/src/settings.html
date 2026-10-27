@@ -25,9 +25,19 @@
     .footer { margin-top: 22px; display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
     #status { margin-right: auto; color: #2a7a2a; font-size: 13px; }
     #status.error { color: #c00; }
+    input[type=range] { flex: 1; accent-color: #000; }
+    #zoomValue { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
+  <h2>Масштаб</h2>
+  <div class="row">
+    <input type="range" id="zoom" min="50" max="200" step="10">
+    <span id="zoomValue"></span>
+    <button id="zoomReset" type="button">100%</button>
+  </div>
+  <p class="hint">Меняется сразу. Также Ctrl+колёсико мыши, Ctrl+= и Ctrl+−.</p>
+
   <h2>Уведомления</h2>
   <label class="check"><input type="checkbox" id="notifyOrders"> Новые заказы</label>
   <label class="check"><input type="checkbox" id="notifyMail"> Новые письма (Входящие и ваши папки, без Спама)</label>
@@ -77,7 +87,22 @@
       $("notifyMail").checked = settings.notifyMail;
       $("pricesEnabled").checked = settings.pricesEnabled;
       $("pricesDir").value = settings.pricesDir;
+      showZoom(settings.zoom);
     }
+
+    function showZoom(zoom) {
+      $("zoom").value = zoom;
+      $("zoomValue").textContent = `${zoom}%`;
+    }
+    $("zoom").oninput = () => {
+      showZoom(Number($("zoom").value));
+      window.emvSettings.save({ zoom: Number($("zoom").value) });
+    };
+    $("zoomReset").onclick = () => {
+      showZoom(100);
+      window.emvSettings.save({ zoom: 100 });
+    };
+    window.emvSettings.onZoom(showZoom);
 
     function collect() {
       return {
@@ -86,6 +111,7 @@
         notifyMail: $("notifyMail").checked,
         pricesEnabled: $("pricesEnabled").checked,
         pricesDir: $("pricesDir").value,
+        zoom: Number($("zoom").value),
       };
     }
 

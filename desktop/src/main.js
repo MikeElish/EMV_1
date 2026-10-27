@@ -97,6 +97,7 @@ function start() {
   });
 
   setupIpc();
+  settings.onChange(applyZoom);
   createMenu();
   createWindow();
   createTray();
@@ -225,7 +226,7 @@ function openSettings() {
   }
   settingsWin = new BrowserWindow({
     width: 560,
-    height: 580,
+    height: 670,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -303,6 +304,10 @@ function createWindow() {
 
   wc.on("context-menu", (_e, params) => buildContextMenu(params).popup({ window: win }));
 
+  // Масштаб from the settings, on every page (and Ctrl + mouse wheel steps it).
+  wc.on("did-finish-load", applyZoom);
+  wc.on("zoom-changed", (_e, direction) => stepZoom(direction === "in" ? +1 : -1));
+
   win.on("close", (e) => {
     saveState();
     // The cross hides to the tray so notifications keep arriving; quit from the tray menu.
@@ -313,6 +318,16 @@ function createWindow() {
   });
 
   win.loadURL(HOME_URL);
+}
+
+function applyZoom() {
+  if (win && !win.isDestroyed()) win.webContents.setZoomFactor(settings.get().zoom / 100);
+}
+
+/** ±10% (Ctrl+= / Ctrl+- / Ctrl + wheel); the settings slider follows. */
+function stepZoom(direction) {
+  settings.set({ zoom: settings.get().zoom + direction * 10 });
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("settings:zoom", settings.get().zoom);
 }
 
 function buildContextMenu(params) {
@@ -384,9 +399,12 @@ function createMenu() {
           { label: "Обновить", accelerator: "F5", click: () => focused()?.webContents.reload() },
           { label: "Обновить", accelerator: "CmdOrCtrl+R", visible: false, click: () => focused()?.webContents.reload() },
           { type: "separator" },
-          { label: "Крупнее", role: "zoomIn", accelerator: "CmdOrCtrl+=" },
-          { label: "Мельче", role: "zoomOut" },
-          { label: "Обычный размер", role: "resetZoom" },
+          // Масштаб lives in the settings (the slider there), these just step it.
+          { label: "Крупнее", accelerator: "CmdOrCtrl+=", click: () => stepZoom(+1) },
+          { label: "Крупнее", accelerator: "CmdOrCtrl+numadd", visible: false, click: () => stepZoom(+1) },
+          { label: "Мельче", accelerator: "CmdOrCtrl+-", click: () => stepZoom(-1) },
+          { label: "Мельче", accelerator: "CmdOrCtrl+numsub", visible: false, click: () => stepZoom(-1) },
+          { label: "Обычный размер (100%)", accelerator: "CmdOrCtrl+0", click: () => settings.set({ zoom: 100 }) },
           { type: "separator" },
           { label: "Во весь экран", role: "togglefullscreen" },
           { label: "Инструменты разработчика", accelerator: "CmdOrCtrl+Shift+I", role: "toggleDevTools" },

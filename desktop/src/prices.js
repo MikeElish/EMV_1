@@ -121,7 +121,15 @@ function restart() {
 /** @param {{ onNewFiles: (files: {name: string, supplier: string|null}[]) => void }} opts */
 function start(opts) {
   onNew = opts.onNewFiles;
-  settings.onChange(() => restart());
+  let watched = "";
+  const key = (s) => `${s.pricesEnabled}|${s.pricesDir}`;
+  settings.onChange((s) => {
+    if (key(s) !== watched) {
+      watched = key(s);
+      restart();
+    }
+  });
+  watched = key(settings.get());
   restart();
 }
 

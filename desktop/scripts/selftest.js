@@ -52,13 +52,19 @@ app.whenReady().then(async () => {
   await wait(1500);
   check(prices.pending() === 1, "«Загрузить прайсы из папки» offers it again");
 
+  // Масштаб: kept within 50–200%, and moving the slider doesn't touch the price queue.
+  settings.set({ zoom: 300 });
+  check(settings.get().zoom === 200, "zoom is capped at 200%");
+  settings.set({ zoom: 120 });
+  check(settings.get().zoom === 120 && prices.pending() === 1, "zoom change keeps the waiting price list");
+
   // Settings window screenshot.
   ipcMain.handle("settings:load", () => ({
     settings: settings.get(),
     printers: [{ name: "HP LaserJet", displayName: "HP LaserJet", isDefault: true }, { name: "Zebra", displayName: "Zebra", isDefault: false }],
   }));
   const win = new BrowserWindow({
-    width: 560, height: 620, show: false,
+    width: 560, height: 670, show: false,
     webPreferences: { preload: path.join(__dirname, "..", "src", "settings-preload.js"), sandbox: true, contextIsolation: true },
   });
   await win.loadFile(path.join(__dirname, "..", "src", "settings.html"));
