@@ -63,7 +63,7 @@ export function AddToCartButton({
         onClick={handleAdd}
         className="flex-1 rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90"
       >
-        {justAdded ? "Добавлено ✓" : "Добавить в корзину"}
+        {justAdded ? "Добавлено ✓" : product.price > 0 ? "Добавить в корзину" : "Запросить цену"}
       </button>
     </div>
   );

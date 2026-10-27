@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 import type { Product } from "@prisma/client";
-import { formatRub } from "@/lib/money";
+import { formatRub, formatShopPrice, PRICE_ON_REQUEST } from "@/lib/money";
 import type { ShopOffer } from "@/lib/shop-offer";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
 
@@ -33,14 +33,16 @@ export function useProductOffers(productId: string): ShopOffer[] | null {
 export const offerDays = (o: ShopOffer) => (o.deliveryDays === null ? "—" : `${o.deliveryDays} дн.`);
 export const offerLabel = (o: ShopOffer) => [o.quality, o.deliveryDays !== null ? `${o.deliveryDays} дн.` : null].filter(Boolean).join(", ");
 
-/** «от 1 200 ₽» for a product with several offers, its own price otherwise. */
+/** «от 1 200 ₽» for a product with several offers, its own price otherwise; «По запросу» without one. */
 export function OfferPrice({ product }: { product: Product }) {
   const offers = useProductOffers(product.id);
-  if (!offers) return <>{formatRub(product.price)}</>;
+  const prices = [product.price, ...(offers ?? []).map((o) => o.price)].filter((p) => p > 0);
+  if (prices.length === 0) return <span className="font-normal text-foreground/70">{PRICE_ON_REQUEST}</span>;
+  if (!offers) return <>{formatShopPrice(product.price)}</>;
   return (
     <>
       <span className="font-normal text-foreground/60">от </span>
-      {formatRub(Math.min(product.price, ...offers.map((o) => o.price)))}
+      {formatRub(Math.min(...prices))}
     </>
   );
 }

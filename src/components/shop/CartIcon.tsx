@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { cartKey, useCart } from "@/components/shop/CartProvider";
-import { formatRub } from "@/lib/money";
+import { formatRub, formatShopPrice } from "@/lib/money";
 
 const ROW_HEIGHT = 44; // px
 const VISIBLE_ROWS = 5;
@@ -92,7 +92,7 @@ export function CartIcon({ light = false }: { light?: boolean }) {
                 </span>
                 <span className="shrink-0 text-white/60">× {item.quantity}</span>
                 <span className="w-20 shrink-0 text-right font-medium">
-                  {formatRub(item.price * item.quantity)}
+                  {formatShopPrice(item.price * item.quantity)}
                 </span>
               </div>
             ))}

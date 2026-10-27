@@ -9,6 +9,7 @@ import { DeliveryDateInput } from "@/components/admin/DeliveryDateInput";
 import { OrderFilesMenu } from "@/components/admin/OrderFilesMenu";
 import { OrderDeleteButton } from "@/components/admin/OrderDeleteButton";
 import { NewOrderModal } from "@/components/admin/NewOrderModal";
+import { LinePriceCell } from "@/components/admin/LinePriceCell";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DeliveryMethodCell } from "@/components/admin/DeliveryMethodCell";
 import { ExtraCostsButton, type ExtraCostRow } from "@/components/admin/ExtraCostsButton";
@@ -516,7 +517,7 @@ export function OrdersTable({
                           {item.product?.stock ?? "—"}
                         </td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
-                          {formatRub(item.priceSnapshot)}
+                          {item.priceSnapshot <= 0 && !item.cancelled ? <LinePriceCell itemId={item.id} /> : formatRub(item.priceSnapshot)}
                         </td>
                         <td className={`whitespace-nowrap py-2 pr-4 ${cancelledCellClass}`}>
                           {/* Всего = Количество × Цена */}

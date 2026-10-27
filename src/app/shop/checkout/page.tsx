@@ -7,7 +7,7 @@ import { cartKey, useCart } from "@/components/shop/CartProvider";
 import { createOrder } from "@/actions/shop/checkout";
 import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
-import { formatRub, formatRubPrecise } from "@/lib/money";
+import { formatRub, formatRubPrecise, formatShopPrice } from "@/lib/money";
 import { trackPurchase } from "@/lib/metrika";
 import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
 import { PERSONAL_DATA_CONSENT_URL } from "@/lib/legal-docs";
@@ -312,7 +312,7 @@ export default function CheckoutPage() {
                   {item.name}
                   {item.offerLabel && <span className="text-xs text-foreground/50"> · {item.offerLabel}</span>} × {item.quantity}
                 </span>
-                <span>{formatRub(item.price * item.quantity)}</span>
+                <span>{formatShopPrice(item.price * item.quantity)}</span>
               </div>
             ))}
             <div className="mt-2 flex justify-between border-t border-foreground/10 pt-2 font-semibold">
@@ -323,6 +323,11 @@ export default function CheckoutPage() {
               <span>в т.ч. НДС 22%</span>
               <span>{formatRubPrecise(ndsAmount)}</span>
             </div>
+            {items.some((i) => i.price <= 0) && (
+              <p className="pt-2 text-foreground/60">
+                Позиции «По запросу» в сумму не входят: менеджер уточнит цену и пришлёт счёт.
+              </p>
+            )}
           </div>
         </div>
 

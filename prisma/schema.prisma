@@ -95,6 +95,14 @@ model Product {
 
 // One 1С card (Catalog_Номенклатура Ref_Key) -> the site product it is. The
 // first link is the card new documents for the product are written with.
+// 1С cards removed from the site on purpose (office supplies, services...):
+// the import no longer offers them as new products.
+model OneCIgnoredGood {
+  ref       String   @id
+  name      String
+  createdAt DateTime @default(now())
+}
+
 model OneCProductLink {
   ref       String   @id
   productId String

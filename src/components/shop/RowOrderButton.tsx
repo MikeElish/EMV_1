@@ -93,7 +93,7 @@ export function RowOrderButton({ product, offer }: { product: Product; offer?: S
       onClick={handleStart}
       className="shrink-0 whitespace-nowrap rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
     >
-      Заказать
+      {(offer?.price ?? product.price) > 0 ? "Заказать" : "Запросить цену"}
     </button>
   );
 }

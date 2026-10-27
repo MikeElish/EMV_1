@@ -71,6 +71,23 @@ export async function updateLinePayment(
   return { ok: true };
 }
 
+/**
+ * The price of a line ordered «По запросу» (or any line not paid yet): the
+ * order total follows. Price in kopecks.
+ */
+export async function updateLinePrice(itemId: string, price: number): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  if (!Number.isInteger(price) || price <= 0 || price > 1_000_000_000) return { ok: false, error: "Укажите цену больше нуля" };
+  const item = await prisma.orderItem.findUnique({ where: { id: itemId }, select: { orderId: true, paid: true } });
+  if (!item) return { ok: false, error: "Позиция не найдена" };
+  if (item.paid) return { ok: false, error: "Позиция уже оплачена — цену не меняем" };
+  await prisma.orderItem.update({ where: { id: itemId }, data: { priceSnapshot: price } });
+  await refreshOrder(prisma, item.orderId);
+  revalidateOrders();
+  return { ok: true };
+}
+
 export async function updateLineDeliveryDate(
   itemId: string,
   deliveryDate: string | null,

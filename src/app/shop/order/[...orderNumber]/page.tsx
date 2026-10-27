@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatRub } from "@/lib/money";
+import { formatRub, formatShopPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 
 export default async function OrderConfirmationPage({
@@ -35,13 +35,18 @@ export default async function OrderConfirmationPage({
             <span>
               {item.nameSnapshot} × {item.quantity}
             </span>
-            <span>{formatRub(item.priceSnapshot * item.quantity)}</span>
+            <span>{formatShopPrice(item.priceSnapshot * item.quantity)}</span>
           </div>
         ))}
         <div className="mt-2 flex justify-between border-t border-foreground/10 pt-2 font-semibold">
           <span>Итого</span>
           <span>{formatRub(order.totalAmount)}</span>
         </div>
+        {order.items.some((i) => i.priceSnapshot <= 0) && (
+          <p className="mt-2 text-foreground/60">
+            Позиции «По запросу» в сумму не входят: менеджер уточнит цену и пришлёт счёт.
+          </p>
+        )}
       </div>
 
       <Link

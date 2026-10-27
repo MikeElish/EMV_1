@@ -110,16 +110,18 @@ export type ProductMatching = {
 };
 
 export async function computeProductMatching(goods: OneCGood[]): Promise<ProductMatching> {
-  const [products, links] = await Promise.all([
+  const [products, links, ignored] = await Promise.all([
     prisma.product.findMany({
       select: { id: true, sku: true, name: true, brand: true, oneCNoMatch: true },
       orderBy: { sku: "asc" },
     }),
     prisma.oneCProductLink.findMany({ select: { ref: true, productId: true } }),
+    prisma.oneCIgnoredGood.findMany({ select: { ref: true } }),
   ]);
   const linkedRefs = new Set(links.map((l) => l.ref));
+  const ignoredRefs = new Set(ignored.map((i) => i.ref));
   const linkedProducts = new Set(links.map((l) => l.productId));
-  const free = goods.filter((g) => !linkedRefs.has(g.ref));
+  const free = goods.filter((g) => !linkedRefs.has(g.ref) && !ignoredRefs.has(g.ref));
 
   const bySku = new Map<string, OneCGood[]>();
   const byName = new Map<string, OneCGood[]>();

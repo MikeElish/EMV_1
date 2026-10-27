@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ShopLink } from "@/components/shop/ShopLink";
 import type { Product } from "@prisma/client";
-import { formatRub } from "@/lib/money";
+import { formatShopPrice } from "@/lib/money";
 import { useCart } from "@/components/shop/CartProvider";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
@@ -83,7 +83,7 @@ function ProductListRow({ product }: { product: Product }) {
             <span className="ml-1 text-xs text-foreground/50">{offersOpen ? "▴" : "▾"}</span>
           </button>
         ) : (
-          <span className="w-28 shrink-0 text-right font-semibold">{formatRub(product.price)}</span>
+          <span className="w-28 shrink-0 text-right font-semibold">{formatShopPrice(product.price)}</span>
         )}
 
         <div className="flex shrink-0 items-center gap-2">
@@ -113,7 +113,7 @@ function ProductListRow({ product }: { product: Product }) {
             onClick={handleOrderClick}
             className="whitespace-nowrap rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
-            {justAdded ? "Добавлено ✓" : "Заказать"}
+            {justAdded ? "Добавлено ✓" : product.price > 0 ? "Заказать" : "Запросить цену"}
           </button>
         </div>
       </div>

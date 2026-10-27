@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { formatRub } from "@/lib/money";
+import { formatShopPrice } from "@/lib/money";
 import type { SearchSuggestion } from "@/app/shop/suggest/route";
 
 const DEBOUNCE_MS = 120;
@@ -100,7 +100,7 @@ export function SearchSuggestionsList({
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block font-medium">{formatRub(item.price)}</span>
+                  <span className="block font-medium">{formatShopPrice(item.price)}</span>
                   <span className={`block text-xs ${item.inStock ? "text-green-700 dark:text-green-500" : "text-foreground/40"}`}>
                     {item.inStock ? "В наличии" : "Под заказ"}
                   </span>

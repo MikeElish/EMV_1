@@ -16,6 +16,14 @@ export function formatRub(minorUnits: number): string {
   return formatter.format(minorUnits / 100);
 }
 
+/** A product with no price yet (0) is sold «по запросу»: the manager names the price. */
+export const PRICE_ON_REQUEST = "По запросу";
+
+/** Shop prices: «По запросу» instead of 0 ₽. */
+export function formatShopPrice(minorUnits: number): string {
+  return minorUnits > 0 ? formatRub(minorUnits) : PRICE_ON_REQUEST;
+}
+
 /** Same as formatRub, but always shows exactly 2 decimal places (e.g. for VAT breakdowns). */
 export function formatRubPrecise(minorUnits: number): string {
   return preciseFormatter.format(minorUnits / 100);

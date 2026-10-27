@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/shop/product/[slu
   const heading = productHeading(product);
   const stock = product.stock > 0 ? "в наличии" : "под заказ";
   const description = [
-    `${heading}: цена ${rubText(product.price)}, ${stock}. Купить ${SHOP_CITY_IN} в ${SHOP_NAME}.`,
+    `${heading}: ${product.price > 0 ? `цена ${rubText(product.price)}` : "цена по запросу"}, ${stock}. Купить ${SHOP_CITY_IN} в ${SHOP_NAME}.`,
     product.description,
   ]
     .filter(Boolean)
@@ -45,7 +45,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
   const attributes = product.attributes as Attributes;
 
   const offers = await getShopOffers([product.id]);
-  const prices = [product.price, ...(offers[product.id] ?? []).map((o) => o.price)];
+  const prices = [product.price, ...(offers[product.id] ?? []).map((o) => o.price)].filter((p) => p > 0);
 
   // schema.org Product: Яндекс and Google show the price and stock in the results.
   const jsonLd = {
@@ -58,7 +58,8 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
     category: product.category.name,
     image: product.images.length > 0 ? product.images.map((i) => absoluteUrl(i)) : undefined,
     brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
-    offers: {
+    // No price yet («По запросу»): no offer for the search engines.
+    offers: prices.length === 0 ? undefined : {
       "@type": "AggregateOffer",
       priceCurrency: "RUB",
       lowPrice: (Math.min(...prices) / 100).toFixed(2),

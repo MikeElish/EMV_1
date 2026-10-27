@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatRub } from "@/lib/money";
+import { formatShopPrice as formatRub } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { getPaymentDisplayStatus } from "@/lib/validators/payment-status";
 import { OrderActionMenu, type LatestDocs } from "@/components/shop/OrderActionMenu";

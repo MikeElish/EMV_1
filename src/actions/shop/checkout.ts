@@ -93,7 +93,10 @@ export async function createOrder(
     }
   }
 
-  const statuses = await initialLineStatuses(orderItemsData, deferred);
+  // A line «По запросу» (no price yet) always goes to Проценка first.
+  const statuses = (await initialLineStatuses(orderItemsData, deferred)).map((s, i) =>
+    orderItemsData[i].priceSnapshot > 0 ? s : ("CHECKING" as const)
+  );
   const orderNumber = await generateOrderNumber();
   const order = await prisma.order.create({
     data: {

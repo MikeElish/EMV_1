@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { cartKey, useCart } from "@/components/shop/CartProvider";
-import { formatRub } from "@/lib/money";
+import { formatRub, formatShopPrice } from "@/lib/money";
 import { NewArrivalsRotator, type RotatorDirection } from "@/components/shop/NewArrivalsRotator";
 import { EmailVerificationPanel } from "@/components/shop/EmailVerificationPanel";
 import { useEmailVerification } from "@/components/shop/useEmailVerification";
@@ -42,7 +42,7 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
                     {item.offerLabel && <span className="text-xs text-foreground/50"> · {item.offerLabel}</span>}
                   </Link>
                   <p className="text-sm text-foreground/50">
-                    {formatRub(item.price)} · арт. {item.sku}
+                    {formatShopPrice(item.price)} · арт. {item.sku}
                   </p>
                 </div>
 
@@ -67,7 +67,7 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
                 </div>
 
                 <p className="w-24 text-right font-medium">
-                  {formatRub(item.price * item.quantity)}
+                  {formatShopPrice(item.price * item.quantity)}
                 </p>
 
                 <button
@@ -86,6 +86,11 @@ export function CartPageClient({ directions }: { directions: RotatorDirection[] 
             <span className="text-lg font-semibold">Итого</span>
             <span className="text-lg font-semibold">{formatRub(totalAmount)}</span>
           </div>
+          {items.some((i) => i.price <= 0) && (
+            <p className="mt-2 text-sm text-foreground/60">
+              Позиции «По запросу» в сумму не входят: менеджер уточнит цену и пришлёт счёт.
+            </p>
+          )}
 
           {mustVerify ? (
             <button
