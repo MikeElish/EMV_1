@@ -1747,6 +1747,7 @@ export const BRANDS: string[] = [
   "ZIE 277 (SAXBY)",
   "ZIL",
   "ZIVAN",
+  "ZMZ",
   "ZOOMLION",
   "ZTD",
   "ZUBR",
