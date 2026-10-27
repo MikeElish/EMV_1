@@ -66,32 +66,12 @@ export default function TaxiLayout({ children }: LayoutProps<"/taxi">) {
               </Link>
             ))}
           </nav>
+          {/* No phone number in the header: it's in Контакты and the footer. */}
           <div className="hidden items-center gap-3 md:flex">
-            <a
-              href={`tel:${taxiContent.contacts.phoneHref}`}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 ${
-                isVideoPage
-                  ? "bg-white text-black"
-                  : "bg-foreground text-background"
-              }`}
-            >
-              {taxiContent.contacts.phone}
-            </a>
             <CrmEntryButton variant={isVideoPage ? "dark" : "light"} />
           </div>
-          {/* Phones: a call button and ☰ with the sections. */}
+          {/* Phones: ☰ with the sections. */}
           <div className="flex items-center gap-2 md:hidden">
-            <a
-              href={`tel:${taxiContent.contacts.phoneHref}`}
-              aria-label={`Позвонить: ${taxiContent.contacts.phone}`}
-              className={`flex h-10 w-10 items-center justify-center rounded-md ${
-                isVideoPage ? "bg-white text-black" : "bg-foreground text-background"
-              }`}
-            >
-              <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />
-              </svg>
-            </a>
             <MobileMenu light={isVideoPage} title={taxiContent.companyName}>
               {() => (
                 <>
