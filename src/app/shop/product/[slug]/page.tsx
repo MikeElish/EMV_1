@@ -163,7 +163,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
         {related.length > 0 && (
           <div className="mt-12">
             <h2 className="text-lg font-semibold">
-              {product.brand ? `Другие запчасти ${product.brand}` : "Другие запчасти"} — {product.category.name.toLowerCase()}
+              {product.brand ? `Другие запчасти ${product.brand}` : "Другие запчасти"}: {product.category.name}
             </h2>
             <ul className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
               {related.map((p) => (
