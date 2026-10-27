@@ -8,7 +8,8 @@ import { OfferPrice, ProductOffersBlock, ShopOffersProvider } from "@/components
 import { getShopOffers } from "@/lib/supplier-offers";
 import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ShopLink } from "@/components/shop/ShopLink";
-import { absoluteUrl, brandSlug, productHeading, rubText, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
+import { absoluteUrl, brandSlug, productHeading, productIntro, rubText, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
+import { formatShopPrice } from "@/lib/money";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
@@ -44,7 +45,12 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
 
   const attributes = product.attributes as Attributes;
 
-  const offers = await getShopOffers([product.id]);
+  const [offers, mainOffer, related] = await Promise.all([
+    getShopOffers([product.id]),
+    prisma.supplierOffer.findFirst({ where: { productId: product.id, selected: true }, select: { deliveryDays: true } }),
+    relatedProducts(product),
+  ]);
+  const intro = productIntro({ ...product, categoryName: product.category.name, deliveryDays: mainOffer?.deliveryDays ?? null });
   const prices = [product.price, ...(offers[product.id] ?? []).map((o) => o.price)].filter((p) => p > 0);
 
   // schema.org Product: Яндекс and Google show the price and stock in the results.
@@ -54,7 +60,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
     name: productHeading(product),
     sku: product.sku,
     mpn: product.sku,
-    description: product.description ?? undefined,
+    description: [intro, product.description].filter(Boolean).join(" "),
     category: product.category.name,
     image: product.images.length > 0 ? product.images.map((i) => absoluteUrl(i)) : undefined,
     brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
@@ -136,8 +142,9 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
             />
             <ProductOffersBlock product={product} />
 
+            <p className="mt-6 text-foreground/80">{intro}</p>
             {product.description && (
-              <p className="mt-6 text-foreground/80">{product.description}</p>
+              <p className="mt-3 text-foreground/80">{product.description}</p>
             )}
 
             {attributes?.compatibleWith && attributes.compatibleWith.length > 0 && (
@@ -152,7 +159,42 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
             )}
           </div>
         </div>
+
+        {related.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-lg font-semibold">
+              {product.brand ? `Другие запчасти ${product.brand}` : "Другие запчасти"} — {product.category.name.toLowerCase()}
+            </h2>
+            <ul className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              {related.map((p) => (
+                <li key={p.slug} className="flex justify-between gap-3">
+                  <ShopLink href={`/shop/product/${p.slug}`} className="truncate hover:underline">
+                    {p.name} <span className="text-foreground/40">{p.sku}</span>
+                  </ShopLink>
+                  <span className="shrink-0 text-foreground/60">{formatShopPrice(p.price)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
     </ShopOffersProvider>
   );
+}
+
+/** Same brand and category first, then the rest of the category: internal links for the search engines and the customer. */
+async function relatedProducts(product: { id: string; brand: string | null; categoryId: string }) {
+  const select = { slug: true, name: true, sku: true, price: true } as const;
+  const where = { isActive: true, categoryId: product.categoryId, id: { not: product.id } };
+  const sameBrand = product.brand
+    ? await prisma.product.findMany({ where: { ...where, brand: product.brand }, select, orderBy: [{ stock: "desc" }, { name: "asc" }], take: 8 })
+    : [];
+  if (sameBrand.length >= 8) return sameBrand;
+  const rest = await prisma.product.findMany({
+    where: { ...where, slug: { notIn: sameBrand.map((p) => p.slug) } },
+    select,
+    orderBy: [{ stock: "desc" }, { name: "asc" }],
+    take: 8 - sameBrand.length,
+  });
+  return [...sameBrand, ...rest];
 }

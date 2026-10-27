@@ -27,6 +27,39 @@ export function positions(count: number): string {
   return `${count} ${word}`;
 }
 
+/** «1 день», «3 дня», «15 дней». */
+export function daysText(count: number): string {
+  const n = Math.abs(count) % 100;
+  const word = n % 10 === 1 && n !== 11 ? "день" : n % 10 >= 2 && n % 10 <= 4 && (n < 12 || n > 14) ? "дня" : "дней";
+  return `${count} ${word}`;
+}
+
+/**
+ * The product page's own paragraph: what, for which brand, the article, the
+ * price and how soon — so thousands of cards with a category's template text
+ * still read (and rank) as different pages.
+ */
+export function productIntro(product: {
+  name: string;
+  brand: string | null;
+  sku: string;
+  price: number;
+  stock: number;
+  categoryName: string;
+  deliveryDays: number | null;
+}) {
+  const brand = product.brand ? ` для техники ${product.brand}` : "";
+  const what = `${product.name}${brand}, артикул ${product.sku} (раздел «${product.categoryName}»).`;
+  const price = product.price > 0 ? `Цена — ${rubText(product.price)}.` : "Цену сообщим по запросу.";
+  const when =
+    product.stock > 0
+      ? `В наличии на складе ${SHOP_CITY_IN}: ${product.stock} шт.`
+      : product.deliveryDays
+        ? `Поставка под заказ — около ${daysText(product.deliveryDays)}.`
+        : "Поставка под заказ, срок уточнит менеджер.";
+  return `${what} ${price} ${when} Заказать можно на сайте ${SHOP_NAME} или по телефону.`;
+}
+
 /**
  * «Обойма подшипника CATERPILLAR 2D9454» — what people type into the search;
  * the brand and article are added only when the name lacks them.
