@@ -14,7 +14,7 @@ export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false;
 export async function getManualOrderFormData() {
   await requireSection("crm.orders", "view");
 
-  const [customers, products] = await Promise.all([
+  const [customers, companies, products] = await Promise.all([
     prisma.user.findMany({
       where: { role: "CUSTOMER" },
       select: {
@@ -28,6 +28,13 @@ export async function getManualOrderFormData() {
         company: { select: { name: true, hasContract: true, contract: true } },
       },
       orderBy: { createdAt: "desc" },
+    }),
+    // Client companies, so a buyer can be found by the company name or ИНН
+    // even when nobody from it has an account on the site.
+    prisma.company.findMany({
+      where: { isOwn: false, OR: [{ type: null }, { type: { not: "Поставщик" } }] },
+      select: { id: true, name: true, inn: true, hasContract: true, contract: true },
+      orderBy: { name: "asc" },
     }),
     prisma.product.findMany({
       select: {
@@ -52,6 +59,12 @@ export async function getManualOrderFormData() {
       phone: c.phone ?? "",
       companyName: c.company?.name ?? null,
       contract: c.company?.hasContract ? c.company.contract : null,
+    })),
+    companies: companies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      inn: c.inn,
+      contract: c.hasContract ? c.contract : null,
     })),
     products: products.map((p) => ({
       id: p.id,
@@ -79,7 +92,7 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   }
-  const { customerId, customerName, customerPhone, customerEmail, deliveryNote, items } = parsed.data;
+  const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, items } = parsed.data;
 
   let deferred = false;
   if (customerId) {
@@ -89,6 +102,10 @@ export async function createManualOrder(input: ManualOrderInput): Promise<Manual
     });
     if (customer?.role !== "CUSTOMER") return { ok: false, error: "Покупатель не найден" };
     deferred = customer.company?.paymentType === "DEFERRED";
+  } else if (companyId) {
+    const company = await prisma.company.findUnique({ where: { id: companyId }, select: { paymentType: true } });
+    if (!company) return { ok: false, error: "Компания не найдена" };
+    deferred = company.paymentType === "DEFERRED";
   }
 
   const productIds = [...new Set(items.map((i) => i.productId))];

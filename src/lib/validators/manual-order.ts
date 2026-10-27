@@ -12,6 +12,9 @@ export const manualOrderSchema = z.object({
   // Set when an existing Покупатель was picked -- the order then shows up
   // in their "Мои заказы". Empty for a new buyer (stored like a guest order).
   customerId: z.string().trim().optional(),
+  // A client company picked instead (nobody from it has an account): its
+  // payment terms (Отсрочка) apply to the order.
+  companyId: z.string().trim().optional(),
   customerName: z.string().trim().min(2, "Укажите покупателя").max(120),
   customerPhone: z.string().trim().min(5, "Укажите телефон покупателя").max(30),
   customerEmail: z.string().trim().email("Укажите корректный e-mail покупателя"),

@@ -20,6 +20,9 @@ import {
 import { PRICE_TYPES, PRICE_TYPE_LABELS, type PriceType } from "@/lib/validators/manual-order";
 
 type Customer = ManualOrderFormData["customers"][number];
+type Company = ManualOrderFormData["companies"][number];
+// The «Покупатель» search finds people with an account and client companies.
+type Buyer = { id: string; customer: Customer; company?: undefined } | { id: string; company: Company; customer?: undefined };
 type Product = ManualOrderFormData["products"][number];
 type Line = { key: number; productId: string; quantity: string; priceRub: string };
 type Tab = "items" | "delivery";
@@ -96,7 +99,10 @@ function SearchPicker<T extends { id: string }>({
   );
 }
 
-const filterCustomer = (c: Customer, q: string) => matches(q, c.name, c.email, c.phone, c.companyName);
+const filterBuyer = (b: Buyer, q: string) =>
+  b.customer
+    ? matches(q, b.customer.name, b.customer.email, b.customer.phone, b.customer.companyName)
+    : matches(q, b.company.name, b.company.inn);
 const filterProduct = (p: Product, q: string) => matches(q, p.sku, p.name, p.brand);
 
 let nextKey = 1;
@@ -110,6 +116,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
 
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -129,12 +136,26 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   const productById = useMemo(() => new Map((data?.products ?? []).map((p) => [p.id, p])), [data]);
+  const buyers = useMemo<Buyer[]>(
+    () => [
+      ...(data?.customers ?? []).map((c) => ({ id: `u:${c.id}`, customer: c })),
+      ...(data?.companies ?? []).map((c) => ({ id: `c:${c.id}`, company: c })),
+    ],
+    [data]
+  );
 
-  function pickCustomer(c: Customer) {
-    setCustomer(c);
-    setCustomerName(c.name);
-    setCustomerPhone(c.phone);
-    setCustomerEmail(c.email);
+  function pickBuyer(b: Buyer) {
+    if (b.customer) {
+      setCustomer(b.customer);
+      setCustomerName(b.customer.name);
+      setCustomerPhone(b.customer.phone);
+      setCustomerEmail(b.customer.email);
+    } else {
+      // A company without an account: its name goes into the order, the
+      // phone and e-mail of the contact are typed below.
+      setCompany(b.company);
+      setCustomerName(b.company.name);
+    }
   }
 
   function updateLine(key: number, patch: Partial<Line>) {
@@ -183,6 +204,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     const result = await createManualOrder({
       customerId: customer?.id,
+      companyId: company?.id,
       customerName,
       customerPhone,
       customerEmail,
@@ -214,15 +236,27 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
           <div className="mt-4 space-y-3">
             <div>
               <span className="text-sm text-foreground/60">Покупатель</span>
-              {customer ? (
+              {customer || company ? (
                 <div className="mt-1 flex items-center justify-between rounded-md border border-foreground/20 px-3 py-2 text-sm">
-                  <span>
-                    {customer.name} · {customer.email}
-                    {customer.companyName && <span className="text-foreground/50"> · {customer.companyName}</span>}
-                  </span>
+                  {customer ? (
+                    <span>
+                      {customer.name} · {customer.email}
+                      {customer.companyName && <span className="text-foreground/50"> · {customer.companyName}</span>}
+                    </span>
+                  ) : (
+                    <span>
+                      {company!.name}
+                      <span className="text-foreground/50">
+                        {company!.inn && ` · ИНН ${company!.inn}`} · компания, укажите телефон и e-mail контакта
+                      </span>
+                    </span>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setCustomer(null)}
+                    onClick={() => {
+                      setCustomer(null);
+                      setCompany(null);
+                    }}
                     className="text-foreground/40 hover:text-foreground"
                     aria-label="Сбросить покупателя"
                   >
@@ -232,16 +266,25 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
               ) : (
                 <div className="mt-1">
                   <SearchPicker
-                    placeholder="Найти покупателя (ФИО, e-mail, телефон, компания) или заполните поля ниже для нового"
-                    items={data.customers}
-                    filter={filterCustomer}
-                    onPick={pickCustomer}
-                    renderItem={(c) => (
-                      <>
-                        {c.name} <span className="text-foreground/50">· {c.email}</span>
-                        {c.companyName && <span className="text-foreground/50"> · {c.companyName}</span>}
-                      </>
-                    )}
+                    placeholder="Найти покупателя (ФИО, e-mail, телефон, компания, ИНН) или заполните поля ниже для нового"
+                    items={buyers}
+                    filter={filterBuyer}
+                    onPick={pickBuyer}
+                    renderItem={(b) =>
+                      b.customer ? (
+                        <>
+                          {b.customer.name} <span className="text-foreground/50">· {b.customer.email}</span>
+                          {b.customer.companyName && <span className="text-foreground/50"> · {b.customer.companyName}</span>}
+                        </>
+                      ) : (
+                        <>
+                          {b.company.name}
+                          <span className="text-foreground/50">
+                            {b.company.inn && ` · ИНН ${b.company.inn}`} · компания
+                          </span>
+                        </>
+                      )
+                    }
                   />
                 </div>
               )}
@@ -257,7 +300,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
               <div>
                 <span className="text-sm text-foreground/60">Договор</span>
                 <div className="mt-1 rounded-md border border-foreground/10 bg-foreground/[0.03] px-3 py-2 text-sm">
-                  {customer?.contract ?? <span className="text-foreground/40">—</span>}
+                  {(customer ?? company)?.contract ?? <span className="text-foreground/40">—</span>}
                 </div>
               </div>
               <div>
