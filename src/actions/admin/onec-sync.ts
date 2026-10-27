@@ -120,7 +120,7 @@ export async function importOneCGoods(): Promise<SyncResult> {
   }
 }
 
-/** Наличие from today's 1С balances now, without waiting for the 06:00 run. */
+/** Наличие from today's 1С balances now, without waiting for the next scheduled run. */
 export async function syncStockNow(): Promise<SyncResult> {
   const denied = await accessDenied("settings.1c");
   if (denied) return denied;

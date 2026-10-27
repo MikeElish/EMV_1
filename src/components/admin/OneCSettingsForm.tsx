@@ -18,7 +18,7 @@ const inputClassName =
 type Saved = { baseUrl: string; login: string; updatedAt: string } | null;
 type StockSync = { at: string; summary: string } | null;
 
-/** Наличие from 1С: the last run (daily at 06:00) and a button to run it now. */
+/** Наличие from 1С: the last run (06:00 and 18:00) and a button to run it now. */
 function StockSyncSection({ last }: { last: StockSync }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -37,7 +37,7 @@ function StockSyncSection({ last }: { last: StockSync }) {
     <section className="mt-8 rounded-lg border border-foreground/10 p-4">
       <h2 className="text-sm font-semibold">Остатки товаров</h2>
       <p className="mt-1 text-sm text-foreground/60">
-        Каждый день в 06:00 (МСК) «Наличие» товаров, связанных с 1С, обновляется по остаткам на счетах 41 «Товары».
+        Дважды в сутки, в 06:00 и 18:00 (МСК), «Наличие» товаров, связанных с 1С, обновляется по остаткам на счетах 41 «Товары».
         Товары без связи с 1С не меняются.
       </p>
       {last ? (

@@ -5,8 +5,8 @@ import { oneCGet } from "@/lib/onec";
 
 // «Наличие» of products linked to 1С comes from 1С:Бухгалтерия: the balance
 // of the goods accounts by item, summed over a product's 1С cards. Products
-// with no 1С card keep the stock entered on the site. Runs every day at
-// 06:00 Moscow time and from Настройки → 1С.
+// with no 1С card keep the stock entered on the site. Runs at 06:00 and
+// 18:00 Moscow time and from Настройки → 1С.
 
 /** Goods for sale: on warehouses, in retail, bought-in items. */
 const GOODS_ACCOUNTS = ["41.01", "41.02", "41.04"];
@@ -80,12 +80,12 @@ export async function syncStockFromOneC(): Promise<StockSyncResult> {
 
 const timerState = globalThis as unknown as { oneCStockTimer?: ReturnType<typeof setTimeout> };
 
-/** Milliseconds until the next 06:00 Moscow time (UTC+3, no DST). */
+/** Milliseconds until the next 06:00 or 18:00 Moscow time (UTC+3, no DST). */
 function untilNextRun(now = Date.now()) {
-  const day = 24 * 60 * 60 * 1000;
+  const period = 12 * 60 * 60 * 1000;
   const sixMsk = 3 * 60 * 60 * 1000;
-  const wait = (sixMsk - (now % day) + day) % day;
-  return wait || day;
+  const wait = (sixMsk - (now % period) + period) % period;
+  return wait || period;
 }
 
 /** Started from src/instrumentation.ts. */
