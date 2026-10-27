@@ -164,6 +164,7 @@ export function CompaniesTable({
                 initial={{
                   name: selected.name,
                   inn: selected.inn ?? undefined,
+                  kpp: selected.kpp ?? undefined,
                   ogrn: selected.ogrn ?? undefined,
                   address: selected.address ?? undefined,
                   hasContract: selected.hasContract,

@@ -49,6 +49,7 @@ export const companySchema = z
   .object({
     name: z.string().trim().min(2, "Минимум 2 символа"),
     inn: z.string().trim().optional(),
+    kpp: z.string().trim().optional(),
     ogrn: z.string().trim().optional(),
     address: z.string().trim().optional(),
     hasContract: z.boolean().default(false),

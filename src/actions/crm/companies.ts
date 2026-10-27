@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
 import { companySchema, type CompanyInput } from "@/lib/validators/crm";
+import { DadataError, findPartyByInn, type Party } from "@/lib/dadata";
 import {
   uploadCompanyDocumentFile,
   deleteCompanyDocumentFile,
@@ -18,6 +19,7 @@ function toCompanyData(data: CompanyInput) {
   return {
     name: data.name,
     inn: data.inn || null,
+    kpp: data.kpp || null,
     ogrn: data.ogrn || null,
     address: data.address || null,
     hasContract: data.hasContract,
@@ -55,6 +57,26 @@ export async function updateCompany(id: string, input: CompanyInput): Promise<Ac
   await prisma.company.update({ where: { id }, data: toCompanyData(parsed.data) });
   revalidatePath("/admin/crm/companies");
   return { ok: true };
+}
+
+export type PartyLookup = { ok: true; party: Party } | { ok: false; error: string };
+
+/** Card → «Заполнить по ИНН»: name, КПП, ОГРН and address from ЕГРЮЛ/ЕГРИП. */
+export async function lookupCompanyByInn(inn: string): Promise<PartyLookup> {
+  const denied = await accessDenied("crm.companies");
+  if (denied) return denied;
+
+  const digits = inn.replace(/\D/g, "");
+  if (digits.length !== 10 && digits.length !== 12) {
+    return { ok: false, error: "ИНН — 10 цифр у организации или 12 у ИП" };
+  }
+  try {
+    const party = await findPartyByInn(digits);
+    return party ? { ok: true, party } : { ok: false, error: "В ЕГРЮЛ/ЕГРИП нет организации с таким ИНН" };
+  } catch (error) {
+    if (error instanceof DadataError) return { ok: false, error: error.message };
+    throw error;
+  }
 }
 
 export async function deleteCompany(id: string): Promise<ActionResult> {

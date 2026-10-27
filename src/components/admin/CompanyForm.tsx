@@ -8,7 +8,8 @@ import {
   COMPANY_PAYMENT_TYPE_LABELS,
   ROLE_LABELS,
 } from "@/lib/validators/crm";
-import type { ActionResult } from "@/actions/crm/companies";
+import { lookupCompanyByInn, type ActionResult } from "@/actions/crm/companies";
+import type { Party } from "@/lib/dadata";
 import type { Role } from "@prisma/client";
 import { CompanyDocumentsModal } from "@/components/admin/CompanyDocumentsModal";
 
@@ -33,6 +34,51 @@ export function CompanyForm({
   const [hasContract, setHasContract] = useState(initial?.hasContract ?? false);
   const [paymentType, setPaymentType] = useState(initial?.paymentType ?? "PREPAYMENT");
   const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [requisites, setRequisites] = useState({
+    name: initial?.name ?? "",
+    inn: initial?.inn ?? "",
+    kpp: initial?.kpp ?? "",
+    ogrn: initial?.ogrn ?? "",
+    address: initial?.address ?? "",
+  });
+  const [lookup, setLookup] = useState<{ busy: boolean; message: string | null; warning: boolean }>({
+    busy: false,
+    message: null,
+    warning: false,
+  });
+  const field = (key: keyof typeof requisites) => ({
+    value: requisites[key],
+    onChange: (e: { target: { value: string } }) => setRequisites((r) => ({ ...r, [key]: e.target.value })),
+  });
+
+  /** ЕГРЮЛ/ЕГРИП by ИНН. `overwrite` (the button) replaces what is typed; the automatic lookup only fills empty fields. */
+  async function fillByInn(inn: string, overwrite: boolean) {
+    setLookup({ busy: true, message: null, warning: false });
+    const result = await lookupCompanyByInn(inn);
+    if (!result.ok) {
+      setLookup({ busy: false, message: result.error, warning: true });
+      return;
+    }
+    const { party } = result;
+    setRequisites((r) => {
+      const pick = (current: string, found: string | null) => (overwrite || !current ? found ?? (overwrite ? "" : current) : current);
+      return {
+        ...r,
+        name: pick(r.name, party.name),
+        kpp: pick(r.kpp, party.kpp),
+        ogrn: pick(r.ogrn, party.ogrn),
+        address: pick(r.address, party.address),
+      };
+    });
+    setLookup({ busy: false, ...describeParty(party) });
+  }
+
+  function onInnChange(value: string) {
+    setRequisites((r) => ({ ...r, inn: value }));
+    const digits = value.replace(/\D/g, "");
+    // A new card: look it up as soon as the ИНН is complete.
+    if (!requisites.name && (digits.length === 10 || digits.length === 12)) void fillByInn(digits, false);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,10 +88,11 @@ export function CompanyForm({
     const formData = new FormData(event.currentTarget);
     const deferralDaysRaw = String(formData.get("paymentDeferralDays") ?? "");
     const result = await onSubmit({
-      name: String(formData.get("name") ?? ""),
-      inn: String(formData.get("inn") ?? "") || undefined,
-      ogrn: String(formData.get("ogrn") ?? "") || undefined,
-      address: String(formData.get("address") ?? "") || undefined,
+      name: requisites.name,
+      inn: requisites.inn || undefined,
+      kpp: requisites.kpp || undefined,
+      ogrn: requisites.ogrn || undefined,
+      address: requisites.address || undefined,
       hasContract,
       contract: String(formData.get("contract") ?? "") || undefined,
       type: String(formData.get("type") ?? "") || undefined,
@@ -72,31 +119,61 @@ export function CompanyForm({
           id="name"
           name="name"
           required
-          defaultValue={initial?.name}
+          {...field("name")}
           className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="inn" className="text-sm text-foreground/60">
-            ИНН
-          </label>
+      <div>
+        <label htmlFor="inn" className="text-sm text-foreground/60">
+          ИНН
+        </label>
+        <div className="mt-1 flex gap-2">
           <input
             id="inn"
             name="inn"
-            defaultValue={initial?.inn}
+            inputMode="numeric"
+            value={requisites.inn}
+            onChange={(e) => onInnChange(e.target.value)}
+            className="w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+          <button
+            type="button"
+            disabled={lookup.busy || !requisites.inn.trim()}
+            onClick={() => void fillByInn(requisites.inn, true)}
+            className="shrink-0 rounded-md border border-foreground/20 px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {lookup.busy ? "Ищем..." : "Заполнить по ИНН"}
+          </button>
+        </div>
+        {lookup.message && (
+          <p className={`mt-1 text-sm ${lookup.warning ? "text-red-600" : "text-foreground/60"}`}>{lookup.message}</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="kpp" className="text-sm text-foreground/60">
+            КПП
+          </label>
+          <input
+            id="kpp"
+            name="kpp"
+            inputMode="numeric"
+            placeholder="у ИП нет"
+            {...field("kpp")}
             className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
           />
         </div>
         <div>
           <label htmlFor="ogrn" className="text-sm text-foreground/60">
-            ОГРН
+            ОГРН / ОГРНИП
           </label>
           <input
             id="ogrn"
             name="ogrn"
-            defaultValue={initial?.ogrn}
+            inputMode="numeric"
+            {...field("ogrn")}
             className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
           />
         </div>
@@ -109,7 +186,7 @@ export function CompanyForm({
         <input
           id="address"
           name="address"
-          defaultValue={initial?.address}
+          {...field("address")}
           className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
         />
       </div>
@@ -241,4 +318,17 @@ export function CompanyForm({
       )}
     </form>
   );
+}
+
+const STATUS_WARNINGS: Partial<Record<NonNullable<Party["status"]>, string>> = {
+  LIQUIDATING: "организация в процессе ликвидации",
+  LIQUIDATED: "организация ликвидирована",
+  BANKRUPT: "организация признана банкротом",
+  REORGANIZING: "организация присоединяется к другому юрлицу",
+};
+
+function describeParty(party: Party): { message: string; warning: boolean } {
+  const warning = party.status ? STATUS_WARNINGS[party.status] : undefined;
+  if (warning) return { message: `Заполнено из ЕГРЮЛ: ${party.name} — внимание, ${warning}.`, warning: true };
+  return { message: `Заполнено из ${party.individual ? "ЕГРИП" : "ЕГРЮЛ"}: ${party.name}. Проверьте и сохраните.`, warning: false };
 }
