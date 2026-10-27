@@ -1,0 +1,62 @@
+{
+  "name": "emv-desktop",
+  "productName": "EMV",
+  "version": "1.1.0",
+  "description": "EMV — программа для Windows",
+  "author": "EMV",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node scripts/run.js",
+    "dev": "node scripts/run.js http://localhost:3000",
+    "icon": "node scripts/make-icon.js",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "pdf-to-printer": "^5.8.1"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "one.emv.desktop",
+    "productName": "EMV",
+    "copyright": "EMV",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/pdf-to-printer/dist/*.exe"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "artifactName": "EMV-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EMV"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://emv.one/desktop/"
+    }
+  }
+}

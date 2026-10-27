@@ -5,6 +5,7 @@ import type { OrderDocument, OrderDocumentCategory } from "@prisma/client";
 import { Modal } from "@/components/Modal";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { ORDER_DOCUMENT_CATEGORY_LABELS } from "@/lib/validators/orders";
+import { useDesktop } from "@/lib/desktop";
 import {
   listOrderDocuments,
   uploadOrderDocument,
@@ -24,6 +25,18 @@ export function OrderDocumentsModal({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // In the Windows program: «Печать» sends the file straight to the printer.
+  const desktop = useDesktop();
+  const [printing, setPrinting] = useState<string | null>(null);
+
+  async function print(doc: OrderDocument) {
+    if (!desktop) return;
+    setPrinting(doc.id);
+    setError(null);
+    const result = await desktop.printFile(new URL(doc.fileUrl, location.href).href, doc.fileName);
+    setPrinting(null);
+    if (!result.ok) setError(result.error);
+  }
 
   function refresh() {
     listOrderDocuments(orderId, category).then(setDocuments);
@@ -102,6 +115,16 @@ export function OrderDocumentsModal({
             <span className="shrink-0 text-xs text-foreground/40">
               {new Date(doc.uploadedAt).toLocaleDateString("ru-RU")}
             </span>
+            {desktop && /\.(pdf|png|jpe?g|gif|webp)$/i.test(doc.fileName) && (
+              <button
+                type="button"
+                onClick={() => print(doc)}
+                disabled={printing !== null}
+                className="shrink-0 hover:underline disabled:opacity-50"
+              >
+                {printing === doc.id ? "Печать..." : "Печать"}
+              </button>
+            )}
             <DeleteButton
               action={async () => {
                 const result = await deleteOrderDocument(doc.id);

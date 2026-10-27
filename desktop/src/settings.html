@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>Настройки EMV</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px 24px; font: 14px/1.5 "Segoe UI", Arial, sans-serif; color: #111; background: #fff; }
+    h2 { font-size: 15px; margin: 18px 0 8px; }
+    h2:first-child { margin-top: 0; }
+    .hint { color: #666; font-size: 12px; margin: 4px 0 0; }
+    select, input[type=text] {
+      width: 100%; font: inherit; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; background: #fff;
+    }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row input[type=text] { flex: 1; }
+    label.check { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+    button {
+      font: inherit; padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; white-space: nowrap;
+    }
+    button:hover { background: #f3f3f3; }
+    button.primary { background: #000; color: #fff; border-color: #000; }
+    button.primary:hover { background: #333; }
+    .footer { margin-top: 22px; display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+    #status { margin-right: auto; color: #2a7a2a; font-size: 13px; }
+    #status.error { color: #c00; }
+  </style>
+</head>
+<body>
+  <h2>Уведомления</h2>
+  <label class="check"><input type="checkbox" id="notifyOrders"> Новые заказы</label>
+  <label class="check"><input type="checkbox" id="notifyMail"> Новые письма во «Входящих»</label>
+  <p class="hint">Приходят, пока программа запущена (в том числе свёрнутая в трей) и вы вошли в CRM.</p>
+
+  <h2>Печать документов</h2>
+  <div class="row">
+    <select id="printer"></select>
+    <button id="testPrint" type="button">Пробная печать</button>
+  </div>
+  <p class="hint">Кнопка «Печать» в документах заказа (счёт, УПД, ТН) печатает сразу на этот принтер, без окна выбора.</p>
+
+  <h2>Папка прайсов</h2>
+  <label class="check"><input type="checkbox" id="pricesEnabled"> Следить за папкой</label>
+  <div class="row">
+    <input type="text" id="pricesDir" readonly>
+    <button id="pick" type="button">Выбрать…</button>
+    <button id="open" type="button">Открыть</button>
+  </div>
+  <p class="hint">
+    Положите Excel/CSV в подпапку поставщика (они создаются сами по списку поставщиков) — файл откроется
+    в CRM → Проценка с выбранным поставщиком и проверкой. После загрузки он переносится в «Загружено».
+  </p>
+
+  <div class="footer">
+    <span id="status"></span>
+    <button id="close" type="button">Закрыть</button>
+    <button id="save" type="button" class="primary">Сохранить</button>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const status = (text, error) => { $("status").textContent = text; $("status").className = error ? "error" : ""; };
+
+    async function load() {
+      const { settings, printers } = await window.emvSettings.load();
+      const sel = $("printer");
+      sel.innerHTML = "";
+      const def = printers.find((p) => p.isDefault);
+      sel.add(new Option(`По умолчанию в Windows${def ? ` (${def.displayName || def.name})` : ""}`, ""));
+      for (const p of printers) sel.add(new Option(p.displayName || p.name, p.name));
+      if (settings.printer && !printers.some((p) => p.name === settings.printer)) {
+        sel.add(new Option(`${settings.printer} (не найден)`, settings.printer));
+      }
+      sel.value = settings.printer;
+      $("notifyOrders").checked = settings.notifyOrders;
+      $("notifyMail").checked = settings.notifyMail;
+      $("pricesEnabled").checked = settings.pricesEnabled;
+      $("pricesDir").value = settings.pricesDir;
+    }
+
+    function collect() {
+      return {
+        printer: $("printer").value,
+        notifyOrders: $("notifyOrders").checked,
+        notifyMail: $("notifyMail").checked,
+        pricesEnabled: $("pricesEnabled").checked,
+        pricesDir: $("pricesDir").value,
+      };
+    }
+
+    $("pick").onclick = async () => {
+      const dir = await window.emvSettings.pickFolder();
+      if (dir) $("pricesDir").value = dir;
+    };
+    $("open").onclick = () => window.emvSettings.openFolder();
+    $("testPrint").onclick = async () => {
+      await window.emvSettings.save(collect());
+      status("Отправляем на печать…");
+      const r = await window.emvSettings.testPrint();
+      status(r.ok ? "Пробная страница отправлена на принтер" : r.error, !r.ok);
+    };
+    $("save").onclick = async () => {
+      await window.emvSettings.save(collect());
+      status("Сохранено");
+    };
+    $("close").onclick = () => window.close();
+    load();
+  </script>
+</body>
+</html>

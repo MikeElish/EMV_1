@@ -39,6 +39,9 @@ yarn-error.log*
 # user-uploaded product photos (watermarked on upload) -- lives on the
 # server's disk, not tracked in git
 /public/uploads/
+# Windows program installers (desktop/ → npm run dist), copied to the server
+# by hand and served by app/desktop/[file]
+/desktop-releases/
 
 # typescript
 *.tsbuildinfo

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { formatRubPrecise } from "@/lib/money";
 import {
@@ -18,6 +18,7 @@ import { QUALITY_SUGGESTIONS } from "@/components/admin/ProductPricesPanel";
 import { Modal } from "@/components/Modal";
 import { exportPriceCheck } from "@/actions/admin/supplier-orders";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
+import { supplierFolderName, useDesktop, type DesktopPriceFile } from "@/lib/desktop";
 
 export type PriceCheckProduct = {
   id: string;
@@ -271,17 +272,51 @@ function OrderModal({ offer, onClose }: { offer: OfferView; onClose: () => void 
 
 const KIND_LABELS = { update: "обновить", add: "новое предложение", missing: "нет такого артикула" } as const;
 
-function ImportModal({ suppliers, onClose, onDone }: { suppliers: SupplierOption[]; onClose: () => void; onDone: () => void }) {
-  const [supplierId, setSupplierId] = useState("");
-  const [analysis, setAnalysis] = useState<Extract<OfferImportAnalysis, { ok: true }> | null>(null);
+const sameFolder = (supplier: string, folder: string) =>
+  supplierFolderName(supplier).toLowerCase() === folder.trim().toLowerCase();
+
+const desktopFileOf = (f: DesktopPriceFile) => new File([new Uint8Array(f.data)], f.name);
+
+/** A price list from the Windows program's folder, checked against its subfolder's supplier when that is known. */
+type DesktopImport = { file: DesktopPriceFile; supplierId: string; analysis: OfferImportAnalysis | null };
+
+async function prepareDesktopImport(file: DesktopPriceFile, suppliers: SupplierOption[]): Promise<DesktopImport> {
+  const folder = file.supplier;
+  const supplierId = folder ? (suppliers.find((s) => sameFolder(s.name, folder))?.id ?? "") : "";
+  if (!supplierId) return { file, supplierId, analysis: null };
+  const form = new FormData();
+  form.set("supplierId", supplierId);
+  form.set("file", desktopFileOf(file));
+  return { file, supplierId, analysis: await analyzeOfferImport(form) };
+}
+
+function ImportModal({
+  suppliers,
+  desktop,
+  onClose,
+  onDone,
+}: {
+  suppliers: SupplierOption[];
+  desktop?: DesktopImport | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const desktopFile = desktop?.file;
+  const [supplierId, setSupplierId] = useState(desktop?.supplierId ?? "");
+  const [analysis, setAnalysis] = useState<Extract<OfferImportAnalysis, { ok: true }> | null>(
+    desktop?.analysis?.ok ? desktop.analysis : null
+  );
   const [createMissing, setCreateMissing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    desktop?.analysis && !desktop.analysis.ok ? desktop.analysis.error : null
+  );
   const [pending, startTransition] = useTransition();
 
   function analyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    if (desktopFile) form.set("file", desktopFileOf(desktopFile));
     setError(null);
     startTransition(async () => {
       const r = await analyzeOfferImport(form);
@@ -348,13 +383,25 @@ function ImportModal({ suppliers, onClose, onDone }: { suppliers: SupplierOption
               ))}
             </select>
           </div>
-          <input
-            name="file"
-            type="file"
-            required
-            accept=".xlsx,.xls,.ods,.csv"
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-foreground/20 file:bg-transparent file:px-3 file:py-1.5 file:text-sm file:text-foreground"
-          />
+          {desktopFile ? (
+            <p className="text-sm">
+              Файл из папки прайсов: <b>{desktopFile.name}</b>
+              {desktopFile.supplier && !desktop?.supplierId && (
+                <span className="text-yellow-700 dark:text-yellow-400">
+                  {" "}
+                  — поставщик «{desktopFile.supplier}» не найден, выберите вручную
+                </span>
+              )}
+            </p>
+          ) : (
+            <input
+              name="file"
+              type="file"
+              required
+              accept=".xlsx,.xls,.ods,.csv"
+              className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-foreground/20 file:bg-transparent file:px-3 file:py-1.5 file:text-sm file:text-foreground"
+            />
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
@@ -480,6 +527,43 @@ export function PriceCheckBoard({
   const [editing, setEditing] = useState<OfferView | "new" | null>(null);
   const [ordering, setOrdering] = useState<OfferView | null>(null);
   const [importing, setImporting] = useState(false);
+
+  // Windows program: price lists dropped into its folder open here one by one.
+  const desktop = useDesktop();
+  const [desktopImport, setDesktopImport] = useState<DesktopImport | null>(null);
+  const importBusy = useRef(false);
+  const imported = useRef(false);
+
+  const pullDesktopFile = useCallback(async () => {
+    if (!desktop || importBusy.current) return;
+    importBusy.current = true;
+    const file = await desktop.prices.next();
+    if (!file) {
+      importBusy.current = false;
+      return;
+    }
+    imported.current = false;
+    setDesktopImport(await prepareDesktopImport(file, suppliers));
+    setImporting(true);
+  }, [desktop, suppliers]);
+
+  // Fires at once when files are already waiting.
+  useEffect(() => desktop?.prices.onAvailable(pullDesktopFile), [desktop, pullDesktopFile]);
+
+  function closeImport() {
+    setImporting(false);
+    if (!desktop || !desktopImport) {
+      importBusy.current = false;
+      if (desktop) pullDesktopFile(); // files that came while the manual upload was open
+      return;
+    }
+    const { file } = desktopImport;
+    setDesktopImport(null);
+    desktop.prices.finish(file.id, imported.current).then(() => {
+      importBusy.current = false;
+      pullDesktopFile();
+    });
+  }
 
   const filtered = useMemo(() => {
     const active = COLUMNS.filter((c) => filters[c.key].trim());
@@ -641,7 +725,11 @@ export function PriceCheckBoard({
           </button>
           <button
             type="button"
-            onClick={() => setImporting(true)}
+            onClick={() => {
+              if (importBusy.current) return;
+              importBusy.current = true;
+              setImporting(true);
+            }}
             className="shrink-0 whitespace-nowrap rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5"
           >
             Загрузить из Excel
@@ -739,9 +827,12 @@ export function PriceCheckBoard({
       {ordering && <OrderModal offer={ordering} onClose={() => setOrdering(null)} />}
       {importing && (
         <ImportModal
+          key={desktopImport?.file.id ?? "manual"}
           suppliers={suppliers}
-          onClose={() => setImporting(false)}
+          desktop={desktopImport}
+          onClose={closeImport}
           onDone={() => {
+            imported.current = true;
             if (selectedId) loadOffers(selectedId);
             router.refresh();
           }}
