@@ -28,7 +28,7 @@ async function context() {
 }
 
 /** Unit of measure of each 1С item (lines need it). */
-async function units(itemRefs: string[]): Promise<Map<string, string>> {
+export async function units(itemRefs: string[]): Promise<Map<string, string>> {
   const entries = await Promise.all(
     [...new Set(itemRefs)].map(async (ref) => {
       const card = await oneCGet<{ ЕдиницаИзмерения_Key?: string }>(
@@ -41,7 +41,7 @@ async function units(itemRefs: string[]): Promise<Map<string, string>> {
 }
 
 /** Creates the document, posts it; if 1С won't post it, marks it for deletion and says why. */
-async function createPosted(entity: string, data: Record<string, unknown>): Promise<{ ref: string; number: string }> {
+export async function createPosted(entity: string, data: Record<string, unknown>): Promise<{ ref: string; number: string }> {
   const created = await oneCSend<{ Ref_Key: string; Number: string }>("POST", `/${q(entity)}`, data);
   try {
     await oneCSend("POST", `/${q(entity)}(guid'${created.Ref_Key}')/Post?PostingModeOperational=false`);
@@ -55,7 +55,7 @@ async function createPosted(entity: string, data: Record<string, unknown>): Prom
 }
 
 /** After a document: Склад and «Наличие» on the site follow at once. */
-async function afterWrite() {
+export async function afterWrite() {
   await getWarehouseData(true).catch(() => {});
   await syncStockFromOneC().catch((error) => console.error("[1c-stock] after document", error));
 }

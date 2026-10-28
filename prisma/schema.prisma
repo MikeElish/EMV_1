@@ -236,6 +236,9 @@ model SupplierOrderLine {
   orderItem    OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   purchaseId   String?
   purchase     SupplierPurchase?   @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  // Склад → Поступление that brought it.
+  receiptId    String?
+  receipt      SupplierReceipt?    @relation(fields: [receiptId], references: [id], onDelete: SetNull)
   createdAt    DateTime            @default(now())
 
   @@index([productId])
@@ -280,6 +283,11 @@ model Order {
   invoiceRef         String?
   invoiceNumber      String?
   invoiceDate        DateTime?
+  // Склад → Выдача: «Выдан» or «Передан в ТК» (the company and waybill
+  // number in handoverNote, the ТН among the order's documents).
+  handover           String?
+  handoverAt         DateTime?
+  handoverNote       String?
   userId             String?
   user               User?              @relation(fields: [userId], references: [id])
   items              OrderItem[]
@@ -584,6 +592,7 @@ model Company {
   extraCosts          ExtraCost[]         @relation("ExtraCostSupplier")
   priceRequests       PriceRequest[]      @relation("PriceRequestSupplier")
   supplierPurchases   SupplierPurchase[]  @relation("SupplierPurchaseSupplier")
+  supplierReceipts    SupplierReceipt[]   @relation("SupplierReceiptSupplier")
   paymentRequests     PaymentRequest[]    @relation("PaymentRequestCompany")
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
@@ -1028,6 +1037,35 @@ model SupplierPurchaseFile {
   createdAt  DateTime         @default(now())
 
   @@index([purchaseId])
+}
+
+/**
+ * Склад → Поступление: the supplier's УПД received at a warehouse -- the
+ * «Поступление» written and posted in 1С, its lines «Поставлено»
+ * (src/lib/supplier-receipts.ts).
+ */
+model SupplierReceipt {
+  id           String              @id @default(cuid())
+  number       Int                 @unique @default(autoincrement())
+  supplierId   String
+  supplier     Company             @relation("SupplierReceiptSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+  // Catalog_Склады Ref_Key.
+  warehouseRef String
+  // The supplier's УПД.
+  docNumber    String
+  docDate      DateTime
+  vatRate      String
+  // Kopecks.
+  amount       Int
+  oneCRef      String?
+  oneCNumber   String?
+  fileName     String?
+  fileUrl      String?
+  note         String?
+  lines        SupplierOrderLine[]
+  createdAt    DateTime            @default(now())
+
+  @@index([supplierId])
 }
 
 /**

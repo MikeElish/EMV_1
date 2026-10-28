@@ -57,9 +57,15 @@ export async function counterpartyRef(company: { id: string; oneCRef: string | n
   throw new OneCError(`«${company.name}» нет в 1С (контрагент с ИНН ${company.inn ?? "—"} не найден) — заведите его в 1С`);
 }
 
-/** The buyer's contract: the one whose number the site has, else «Основной договор» (created if there is none). */
-async function contractRef(owner: string, org: string, currency: string, number: string | null): Promise<string> {
-  const filter = q(`Owner_Key eq guid'${owner}' and ВидДоговора eq 'СПокупателем' and DeletionMark eq false`);
+/** The buyer's (or supplier's) contract: the one whose number the site has, else «Основной договор» (created if there is none). */
+export async function contractRef(
+  owner: string,
+  org: string,
+  currency: string,
+  number: string | null,
+  kind: "СПокупателем" | "СПоставщиком" = "СПокупателем"
+): Promise<string> {
+  const filter = q(`Owner_Key eq guid'${owner}' and ВидДоговора eq '${kind}' and DeletionMark eq false`);
   const r = await oneCGet<{ value: { Ref_Key: string; Description: string; Номер: string }[] }>(
     `/${q("Catalog_ДоговорыКонтрагентов")}?$filter=${filter}&$select=Ref_Key,Description,Номер`
   );
@@ -71,7 +77,7 @@ async function contractRef(owner: string, org: string, currency: string, number:
     Description: "Основной договор",
     Owner_Key: owner,
     Организация_Key: org,
-    ВидДоговора: "СПокупателем",
+    ВидДоговора: kind,
     ВалютаВзаиморасчетов_Key: currency,
   });
   return created.Ref_Key;

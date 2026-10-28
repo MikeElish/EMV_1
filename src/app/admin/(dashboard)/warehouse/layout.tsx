@@ -22,6 +22,8 @@ export default async function WarehouseLayout({ children }: { children: React.Re
       fill
       tabs={[
         ...warehouses.map((w) => ({ href: `/admin/warehouse/${w.ref}`, label: w.name })),
+        { href: "/admin/warehouse/receipts", label: "Поступление" },
+        { href: "/admin/warehouse/handover", label: "Выдача" },
         { href: "/admin/warehouse/adjustments", label: "Списание/Оприходование" },
       ]}
     >
