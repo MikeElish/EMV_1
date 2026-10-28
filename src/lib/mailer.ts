@@ -9,6 +9,8 @@ export type SiteMail = {
   text: string;
   html?: string;
   cc?: string;
+  /** Where «Ответить» goes, when not to the site's mailbox. */
+  replyTo?: string;
   attachments?: { filename: string; content: Buffer }[];
   /** Message-ID of the letter this one follows (a reminder in the same thread). */
   inReplyTo?: string;

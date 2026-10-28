@@ -122,6 +122,8 @@ export async function sendPriceRequests(orderId: string): Promise<RequestsSent> 
     const messageId = await sendSiteMail({
       to: supplier.contactEmail,
       cc: SHOP_MAILBOX,
+      // Replies land in the shop's mailbox, which the site reads.
+      replyTo: SHOP_MAILBOX,
       subject: order.orderNumber,
       text: `${GREETING(supplier.contactName)}\n\n${ASK}\n\nЗаранее благодарим за ответ!`,
       attachments: [{ filename: sheetName(order.orderNumber), content: await requestSheet(items) }],
@@ -244,6 +246,8 @@ export async function remindPriceRequests(): Promise<number> {
     await sendSiteMail({
       to: r.email,
       cc: SHOP_MAILBOX,
+      // Replies land in the shop's mailbox, which the site reads.
+      replyTo: SHOP_MAILBOX,
       subject: r.order.orderNumber,
       text: `${GREETING(r.contactName)}\n\n${ASK_AGAIN}\n\nЗаранее благодарим за ответ!`,
       attachments: [{ filename: sheetName(r.order.orderNumber), content: await requestSheet(r.items as Item[]) }],
