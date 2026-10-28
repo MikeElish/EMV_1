@@ -23,7 +23,12 @@ export default async function MyOrdersPage({ searchParams }: PageProps<"/shop/or
   const orders = await prisma.order.findMany({
     where: { userId: session.userId },
     include: {
-      items: { include: { product: { select: { sku: true } } } },
+      items: {
+        include: {
+          product: { select: { sku: true } },
+          claims: { select: { number: true, status: true, quantity: true }, orderBy: { number: "asc" } },
+        },
+      },
       documents: { orderBy: { uploadedAt: "desc" } },
     },
     orderBy: { createdAt: "desc" },

@@ -6,6 +6,7 @@ import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { getPaymentDisplayStatus } from "@/lib/validators/payment-status";
 import { OrderActionMenu, type LatestDocs } from "@/components/shop/OrderActionMenu";
 import { OrderStatusBadge } from "@/components/shop/OrderStatusBadge";
+import { CLAIMABLE_STATUSES } from "@/lib/validators/claims";
 import { PaymentStatusBadge } from "@/components/shop/PaymentStatusBadge";
 import { SuggestField } from "@/components/SuggestField";
 import { DeliveryConfirmCell } from "@/components/shop/DeliveryConfirmCell";
@@ -21,14 +22,27 @@ function paymentStatusText(item: Pick<OrderItem, "paid" | "deferred">, order: Pi
   return `План оплаты ${status.date.toLocaleDateString("ru-RU")}`;
 }
 
+type LineClaim = { number: number; status: string; quantity: number };
+
+/** Shipped lines offer «Возврат / рекламация» for what isn’t claimed yet (rejected claims free their quantity). */
+function claimOf(item: Row["item"]) {
+  if (!(CLAIMABLE_STATUSES as readonly string[]).includes(item.status) && !item.claims.length) return undefined;
+  const taken = item.claims.filter((c) => c.status !== "Отклонена").reduce((s, c) => s + c.quantity, 0);
+  return {
+    name: item.nameSnapshot,
+    left: (CLAIMABLE_STATUSES as readonly string[]).includes(item.status) ? item.quantity - taken : 0,
+    existing: item.claims,
+  };
+}
+
 type OrderWithExtras = Order & {
-  items: (OrderItem & { product: { sku: string } | null })[];
+  items: (OrderItem & { product: { sku: string } | null; claims: LineClaim[] })[];
   latestDocs: LatestDocs;
 };
 
 type Row = {
   order: OrderWithExtras;
-  item: OrderItem & { product: { sku: string } | null };
+  item: OrderItem & { product: { sku: string } | null; claims: LineClaim[] };
 };
 
 const COLUMNS: {
@@ -152,6 +166,7 @@ export function CustomerOrdersTable({
                     itemsCount={order.items.length}
                     itemCancelled={item.cancelled}
                     latestDocs={order.latestDocs}
+                    claim={claimOf(item)}
                   />
                 </div>
                 <p className="text-foreground/70">
@@ -252,6 +267,7 @@ export function CustomerOrdersTable({
                   itemsCount={order.items.length}
                   itemCancelled={item.cancelled}
                   latestDocs={order.latestDocs}
+                  claim={claimOf(item)}
                 />
               </td>
             </tr>

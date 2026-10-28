@@ -284,6 +284,7 @@ model Order {
   documents          OrderDocument[]
   extraCosts         ExtraCost[]
   priceRequests      PriceRequest[]
+  claims             Claim[]
   payment            Payment?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
@@ -396,6 +397,7 @@ model OrderItem {
   offerId                String?
   offer                  SupplierOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
   supplierOrderLines     SupplierOrderLine[]
+  claims                 Claim[]
   // Payment and planned delivery per line; Order.paid/deferred/deliveryDate
   // are derived from these (src/lib/order-status.ts).
   paid                   Boolean             @default(false)
@@ -891,4 +893,37 @@ model PriceRequest {
   @@index([orderId])
   @@index([supplierId])
   @@index([answeredAt])
+}
+
+/**
+ * Возврат / рекламация of a shipped order line: the customer asks in «Мои
+ * заказы» (reason, photos), the staff decide in CRM → Рекламации; a defect
+ * goes to the supplier as a claim (src/lib/claims.ts).
+ */
+model Claim {
+  id              String    @id @default(cuid())
+  number          Int       @unique @default(autoincrement())
+  orderId         String
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId     String
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  userId          String?
+  quantity        Int
+  // Брак, Не подошло, Пересорт, Другое (CLAIM_REASONS).
+  reason          String
+  description     String
+  photos          String[]
+  // Новая, На проверке, Принята, Отклонена, Закрыта (CLAIM_STATUSES).
+  status          String    @default("Новая")
+  // Возврат денег, Зачёт в следующий заказ, Замена товара.
+  resolution      String?
+  // Seen by the customer in the letters and «Мои заказы».
+  answer          String?
+  supplierClaimAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([orderItemId])
+  @@index([status])
 }
