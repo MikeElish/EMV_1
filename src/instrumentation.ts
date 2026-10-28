@@ -12,5 +12,8 @@ export async function register() {
     // Проценка по почте: replies, reminders, summaries, every half hour.
     const { startPriceRequestTimer } = await import("@/lib/price-requests");
     startPriceRequestTimer();
+    // Банки: Точка's statement at 10:00, 14:00 and 20:00 Moscow time.
+    const { startBankTimer } = await import("@/lib/banks");
+    startBankTimer();
   }
 }

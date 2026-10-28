@@ -76,6 +76,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "settings.yandex-fleet", label: "Яндекс.Флот", path: "/admin/settings/yandex-fleet" },
       { key: "settings.1c", label: "1С", path: "/admin/settings/1c" },
       { key: "settings.warehouses", label: "Склады", path: "/admin/settings/warehouses" },
+      { key: "settings.banks", label: "Банки", path: "/admin/settings/banks" },
       { key: "settings.access", label: "Доступ", path: "/admin/settings/access" },
     ],
   },
