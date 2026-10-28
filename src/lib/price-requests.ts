@@ -139,10 +139,10 @@ export async function sendPriceRequests(orderId: string): Promise<RequestsSent> 
 
 // ---- Replies ------------------------------------------------------------------
 
-type Mailbox = { host: string; port: number; user: string; pass: string };
+export type Mailbox = { host: string; port: number; user: string; pass: string };
 
 /** The site's mailbox (Настройки → Почта) and the shop's (the owner's in Почта). */
-async function mailboxes(): Promise<Mailbox[]> {
+export async function mailboxes(): Promise<Mailbox[]> {
   const [site, owner] = await Promise.all([
     prisma.mailSettings.findUnique({ where: { id: 1 } }),
     prisma.user.findFirst({ where: { mailLogin: SHOP_MAILBOX, mailPasswordEnc: { not: null } }, select: { mailLogin: true, mailPasswordEnc: true } }),

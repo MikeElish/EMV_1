@@ -10,6 +10,7 @@ export default async function CrmSupplierOrdersPage() {
       product: { select: { id: true, brand: true, name: true, sku: true, category: { select: { name: true } } } },
       supplier: { select: { name: true } },
       orderItem: { select: { order: { select: { orderNumber: true } } } },
+      purchase: { select: { number: true, sentAt: true, invoiceAt: true, files: { select: { kind: true, fileName: true, fileUrl: true }, orderBy: { createdAt: "asc" } } } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -30,6 +31,14 @@ export default async function CrmSupplierOrdersPage() {
           deliveryDays: l.deliveryDays,
           quality: l.quality,
           status: l.status,
+          purchaseNumber: l.purchase?.number ?? null,
+          sentAt: l.purchase?.sentAt?.toISOString() ?? null,
+          // Planned: from the letter (or, not sent yet, from today) plus the supplier's term.
+          deliveryDate:
+            l.deliveryDays == null
+              ? null
+              : new Date((l.purchase?.sentAt ?? new Date()).getTime() + l.deliveryDays * 24 * 60 * 60 * 1000).toISOString(),
+          files: l.purchase?.files ?? [],
         }))}
       />
     </CrmPage>

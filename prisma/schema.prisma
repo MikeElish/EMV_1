@@ -234,6 +234,8 @@ model SupplierOrderLine {
   // The customer order line it covers, if any.
   orderItemId  String?
   orderItem    OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  purchaseId   String?
+  purchase     SupplierPurchase?   @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
   createdAt    DateTime            @default(now())
 
   @@index([productId])
@@ -250,19 +252,19 @@ model PriceSettings {
 }
 
 model Order {
-  id                 String            @id @default(cuid())
-  orderNumber        String            @unique
+  id                 String             @id @default(cuid())
+  orderNumber        String             @unique
   customerName       String
   customerPhone      String
   customerEmail      String?
   deliveryNote       String?
   // Derived from the lines: their common status, or the least advanced one
   // while they differ (src/lib/order-status.ts).
-  status             OrderStatus       @default(AWAITING_PAYMENT)
-  paid               Boolean           @default(false)
+  status             OrderStatus        @default(AWAITING_PAYMENT)
+  paid               Boolean            @default(false)
   // "Отсрочка": payment after shipment is agreed for this order. Taken from
   // the customer company's terms at creation, editable in CRM → Заказы.
-  deferred           Boolean           @default(false)
+  deferred           Boolean            @default(false)
   deliveryDate       DateTime?
   // Set once, automatically, the first time the order enters
   // SHIPPED_AWAITING_PAYMENT -- distinct from deliveryDate, which staff set
@@ -279,16 +281,17 @@ model Order {
   invoiceNumber      String?
   invoiceDate        DateTime?
   userId             String?
-  user               User?             @relation(fields: [userId], references: [id])
+  user               User?              @relation(fields: [userId], references: [id])
   items              OrderItem[]
   documents          OrderDocument[]
   extraCosts         ExtraCost[]
   priceRequests      PriceRequest[]
   claims             Claim[]
   bankTransactions   BankTransaction[]
+  supplierPurchases  SupplierPurchase[]
   payment            Payment?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([status])
   @@index([userId])
@@ -578,6 +581,7 @@ model Company {
   supplierOrderLines  SupplierOrderLine[]
   extraCosts          ExtraCost[]         @relation("ExtraCostSupplier")
   priceRequests       PriceRequest[]      @relation("PriceRequestSupplier")
+  supplierPurchases   SupplierPurchase[]  @relation("SupplierPurchaseSupplier")
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
   oneCRef             String?             @unique
@@ -977,4 +981,45 @@ model BankTransaction {
   @@unique([bankAccountId, externalId])
   @@index([date])
   @@index([orderId])
+}
+
+/**
+ * Заказ поставщику: the lines of one supplier for one customer order (or
+ * without one), sent with an Excel sheet; the supplier's invoice from the
+ * reply makes them «Требуется оплата» (src/lib/supplier-purchases.ts).
+ */
+model SupplierPurchase {
+  id          String                 @id @default(cuid())
+  number      Int                    @unique @default(autoincrement())
+  supplierId  String
+  supplier    Company                @relation("SupplierPurchaseSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+  orderId     String?
+  order       Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  email       String?
+  contactName String?
+  messageId   String?
+  sentAt      DateTime?
+  invoiceAt   DateTime?
+  lines       SupplierOrderLine[]
+  files       SupplierPurchaseFile[]
+  createdAt   DateTime               @default(now())
+
+  @@index([supplierId])
+  @@index([orderId])
+}
+
+/**
+ * A file of a supplier order: its invoice, the payment order, others.
+ */
+model SupplierPurchaseFile {
+  id         String           @id @default(cuid())
+  purchaseId String
+  purchase   SupplierPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  // INVOICE, PAYMENT or OTHER.
+  kind       String
+  fileName   String
+  fileUrl    String
+  createdAt  DateTime         @default(now())
+
+  @@index([purchaseId])
 }

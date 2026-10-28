@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { SupplierOrderStatus } from "@prisma/client";
-import { exportSupplierOrders, updateSupplierOrderDays, updateSupplierOrderStatus } from "@/actions/admin/supplier-orders";
+import {
+  exportSupplierOrders,
+  sendSupplierOrdersNow,
+  updateSupplierOrderDays,
+  updateSupplierOrderStatus,
+  uploadSupplierInvoice,
+} from "@/actions/admin/supplier-orders";
 import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
@@ -22,7 +28,45 @@ export type SupplierOrderRow = {
   deliveryDays: number | null;
   quality: string | null;
   status: SupplierOrderStatus;
+  purchaseNumber: number | null;
+  sentAt: string | null;
+  deliveryDate: string | null;
+  files: { kind: string; fileName: string; fileUrl: string }[];
 };
+
+const FILE_KINDS: Record<string, string> = { INVOICE: "Счёт", PAYMENT: "Платёжка", OTHER: "Файл" };
+const UNFINISHED_KEY = "crm-supplier-orders-unfinished";
+const GROUPED_KEY = "crm-supplier-orders-grouped";
+
+/** A supplier's invoice that came another way, into this line's supplier order. */
+function InvoiceUpload({ id }: { id: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  return (
+    <label className={`cursor-pointer text-xs text-blue-600 hover:underline dark:text-blue-400 ${pending ? "opacity-50" : ""}`}>
+      {pending ? "..." : "+ счёт"}
+      <input
+        type="file"
+        className="hidden"
+        disabled={pending}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          const form = new FormData();
+          form.set("lineId", id);
+          form.set("file", file);
+          setError(null);
+          startTransition(async () => {
+            const r = await uploadSupplierInvoice(form);
+            if (!r.ok) setError(r.error);
+          });
+        }}
+      />
+      {error && <span className="block text-red-600">{error}</span>}
+    </label>
+  );
+}
 
 type Filters = {
   orderNumber: string;
@@ -164,15 +208,51 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
     [rows]
   );
 
+  const [unfinished, setUnfinished] = useState(false);
+  const [grouped, setGrouped] = useState(false);
+  const [sendNote, setSendNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [sending, startSending] = useTransition();
+
+  // Remembered per browser.
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after hydration
+      if (localStorage.getItem(UNFINISHED_KEY) === "1") setUnfinished(true);
+      if (localStorage.getItem(GROUPED_KEY) === "1") setGrouped(true);
+    } catch {
+      // storage unavailable
+    }
+  }, []);
+  function remember(key: string, value: boolean, set: (v: boolean) => void) {
+    set(value);
+    try {
+      localStorage.setItem(key, value ? "1" : "0");
+    } catch {
+      // storage unavailable
+    }
+  }
+
   const filtered = useMemo(() => {
     const active = TEXT_COLUMNS.filter((c) => filters[c.key].trim());
-    return rows.filter(
+    const list = rows.filter(
       (r) =>
+        (!unfinished || r.status !== "DELIVERED") &&
         (!category || r.category === category) &&
         (!filters.status || r.status === filters.status) &&
         active.every((c) => c.get(r).toLowerCase().includes(filters[c.key].trim().toLowerCase()))
     );
-  }, [rows, filters, category]);
+    // Grouped: the lines of one customer order together, newest orders first.
+    return grouped ? [...list].sort((a, b) => (b.orderNumber ?? "").localeCompare(a.orderNumber ?? "")) : list;
+  }, [rows, filters, category, unfinished, grouped]);
+
+  const toSend = filtered.filter((r) => r.status === "TO_ORDER" && !r.sentAt);
+  function send() {
+    setSendNote(null);
+    startSending(async () => {
+      const r = await sendSupplierOrdersNow(toSend.map((x) => x.id));
+      setSendNote(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
+    });
+  }
 
   const hasActiveFilters = !!category || Object.values(filters).some(Boolean);
 
@@ -194,6 +274,23 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
           ))}
         </select>
         <SheetExportButton count={filtered.length} run={() => exportSupplierOrders(filtered.map((r) => r.id))} />
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending || !toSend.length}
+          title="Письмо с Excel каждому поставщику (по заказам клиентов) — на e-mail из карточки компании; так же уходят сами каждые полчаса"
+          className="rounded-md bg-foreground px-3 py-1 text-sm font-medium text-background disabled:opacity-40"
+        >
+          {sending ? "Отправляем..." : `Отправить поставщикам (${toSend.length})`}
+        </button>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+          <input type="checkbox" checked={unfinished} onChange={(e) => remember(UNFINISHED_KEY, e.target.checked, setUnfinished)} />
+          Не завершённые
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+          <input type="checkbox" checked={grouped} onChange={(e) => remember(GROUPED_KEY, e.target.checked, setGrouped)} />
+          Группировать по заказам
+        </label>
         {hasActiveFilters && (
           <button
             type="button"
@@ -208,6 +305,7 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
         )}
       </div>
 
+      {sendNote && <p className={`mt-2 text-sm ${sendNote.ok ? "text-green-600" : "text-red-600"}`}>{sendNote.text}</p>}
       {rows.length === 0 ? (
         <p className="mt-6 text-sm text-foreground/40">
           Пока пусто. Сюда попадают позиции из «Проценки» (кнопка «Заказать») и заказы покупателей на товар не из
@@ -223,7 +321,9 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
                     {c.label}
                   </th>
                 ))}
+                <th className="py-2 pr-4">Дата поставки</th>
                 <th className="py-2 pr-4">Статус</th>
+                <th className="py-2 pr-4">Файлы</th>
                 <th className="py-2" />
               </tr>
               <tr className="text-left">
@@ -237,6 +337,7 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
                     />
                   </th>
                 ))}
+                <th className="pb-2 pr-4" />
                 <th className="pb-2 pr-4">
                   <select
                     value={filters.status}
@@ -252,19 +353,25 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
                     ))}
                   </select>
                 </th>
+                <th className="pb-2 pr-4" />
                 <th className="pb-2" />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={TEXT_COLUMNS.length + 2} className="py-4 text-foreground/40">
+                  <td colSpan={TEXT_COLUMNS.length + 4} className="py-4 text-foreground/40">
                     Ничего не найдено.
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className="border-b border-foreground/10">
+                filtered.map((r, i) => (
+                  <tr
+                    key={r.id}
+                    className={`border-b border-foreground/10 ${
+                      grouped && i > 0 && filtered[i - 1].orderNumber !== r.orderNumber ? "border-t-2 border-t-foreground/30" : ""
+                    }`}
+                  >
                     <td className="whitespace-nowrap py-2 pr-4">
                       {r.orderNumber ? (
                         <Link
@@ -293,8 +400,20 @@ export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
                       <DaysCell id={r.id} days={r.deliveryDays} />
                     </td>
                     <td className="py-2 pr-4">{r.quality ?? "—"}</td>
+                    <td className="whitespace-nowrap py-2 pr-4" title={r.sentAt ? `Заказ № ${r.purchaseNumber} отправлен ${new Date(r.sentAt).toLocaleDateString("ru-RU")}` : "Ещё не отправлен: от сегодняшнего дня"}>
+                      {r.deliveryDate ? new Date(r.deliveryDate).toLocaleDateString("ru-RU") : "—"}
+                      {r.sentAt && <div className="text-xs text-foreground/50">№ {r.purchaseNumber}</div>}
+                    </td>
                     <td className="py-2 pr-4">
                       <StatusSelect id={r.id} status={r.status} />
+                    </td>
+                    <td className="py-2 pr-4">
+                      {r.files.map((f) => (
+                        <a key={f.fileUrl} href={f.fileUrl} download={f.fileName} className="block max-w-40 truncate text-xs text-blue-600 hover:underline dark:text-blue-400">
+                          {FILE_KINDS[f.kind] ?? "Файл"}: {f.fileName}
+                        </a>
+                      ))}
+                      {r.supplier && ["TO_ORDER", "AWAITING_PAYMENT"].includes(r.status) && <InvoiceUpload id={r.id} />}
                     </td>
                     <td className="py-2 text-right">
                       <SupplierOrderDeleteButton id={r.id} />

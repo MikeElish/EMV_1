@@ -15,5 +15,8 @@ export async function register() {
     // Банки: Точка's statement at 10:00, 14:00 and 20:00 Moscow time.
     const { startBankTimer } = await import("@/lib/banks");
     startBankTimer();
+    // Заказ поставщику: agreed lines go out, invoices come in, every half hour.
+    const { startSupplierPurchaseTimer } = await import("@/lib/supplier-purchases");
+    startSupplierPurchaseTimer();
   }
 }

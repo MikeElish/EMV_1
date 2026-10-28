@@ -8,6 +8,7 @@ import { applyPaymentTerms, setLineStatuses } from "@/lib/order-status";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 import { ORDER_STATUS_OF_SUPPLIER } from "@/lib/validators/supplier-orders";
 import { orderSheetBase64, orderSheetFileName } from "@/lib/order-sheet";
+import { addPurchaseFile, sendSupplierOrders } from "@/lib/supplier-purchases";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type SheetResult = { ok: true; base64: string; fileName: string } | { ok: false; error: string };
@@ -103,4 +104,54 @@ export async function updateSupplierOrderDays(id: string, days: number | null): 
   if (!updated.count) return { ok: false, error: "Позиция не найдена" };
   revalidatePath("/admin/crm/supplier-orders");
   return { ok: true };
+}
+
+// ---- Заказ поставщику: letters and invoices (src/lib/supplier-purchases.ts) ----------
+
+export type PurchaseResult = { ok: true; message: string } | { ok: false; error: string };
+
+/** «Отправить поставщикам»: the shown lines in «Заказать» not sent yet. */
+export async function sendSupplierOrdersNow(lineIds: string[]): Promise<PurchaseResult> {
+  const denied = await accessDenied("crm.supplier-orders");
+  if (denied) return denied;
+  try {
+    const r = await sendSupplierOrders(lineIds.map(String));
+    const parts = [
+      r.sent.length ? `Отправлено: ${r.sent.join("; ")}` : "Нечего отправлять",
+      r.noContact.length && `нет e-mail в карточке: ${r.noContact.join(", ")}`,
+      r.noSupplier && `без поставщика: ${r.noSupplier} поз.`,
+    ];
+    return { ok: true, message: parts.filter(Boolean).join("; ") };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Письма не отправлены" };
+  }
+}
+
+/** A supplier's invoice that came another way: into the line's supplier order (made if not sent yet). */
+export async function uploadSupplierInvoice(formData: FormData): Promise<PurchaseResult> {
+  const denied = await accessDenied("crm.supplier-orders");
+  if (denied) return denied;
+  const line = await prisma.supplierOrderLine.findUnique({
+    where: { id: String(formData.get("lineId") ?? "") },
+    include: { orderItem: { select: { orderId: true } } },
+  });
+  const file = formData.get("file");
+  if (!line) return { ok: false, error: "Позиция не найдена" };
+  if (!line.supplierId) return { ok: false, error: "Сначала выберите поставщика в Проценке" };
+  if (!(file instanceof File) || !file.size) return { ok: false, error: "Выберите файл" };
+  if (file.size > 20 * 1024 * 1024) return { ok: false, error: "Файл больше 20 МБ" };
+  let purchaseId = line.purchaseId;
+  if (!purchaseId) {
+    const purchase = await prisma.supplierPurchase.create({ data: { supplierId: line.supplierId, orderId: line.orderItem?.orderId ?? null } });
+    purchaseId = purchase.id;
+    // Every line of this supplier and order in «Заказать» goes with it.
+    await prisma.supplierOrderLine.updateMany({
+      where: { supplierId: line.supplierId, purchaseId: null, status: "TO_ORDER", orderItem: line.orderItem ? { orderId: line.orderItem.orderId } : null },
+      data: { purchaseId },
+    });
+    await prisma.supplierOrderLine.update({ where: { id: line.id }, data: { purchaseId } });
+  }
+  await addPurchaseFile(purchaseId, "INVOICE", file.name, Buffer.from(await file.arrayBuffer()));
+  revalidatePath("/admin/crm/supplier-orders");
+  return { ok: true, message: "Счёт вложен, позиции — «Требуется оплата»" };
 }
