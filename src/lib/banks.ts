@@ -54,7 +54,7 @@ let bankCa: string[] | null = null;
 function caList() {
   bankCa ??= [
     ...tls.rootCertificates,
-    ...["russian_trusted_root_ca.pem", "russian_trusted_sub_ca.pem"].map((f) => readFileSync(path.join(process.cwd(), "assets", "certs", f), "utf8")),
+    ...["russian_trusted_root_ca.crt", "russian_trusted_sub_ca.crt"].map((f) => readFileSync(path.join(process.cwd(), "assets", "certs", f), "utf8")),
   ];
   return bankCa;
 }
