@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { refreshWarehouseData } from "@/actions/admin/warehouse";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type ItemCols = { itemRef: string; name: string; sku: string; productId: string | null };
 export type SummaryRow = ItemCols & { opening: number; qtyIn: number; qtyOut: number; closing: number };
@@ -45,7 +46,7 @@ export function MovementsReport({
   loadedAt: string;
 }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [refreshing, startRefresh] = useTransition();
   const [error, setError] = useState<string | null>(null);
 

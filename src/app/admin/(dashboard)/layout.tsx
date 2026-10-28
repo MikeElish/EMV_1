@@ -8,6 +8,8 @@ import { getMyAccess } from "@/lib/access-server";
 import { resolveAccess } from "@/lib/access";
 import { AccessProvider, ViewOnlyBanner } from "@/components/admin/AccessContext";
 import { AdminLocation, AdminMobileMenu } from "@/components/admin/AdminMobileMenu";
+import { RememberAdminPlace } from "@/components/admin/AdminPlaces";
+import { Suspense } from "react";
 
 export default async function AdminDashboardLayout({
   children,
@@ -59,8 +61,11 @@ export default async function AdminDashboardLayout({
             <ThemeToggle scope="admin" />
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto px-4 pb-6 pt-4 [scrollbar-gutter:stable] lg:px-8 lg:pb-8 lg:pt-6">
+        <main id="admin-main" className="flex min-h-0 flex-1 flex-col overflow-auto px-4 pb-6 pt-4 [scrollbar-gutter:stable] lg:px-8 lg:pb-8 lg:pt-6">
           <AccessProvider access={access}>
+            <Suspense>
+              <RememberAdminPlace />
+            </Suspense>
             <ViewOnlyBanner />
             {children}
           </AccessProvider>

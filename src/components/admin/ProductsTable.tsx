@@ -17,6 +17,7 @@ import {
   saveProductsPlace,
   type ProductsReturnState,
 } from "@/components/admin/products-return";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type ProductRow = Product & {
   category: Category;
@@ -181,7 +182,7 @@ export function ProductsTable({
   reserve: Record<string, number>;
 }) {
   const router = useRouter();
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useRememberedState<Filters>("filters", EMPTY_FILTERS);
   const [reserveOf, setReserveOf] = useState<ProductRow | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingScroll = useRef<number | null>(null);
@@ -212,6 +213,8 @@ export function ProductsTable({
     }
     pendingScroll.current = saved.scrollTop;
     setFilters(restored);
+    // Once, when the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const categories = useMemo(

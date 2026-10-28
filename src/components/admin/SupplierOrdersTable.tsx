@@ -14,6 +14,7 @@ import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
 import { SupplierOrderDeleteButton } from "@/components/admin/SupplierOrderDeleteButton";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type SupplierOrderRow = {
   id: string;
@@ -201,8 +202,8 @@ function StatusSelect({ id, status }: { id: string; status: SupplierOrderStatus 
 }
 
 export function SupplierOrdersTable({ rows }: { rows: SupplierOrderRow[] }) {
-  const [filters, setFilters] = useState<Filters>(EMPTY);
-  const [category, setCategory] = useState("");
+  const [filters, setFilters] = useRememberedState<Filters>("filters", EMPTY);
+  const [category, setCategory] = useRememberedState("category", "");
   const categories = useMemo(
     () => [...new Set(rows.map((r) => r.category))].sort((a, b) => a.localeCompare(b, "ru")),
     [rows]

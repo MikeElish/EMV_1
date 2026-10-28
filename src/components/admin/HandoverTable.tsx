@@ -7,6 +7,7 @@ import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { handOver, issueUpd } from "@/actions/admin/receipts";
 import { HANDOVER_KINDS, type HandoverKind } from "@/lib/validators/receipts";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type HandoverRow = {
   id: string;
@@ -118,7 +119,7 @@ function UpdButton({ orderId, onDone }: { orderId: string; onDone: (message: str
 }
 
 export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [message, setMessage] = useState<string | null>(null);
   const [acting, setActing] = useState<{ order: HandoverRow; kind: HandoverKind } | null>(null);
 

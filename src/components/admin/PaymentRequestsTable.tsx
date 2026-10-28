@@ -19,6 +19,7 @@ import {
   type PaymentRequestFormData,
 } from "@/actions/admin/payment-requests";
 import { PAYMENT_REQUEST_STATUSES, type PaymentRequestInput } from "@/lib/validators/payment-requests";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type PaymentRequestRow = {
   id: string;
@@ -295,7 +296,7 @@ function AddFile({ id }: { id: string }) {
 }
 
 export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [editing, setEditing] = useState<PaymentRequestRow | "new" | null>(null);
 

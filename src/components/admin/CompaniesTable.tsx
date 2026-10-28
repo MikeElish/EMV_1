@@ -12,6 +12,7 @@ import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CompanyBalanceTab, type CompanyOrderRow } from "@/components/admin/CompanyBalanceTab";
 import { formatRub } from "@/lib/money";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Manager = { id: string; lastName: string | null; firstName: string | null; login: string; role: Role };
 
@@ -36,7 +37,7 @@ export function CompaniesTable({
   const router = useRouter();
   const [selected, setSelected] = useState<Company | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("info");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
 
   function openCompany(company: Company, tab: Tab = "info") {
     setSelected(company);

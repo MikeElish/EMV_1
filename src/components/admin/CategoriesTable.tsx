@@ -11,13 +11,14 @@ import { CategoryActiveSwitch } from "@/components/admin/CategoryActiveSwitch";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type CategoryRow = Category & { _count: { products: number } };
 
 export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<CategoryRow | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
 
   function close() {
     setSelected(null);

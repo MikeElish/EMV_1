@@ -4,6 +4,7 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { FitWidth } from "@/components/FitWidth";
 import { useVisible } from "@/components/admin/AccessContext";
+import { useAdminPlaces } from "@/components/admin/AdminPlaces";
 
 export type NavTab = { href: string; label: string };
 
@@ -36,6 +37,8 @@ export function NavTabs({
 }) {
   const pathname = usePathname();
   const visible = useVisible();
+  // A tab leads back to the page last open under it.
+  const place = useAdminPlaces();
 
   return (
     <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
@@ -48,7 +51,7 @@ export function NavTabs({
             return (
               <Link
                 key={tab.href}
-                href={tab.href}
+                href={place(tab.href)}
                 prefetch
                 className={`relative px-1 pb-3 text-sm font-medium transition-colors ${
                   active ? "text-foreground" : "text-foreground/50 hover:text-foreground"

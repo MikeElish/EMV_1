@@ -7,6 +7,7 @@ import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { claimToSupplier, updateClaim } from "@/actions/admin/claims";
 import { CLAIM_RESOLUTIONS, CLAIM_STATUSES } from "@/lib/validators/claims";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type ClaimRow = {
   id: string;
@@ -140,7 +141,7 @@ function ClaimCard({ claim, onClose }: { claim: ClaimRow; onClose: () => void })
 }
 
 export function ClaimsTable({ claims }: { claims: ClaimRow[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [open, setOpen] = useState<ClaimRow | null>(null);
 

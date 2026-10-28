@@ -5,6 +5,7 @@ import { formatRub } from "@/lib/money";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { AdjustmentModal } from "@/components/admin/StockDocForms";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Doc = {
   ref: string;
@@ -23,7 +24,7 @@ const dateRu = (s: string) => `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4
 
 /** Склад → Списание/Оприходование: the documents in 1С and «+» for a new one. */
 export function AdjustmentsTable({ warehouses, docs }: { warehouses: { ref: string; name: string }[]; docs: Doc[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [creating, setCreating] = useState(false);
 
   const shown = useMemo(() => {

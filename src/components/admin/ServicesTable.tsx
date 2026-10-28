@@ -15,6 +15,7 @@ import { DeleteButton } from "@/components/admin/DeleteButton";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { Modal } from "@/components/Modal";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/50";
@@ -217,7 +218,7 @@ function ActiveSwitch({ service }: { service: Service }) {
 }
 
 export function ServicesTable({ services }: { services: Service[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [editing, setEditing] = useState<Service | "new" | null>(null);
   const [importing, setImporting] = useState(false);
 

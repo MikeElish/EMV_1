@@ -14,6 +14,7 @@ import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { UserAccessTab } from "@/components/admin/UserAccessTab";
 import type { AccessMap } from "@/lib/access";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Row = {
   id: string;
@@ -50,7 +51,7 @@ export function UsersTable({
   const router = useRouter();
   const [selected, setSelected] = useState<Row | null>(null);
   const [tab, setTab] = useState<Tab>("info");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();

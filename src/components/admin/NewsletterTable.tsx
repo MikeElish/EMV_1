@@ -5,6 +5,7 @@ import { exportSubscribers } from "@/actions/admin/newsletter";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Status = "active" | "pending" | "unsubscribed";
 type Row = { id: string; email: string; who: string; source: string; consentAt: string; consentIp: string; status: Status };
@@ -17,7 +18,7 @@ const STATUS: Record<Status, { label: string; className: string }> = {
 
 /** CRM → Рассылка: who agreed to the shop's news, when and from where. */
 export function NewsletterTable({ rows }: { rows: Row[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [status, setStatus] = useState<Status | "">("");
 
   const shown = useMemo(() => {

@@ -8,6 +8,7 @@ import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { CreatedNote, ItemPicker } from "@/components/admin/StockDocForms";
 import { PlaceInput } from "@/components/admin/WarehouseTable";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Row = { itemRef: string; name: string; sku: string; place: string; book: number; price: number | null };
 type Count = { factText: string; priceText: string };
@@ -26,7 +27,7 @@ export function InventorySheet({ warehouse, rows: initial }: { warehouse: { ref:
   const [counts, setCounts] = useState<Record<string, Count>>(() =>
     Object.fromEntries(initial.map((r) => [r.itemRef, { factText: String(Math.max(0, r.book)), priceText: r.price ? String(r.price) : "" }]))
   );
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DocsResult | null>(null);

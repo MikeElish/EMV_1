@@ -7,6 +7,7 @@ import { refreshWarehouseData, setStoragePlace } from "@/actions/admin/warehouse
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { TransferModal } from "@/components/admin/StockDocForms";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Row = { itemRef: string; name: string; sku: string; qty: number; place: string; productId: string | null };
 type Warehouse = { ref: string; name: string };
@@ -65,7 +66,7 @@ export function WarehouseTable({
   loadedAt: string;
 }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [refreshing, startRefresh] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [transfer, setTransfer] = useState(false);

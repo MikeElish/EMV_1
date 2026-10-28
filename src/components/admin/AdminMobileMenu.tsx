@@ -9,6 +9,7 @@ import { MobileMenu, MOBILE_MENU_ITEM } from "@/components/MobileMenu";
 import { useMailUnread } from "@/components/mail/useMailUnread";
 import { UnreadLabel } from "@/components/mail/UnreadLabel";
 import { MAIL_TABS } from "@/components/mail/MailShell";
+import { useAdminPlaces } from "@/components/admin/AdminPlaces";
 
 /** The group and tab of a path, e.g. «CRM · Заказы». */
 export function adminLocation(pathname: string): string {
@@ -37,6 +38,7 @@ export function AdminMobileMenu({ access, userLabel }: { access: AccessMap; user
   const current = sectionOfPath(pathname);
   const currentGroup = ACCESS_GROUPS.find((g) => current && g.sections.includes(current));
   const [expanded, setExpanded] = useState<string | null>(currentGroup?.path ?? null);
+  const place = useAdminPlaces();
 
   const groups = ACCESS_GROUPS.map((g) => ({ ...g, sections: g.sections.filter((s) => access[s.key] !== "hide") })).filter(
     (g) => g.sections.length > 0
@@ -57,7 +59,7 @@ export function AdminMobileMenu({ access, userLabel }: { access: AccessMap; user
 
   const single = (g: AccessGroup) => {
     const s = g.sections[0];
-    return link(s.path, g.label, current?.key === s.key);
+    return link(place(s.path), g.label, current?.key === s.key);
   };
 
   // Почта opens into its folders, like a block into its tabs.
@@ -110,7 +112,7 @@ export function AdminMobileMenu({ access, userLabel }: { access: AccessMap; user
                     ▾
                   </span>
                 </button>
-                {open && g.sections.map((s) => link(s.path, s.label, current?.key === s.key, true))}
+                {open && g.sections.map((s) => link(place(s.path), s.label, current?.key === s.key, true))}
               </div>
             );
           })}

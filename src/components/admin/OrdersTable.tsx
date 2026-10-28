@@ -16,6 +16,7 @@ import { ExtraCostsButton, type ExtraCostRow } from "@/components/admin/ExtraCos
 import { DELIVERY_METHOD_LABELS, DELIVERY_METHODS } from "@/lib/delivery";
 import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/client";
 import type { PaymentState } from "@/actions/admin/orders";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type OrderLine = OrderItem & { product: { sku: string; stock: number } | null };
 
@@ -177,10 +178,11 @@ export function OrdersTable({
   /** Владелец: «Удалить» on every row. */
   canDelete?: boolean;
 }) {
-  const [filters, setFilters] = useState<Filters>({
-    ...EMPTY_FILTERS,
-    orderNumber: initialOrderNumber ?? "",
-  });
+  const [filters, setFilters] = useRememberedState<Filters>(
+    "filters",
+    { ...EMPTY_FILTERS, orderNumber: initialOrderNumber ?? "" },
+    { restore: !initialOrderNumber }
+  );
   const [syncedOrderNumber, setSyncedOrderNumber] = useState(initialOrderNumber);
   const [creating, setCreating] = useState(false);
   const [grouped, setGrouped] = useState(false);

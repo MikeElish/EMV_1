@@ -20,6 +20,7 @@ import { Modal } from "@/components/Modal";
 import { exportPriceCheck } from "@/actions/admin/supplier-orders";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
 import { supplierFolderName, useDesktop, type DesktopPriceFile } from "@/lib/desktop";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type PriceCheckProduct = {
   id: string;
@@ -518,9 +519,9 @@ export function PriceCheckBoard({
   initialProductId?: string;
 }) {
   const router = useRouter();
-  const [filters, setFilters] = useState<ProductFilters>(EMPTY);
-  const [onlyChecking, setOnlyChecking] = useState(false);
-  const [category, setCategory] = useState("");
+  const [filters, setFilters] = useRememberedState<ProductFilters>("filters", EMPTY, { restore: !initialProductId });
+  const [onlyChecking, setOnlyChecking] = useRememberedState("onlyChecking", false);
+  const [category, setCategory] = useRememberedState("category", "");
   const categories = useMemo(
     () => [...new Set(products.map((p) => p.category))].sort((a, b) => a.localeCompare(b, "ru")),
     [products]

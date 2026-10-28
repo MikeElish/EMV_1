@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getDispatchData, type DispatchResult } from "@/actions/admin/dispatch";
 import type { FleetDriver, FleetDriverStatus } from "@/lib/yandex-fleet-data";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 const POLL_MS = 30 * 1000;
 
@@ -55,7 +56,7 @@ export function DispatchBoard({ initial }: { initial: DispatchResult }) {
   const [pollError, setPollError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterId>("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [now, setNow] = useState(() => Date.now());
 
   const refresh = useCallback(async () => {

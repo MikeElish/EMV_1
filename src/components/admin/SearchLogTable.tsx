@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { utils, write } from "xlsx";
 import type { SearchLog, SearchLogDaily } from "@prisma/client";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type LogWithDaily = SearchLog & { dailyCounts: SearchLogDaily[] };
 
@@ -36,7 +37,7 @@ export function SearchLogTable({
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const exportHref = buildExportHref(logs);
 
   const filtered = useMemo(() => {

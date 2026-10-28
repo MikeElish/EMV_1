@@ -9,6 +9,7 @@ import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { createReceipt, getReceivableLines, receiptVatRate } from "@/actions/admin/receipts";
 import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { VAT_RATES } from "@/lib/validators/receipts";
+import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type ReceiptRow = {
   id: string;
@@ -245,7 +246,7 @@ function ReceiptCard({ warehouses, onClose, onDone }: { warehouses: { ref: strin
 }
 
 export function ReceiptsTable({ receipts, warehouses }: { receipts: ReceiptRow[]; warehouses: { ref: string; name: string }[] }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRememberedState("search", "");
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
