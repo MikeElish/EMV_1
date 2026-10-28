@@ -103,6 +103,27 @@ model OneCIgnoredGood {
   createdAt DateTime @default(now())
 }
 
+// Рассылка: who agreed to get the shop's news by e-mail. 38-ФЗ «О рекламе»
+// (ст. 18) needs the consent beforehand and the shop to prove it: when, from
+// where, from which address. Only confirmed and not unsubscribed addresses
+// are mailed.
+model NewsletterSubscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  // checkout | account | form
+  source         String
+  consentAt      DateTime  @default(now())
+  consentIp      String?
+  // The address is the subscriber's: a verified account, or the link in the
+  // confirmation letter (form).
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  // Secret of the confirm / unsubscribe links.
+  token          String    @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 // Склад: where a 1С item lies on a 1С warehouse (cell, shelf), typed by
 // staff. The quantities come from 1С documents (src/lib/onec-warehouse.ts).
 model StoragePlace {

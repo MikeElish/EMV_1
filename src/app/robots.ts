@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // The admin, the customer's own pages and the search results stay out of the index.
-      disallow: ["/admin", "/crm", "/api", "/shop/cart", "/shop/checkout", "/shop/order", "/shop/orders", "/shop/search", "/shop/suggest", "/shop/my-prices"],
+      disallow: ["/admin", "/crm", "/api", "/shop/cart", "/shop/checkout", "/shop/order", "/shop/orders", "/shop/search", "/shop/suggest", "/shop/my-prices", "/shop/newsletter"],
     },
     sitemap: absoluteUrl("/sitemap.xml"),
   };

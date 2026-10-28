@@ -11,6 +11,7 @@ const TABS = [
   { href: "/admin/crm/price-check", label: "Проценка" },
   { href: "/admin/crm/supplier-orders", label: "Заказ поставщику" },
   { href: "/admin/crm/extra-costs", label: "Доп.расходы" },
+  { href: "/admin/crm/newsletter", label: "Рассылка" },
 ];
 
 export default function CrmLayout({ children }: { children: React.ReactNode }) {

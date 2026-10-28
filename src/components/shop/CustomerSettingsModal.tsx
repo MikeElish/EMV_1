@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { NewsletterToggle } from "@/components/shop/NewsletterForms";
 import { Modal } from "@/components/Modal";
 import { SuggestField } from "@/components/SuggestField";
 import { DeliveryMethodSelect, type DeliveryMethod } from "@/components/shop/DeliveryMethodSelect";
@@ -334,6 +335,12 @@ export function CustomerSettingsModal({ onClose }: { onClose: () => void }) {
             {submitting ? "Сохраняем..." : "Сохранить"}
           </button>
         </form>
+      )}
+      {/* Saved on its own, at once: not part of «Сохранить». */}
+      {!loading && (
+        <div className="mt-6">
+          <NewsletterToggle />
+        </div>
       )}
     </Modal>
   );

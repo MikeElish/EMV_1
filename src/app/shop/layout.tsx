@@ -5,6 +5,7 @@ import { CustomerPricesProvider } from "@/components/shop/CustomerPrices";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { companyInfo } from "@/content/company";
 import { CookieNotice } from "@/components/CookieNotice";
+import { NewsletterSubscribe } from "@/components/shop/NewsletterForms";
 import { PERSONAL_DATA_CONSENT_URL, USER_AGREEMENT_URL } from "@/lib/legal-docs";
 import { SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 
@@ -44,6 +45,9 @@ export default function ShopLayout({ children }: LayoutProps<"/shop">) {
 
         <footer className="border-t border-foreground/10">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:px-6 py-8 text-sm text-foreground/60">
+            <div className="mb-4">
+              <NewsletterSubscribe />
+            </div>
             <p>EMV Запчасти — запчасти для спецтехники</p>
             <p>
               <Link href="/shop" className="underline-offset-4 hover:text-foreground hover:underline">

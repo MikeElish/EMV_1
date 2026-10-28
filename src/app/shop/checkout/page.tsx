@@ -7,6 +7,8 @@ import { cartKey, useCart } from "@/components/shop/CartProvider";
 import { createOrder } from "@/actions/shop/checkout";
 import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
+import { setMyNewsletter } from "@/actions/shop/newsletter";
+import { NEWSLETTER_CONSENT } from "@/components/shop/NewsletterForms";
 import { formatRub, formatRubPrecise, formatShopPrice } from "@/lib/money";
 import { trackPurchase } from "@/lib/metrika";
 import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
@@ -64,6 +66,8 @@ export default function CheckoutPage() {
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
   const [consent, setConsent] = useState(false);
+  // Off until ticked: an advertising consent can't be pre-checked.
+  const [newsletter, setNewsletter] = useState(false);
 
   // Whether this browser is already signed in as a CRM Покупатель -- while
   // that's unknown (fetch still in flight) it's treated as false, so the
@@ -188,6 +192,9 @@ export default function CheckoutPage() {
       setError(result.error);
       return;
     }
+
+    // The shopper is signed in by now: the consent goes with their account.
+    if (newsletter) await setMyNewsletter(true, "checkout").catch(() => {});
 
     try {
       const toSave: SavedCheckoutInfo = {
@@ -480,6 +487,15 @@ export default function CheckoutPage() {
                   </span>
                 </label>
               )}
+              <label className="flex items-start gap-2 text-sm text-foreground/70">
+                <input
+                  type="checkbox"
+                  checked={newsletter}
+                  onChange={(e) => setNewsletter(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>{NEWSLETTER_CONSENT}</span>
+              </label>
             </div>
           </div>
 
