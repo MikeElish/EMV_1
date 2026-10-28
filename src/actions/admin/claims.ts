@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied } from "@/lib/access-server";
-import { notifyClaimStatus, sendSupplierClaim } from "@/lib/claims";
+import { notifyClaimStatus, sendManualReturnLetter, sendSupplierClaim } from "@/lib/claims";
 import { CLAIM_RESOLUTIONS, CLAIM_STATUSES } from "@/lib/validators/claims";
 
 export type ClaimActionResult = { ok: true; message: string } | { ok: false; error: string };
@@ -31,6 +31,15 @@ export async function updateClaim(
     } catch (error) {
       console.error("[claims] status letter", error);
       message = "Сохранено, но письмо клиенту не ушло";
+    }
+    // Accepted: the return goes into 1С -- by hand while 1С has none to copy.
+    if (input.status === "Принята") {
+      try {
+        if (await sendManualReturnLetter(String(id))) message += "; на emv@emv.one — инструкция для возврата в 1С";
+      } catch (error) {
+        console.error("[claims] 1С return letter", error);
+        message += "; инструкция для 1С не ушла";
+      }
     }
   }
   revalidatePath("/admin/crm/claims");
