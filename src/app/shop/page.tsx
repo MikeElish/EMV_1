@@ -5,6 +5,7 @@ import { getShopOffers } from "@/lib/supplier-offers";
 import { HeroMessageCarousel } from "@/components/shop/HeroMessageCarousel";
 import { CategoryBrowser } from "@/components/shop/CategoryBrowser";
 import { NewArrivalsRotator } from "@/components/shop/NewArrivalsRotator";
+import { rotatorDirections } from "@/lib/shop-rotator";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/shop" },
@@ -32,16 +33,6 @@ export default async function ShopHomePage() {
     count: c._count.products,
   }));
 
-  const inStockPool = allActiveProducts.filter((p) => p.stock > 0);
-  const readyToOfferPool = allActiveProducts.filter((p) => p.stock <= 0);
-  const lastUploadAt = allActiveProducts.reduce<Date | null>(
-    (max, p) => (!max || p.newArrivalAt > max ? p.newArrivalAt : max),
-    null,
-  );
-  const newArrivalsPool = lastUploadAt
-    ? inStockPool.filter((p) => p.newArrivalAt.getTime() === lastUploadAt.getTime())
-    : [];
-
   const offers = await getShopOffers(allActiveProducts.map((p) => p.id));
 
   return (
@@ -68,13 +59,7 @@ export default async function ShopHomePage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-16 pt-4 sm:px-6">
-          <NewArrivalsRotator
-            directions={[
-              { key: "inStock", label: "В наличии", items: inStockPool },
-              { key: "readyToOffer", label: "Готовы предложить", items: readyToOfferPool },
-              { key: "newArrivals", label: "Новое поступление", items: newArrivalsPool },
-            ]}
-          />
+          <NewArrivalsRotator directions={rotatorDirections(allActiveProducts)} />
         </section>
       </>
     </ShopOffersProvider>

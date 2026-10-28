@@ -14,14 +14,19 @@ export type RotatorDirection = {
 
 const ROWS = 5;
 const ROW_HEIGHT = 52; // px
-const STAGGER_MS = 500;
+// Short stagger: while the rows turn over, the title already names the new
+// section -- the old rows must not linger under it.
+const STAGGER_MS = 120;
 const TRANSITION_MS = 500;
 const CYCLE_MS = 5000;
 
+// A slot is empty when the section has fewer than ROWS products.
+type Slot = Product | null;
+
 type RowState = {
-  current: Product;
-  next: Product;
-  original: Product;
+  current: Slot;
+  next: Slot;
+  original: Slot;
   showingNew: boolean;
   instant: boolean;
 };
@@ -35,13 +40,11 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function sampleN(pool: Product[], n: number, shuffled: boolean): Product[] {
-  if (pool.length === 0) return [];
-  const base = shuffled ? shuffle(pool) : pool;
-  if (base.length >= n) return base.slice(0, n);
-  const result: Product[] = [];
-  while (result.length < n) result.push(...(shuffled ? shuffle(pool) : pool));
-  return result.slice(0, n);
+/** n slots from the pool, each product once; empty slots when it is short. */
+function sampleN(pool: Product[], n: number, shuffled: boolean): Slot[] {
+  const base: Slot[] = (shuffled ? shuffle(pool) : pool).slice(0, n);
+  while (base.length < n) base.push(null);
+  return base;
 }
 
 export function NewArrivalsRotator({ directions }: { directions: RotatorDirection[] }) {
@@ -60,14 +63,16 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
   });
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
+  // The section the rows show (or turn back to) -- refs, since the cycle runs
+  // from timers set up by earlier renders.
   const dirIndexRef = useRef(0);
+  const previousDirRef = useRef(0);
   const cycleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const activeForwardRef = useRef<boolean[]>(new Array(ROWS).fill(false));
   const settledRef = useRef<boolean[]>(new Array(ROWS).fill(false));
   const settledCountRef = useRef(0);
   const cascadeInProgressRef = useRef(false);
-  const previousLabelRef = useRef(label);
 
   function clearRowTimers() {
     rowTimersRef.current.forEach(clearTimeout);
@@ -82,11 +87,11 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
 
   function beginForwardCascade() {
     if (available.length === 0) return;
+    previousDirRef.current = dirIndexRef.current;
     dirIndexRef.current = (dirIndexRef.current + 1) % available.length;
     const dir = available[dirIndexRef.current];
     const sample = sampleN(dir.items, ROWS, true);
 
-    previousLabelRef.current = label;
     setLabel(dir.label);
 
     activeForwardRef.current = new Array(ROWS).fill(false);
@@ -101,7 +106,7 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
       const t = setTimeout(() => {
         activeForwardRef.current[i] = true;
         setRowState((prev) =>
-          prev.map((r, idx) => (idx === i ? { ...r, next: sample[i] ?? r.current, showingNew: true } : r))
+          prev.map((r, idx) => (idx === i ? { ...r, next: sample[i], showingNew: true } : r))
         );
       }, i * STAGGER_MS);
       rowTimersRef.current.push(t);
@@ -137,7 +142,8 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
       rowTimersRef.current.push(t);
     });
 
-    setLabel(previousLabelRef.current);
+    dirIndexRef.current = previousDirRef.current;
+    setLabel(available[dirIndexRef.current].label);
     activeForwardRef.current = new Array(ROWS).fill(false);
     settledRef.current = new Array(ROWS).fill(false);
     cascadeInProgressRef.current = false;
@@ -182,7 +188,8 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
 
   if (available.length === 0) return null;
 
-  function renderSlot(product: Product) {
+  function renderSlot(product: Slot) {
+    if (!product) return <div style={{ height: ROW_HEIGHT }} className="w-full shrink-0" />;
     return (
       <div
         style={{ height: ROW_HEIGHT }}
@@ -197,9 +204,8 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
             <span className="block truncate">{product.name}</span>
             <span className="block truncate text-xs text-foreground/40">{product.sku}</span>
           </span>
-          {/* Phones: the name gets the room; the section title already tells the stock. */}
           <span
-            className={`hidden shrink-0 text-xs sm:inline ${
+            className={`shrink-0 text-xs ${
               product.stock > 0 ? "text-green-700 dark:text-green-500" : "text-foreground/40"
             }`}
           >
