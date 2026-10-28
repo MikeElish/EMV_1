@@ -177,6 +177,8 @@ export type OfferImportRow = {
   sku: string;
   price: number; // kopecks
   deliveryDays: number | null;
+  /** As the site names it («Оригинал», «Аналог (OEM)», «Аналог»); null: not given -- the offer keeps its own. */
+  quality: string | null;
   productId: string | null;
   productName: string | null;
   /** update: the supplier already has an offer; add: new offer; missing: no such article. */
@@ -203,10 +205,23 @@ const IMPORT_COLUMNS: RegExp[] = [
   /^цена/,
   /^итого|^всего|^сумма/,
   /^срок/,
+  /^качеств/,
 ];
 
+/** «Качество» of a supplier's file (the request sheet offers Original / OEM / Analog) → the site's words. */
+function parseQuality(raw: unknown): string | null {
+  const value = String(raw ?? "").trim();
+  if (!value) return null;
+  const v = value.toLowerCase();
+  if (/^(original|orig|оригинал)/.test(v)) return "Оригинал";
+  if (/oem|оем/.test(v)) return "Аналог (OEM)";
+  if (/^(analog|аналог)/.test(v)) return "Аналог";
+  if (/б\/у|used/.test(v)) return "Б/у";
+  return value.slice(0, 40);
+}
+
 /**
- * Where Бренд, Наименование, Артикул, Цена, Итого, Срок поставки are: found
+ * Where Бренд, Наименование, Артикул, Цена, Итого, Срок поставки, Качество are: found
  * by the header row (so a file from «Выгрузка», with «Количество», loads
  * too), or in this order when the headers aren't recognised.
  */
@@ -218,7 +233,7 @@ function columnPositions(header: unknown[]): number[] {
 
 /**
  * Reads a supplier price file -- columns Бренд, Наименование, Артикул, Цена,
- * Итого, Срок поставки (first row = headers) -- and matches it with the
+ * Итого, Срок поставки, Качество (first row = headers) -- and matches it with the
  * catalogue. Writes nothing.
  */
 export async function analyzeOfferImport(formData: FormData): Promise<OfferImportAnalysis> {
@@ -242,7 +257,7 @@ export async function analyzeOfferImport(formData: FormData): Promise<OfferImpor
   raw.slice(1).forEach((cells, i) => {
     const row = i + 2;
     if (cells.every((c) => c === "" || c == null)) return;
-    const [brandRaw, nameRaw, skuRaw, priceRaw, totalRaw, daysRaw] = at.map((p) => (p < 0 ? "" : cells[p]));
+    const [brandRaw, nameRaw, skuRaw, priceRaw, totalRaw, daysRaw, qualityRaw] = at.map((p) => (p < 0 ? "" : cells[p]));
     const sku = String(skuRaw ?? "").trim();
     const name = String(nameRaw ?? "").trim();
     const brand = String(brandRaw ?? "").trim();
@@ -250,7 +265,7 @@ export async function analyzeOfferImport(formData: FormData): Promise<OfferImpor
     const price = String(priceRaw ?? "").trim() ? num(priceRaw) : num(totalRaw);
     if (!sku) return errors.push({ row, message: "Нет артикула" });
     if (!(price > 0)) return errors.push({ row, message: `Артикул ${sku}: нет цены` });
-    parsed.push({ row, brand: findCanonicalBrand(brand) ?? brand, name, sku, price: kopecks(price), deliveryDays: parseDays(daysRaw) });
+    parsed.push({ row, brand: findCanonicalBrand(brand) ?? brand, name, sku, price: kopecks(price), deliveryDays: parseDays(daysRaw), quality: parseQuality(qualityRaw) });
   });
 
   // The same article twice in the file: the last line wins.
@@ -336,7 +351,12 @@ export async function commitOfferImport(input: {
     } else if (r.kind === "update") updated++;
     else added++;
 
-    await upsertSupplierOffer(prisma, productId, { supplierId: input.supplierId, price: r.price, deliveryDays: r.deliveryDays });
+    await upsertSupplierOffer(prisma, productId, {
+      supplierId: input.supplierId,
+      price: r.price,
+      deliveryDays: r.deliveryDays,
+      ...(r.quality ? { quality: String(r.quality).slice(0, 40) } : {}),
+    });
     await syncSelectedOffer(prisma, productId);
   }
   revalidate();

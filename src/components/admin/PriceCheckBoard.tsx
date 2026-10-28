@@ -359,7 +359,7 @@ function ImportModal({
       ) : !analysis ? (
         <form onSubmit={analyze} className="mt-4 space-y-4">
           <p className="text-sm text-foreground/60">
-            Столбцы по порядку: <b>Бренд, Наименование, Артикул, Цена, Итого, Срок поставки</b>. Первая строка — заголовки.
+            Столбцы по порядку: <b>Бренд, Наименование, Артикул, Цена, Итого, Срок поставки, Качество</b>. Первая строка — заголовки.
             Если «Цена» пустая, берётся «Итого». Срок — в днях («3», «2-3 дня»). Позиции сопоставляются с номенклатурой по
             артикулу (и бренду, если артикул встречается у нескольких брендов).
           </p>
@@ -446,6 +446,7 @@ function ImportModal({
                   <th className="px-2 py-1.5">Наименование</th>
                   <th className="px-2 py-1.5">Цена</th>
                   <th className="px-2 py-1.5">Срок</th>
+                  <th className="px-2 py-1.5">Качество</th>
                   <th className="px-2 py-1.5">Что будет</th>
                 </tr>
               </thead>
@@ -465,6 +466,7 @@ function ImportModal({
                       {formatRubPrecise(r.price)}
                     </td>
                     <td className="px-2 py-1">{days(r.deliveryDays)}</td>
+                    <td className="whitespace-nowrap px-2 py-1">{r.quality ?? "—"}</td>
                     <td className={`px-2 py-1 ${r.kind === "missing" ? "text-yellow-700 dark:text-yellow-400" : ""}`}>
                       {KIND_LABELS[r.kind]}
                     </td>
