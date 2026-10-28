@@ -210,6 +210,17 @@ async function matchPayment(tx: { id: string; amount: number; date: Date; counte
     orders.find((o) => o.invoiceNumber && invoices.includes(o.invoiceNumber) && (!o.invoiceDate || o.invoiceDate > yearAgo)) ??
     orders.find((o) => orderNumbers.includes(o.orderNumber));
   let how = order ? "по номеру в назначении" : "";
+  if (!order && invoices.length) {
+    // The invoice named is of an order already marked paid (from 1С, or by hand).
+    const settled = await prisma.order.findFirst({
+      where: { invoiceNumber: { in: invoices }, invoiceDate: { gt: yearAgo }, customerName: { in: companies.map((c) => c.name), mode: "insensitive" } },
+      select: { id: true, orderNumber: true },
+    });
+    if (settled) {
+      await prisma.bankTransaction.update({ where: { id: tx.id }, data: { orderId: settled.id } });
+      return `Заказ ${settled.orderNumber} уже отмечен оплаченным`;
+    }
+  }
   if (!order) {
     const sameSum = [];
     for (const o of orders) if (Math.abs((await unpaidOf(o.id)) - tx.amount) < 100) sameSum.push(o);
