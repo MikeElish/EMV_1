@@ -74,12 +74,12 @@ export function SalaryReportView({
             <Tile label="Продажи" amount={report.sales} className="border-lime-500/40 bg-lime-400/15 text-lime-800 dark:text-lime-300" />
             <Tile label="Себестоимость" amount={report.costOfSales} className="border-yellow-500/40 bg-yellow-300/20 text-yellow-800 dark:text-yellow-300" />
             <Tile label="Затраты" amount={report.costs} className="border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400" />
-            <Tile label="К выплате" amount={report.payout} strong className="border-green-700/50 bg-green-600/15 text-green-800 dark:text-green-400" />
+            <Tile label="Бонус к выплате" amount={report.payout} strong className="border-green-700/50 bg-green-600/15 text-green-800 dark:text-green-400" />
           </div>
           <p className="mt-2 text-xs text-foreground/50">
             {report.percent === null
               ? "У сотрудника не задан «% от прибыли» (CRM → Пользователи → карточка) — «К выплате» не считается."
-              : `К выплате = ${String(report.percent).replace(".", ",")}% от прибыли ${formatRub(report.profit)} (продажи − себестоимость − затраты).`}
+              : `Бонус = ${String(report.percent).replace(".", ",")}% от прибыли ${formatRub(report.profit)} (продажи − себестоимость − затраты) сверх плана ${formatRub(report.plan)} (оклад × 1,5 × 1,5). Оклад начисляется в Финансы → Зарплата.`}
           </p>
 
           <h2 className="mt-8 text-base font-semibold">Деталировка</h2>

@@ -8,6 +8,8 @@ import { accessDenied, requireSection } from "@/lib/access-server";
 import { companyByInn, type SupplierLookup } from "@/lib/company-by-inn";
 import { markRequestPaid, matchRequest, paymentsFor, storeRequestFile, syncExtraCostRequest } from "@/lib/payment-requests";
 import { PAYMENT_REQUEST_STATUSES, type PaymentRequestInput } from "@/lib/validators/payment-requests";
+import { FUNDS } from "@/lib/fund-labels";
+import { fundCanPay } from "@/lib/funds";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -61,6 +63,7 @@ export async function savePaymentRequest(formData: FormData): Promise<ActionResu
     orderId: input.orderId || null,
     amount,
     purpose: String(input.purpose ?? "").trim().slice(0, 500) || null,
+    fund: (FUNDS as readonly string[]).includes(input.fund) ? input.fund : "FREE",
   };
   const saved = input.id
     ? await prisma.paymentRequest.update({ where: { id: input.id }, data })
@@ -78,6 +81,11 @@ export async function setPaymentRequestStatus(id: string, status: string): Promi
   if (!(PAYMENT_REQUEST_STATUSES as readonly string[]).includes(status)) return { ok: false, error: "Некорректный статус" };
   const request = await prisma.paymentRequest.findUnique({ where: { id: String(id) } });
   if (!request) return { ok: false, error: "Заявка не найдена" };
+  if (status === "Оплачено" && request.status !== "Оплачено") {
+    // Paid from its fund -- only while the fund holds enough.
+    const can = await fundCanPay(request.fund, request.amount);
+    if (!can.ok) return can;
+  }
   if (status === "Оплачено") await markRequestPaid(request.id);
   else {
     await prisma.paymentRequest.update({

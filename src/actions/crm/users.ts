@@ -92,6 +92,8 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
         role: data.role,
         companyId,
         salaryPercent: data.role === "CUSTOMER" ? null : (data.salaryPercent ?? null),
+        salary: data.role === "CUSTOMER" ? null : (data.salary ?? null),
+        position: data.role === "CUSTOMER" ? null : data.position || null,
         login,
         passwordHash,
       },
@@ -136,6 +138,8 @@ export async function updateUser(id: string, input: UserInput): Promise<ActionRe
         role: data.role,
         companyId,
         salaryPercent: data.role === "CUSTOMER" ? null : (data.salaryPercent ?? null),
+        salary: data.role === "CUSTOMER" ? null : (data.salary ?? null),
+        position: data.role === "CUSTOMER" ? null : data.position || null,
         ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 12) } : {}),
       },
     });

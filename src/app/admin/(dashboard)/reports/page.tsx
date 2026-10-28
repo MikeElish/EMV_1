@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function ReportsIndexPage() {
-  redirect("/admin/reports/funds");
+  redirect("/admin/reports/bonuses");
 }

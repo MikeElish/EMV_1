@@ -19,6 +19,9 @@ export type SalaryReport = {
   costs: number;
   profit: number;
   percent: number | null;
+  /** The plan of the Оклад for the period (Финансы → Зарплата): 2.25 × Оклад a month. */
+  plan: number;
+  /** The bonus: % of the profit above the plan. */
   payout: number;
   rows: SalaryRow[];
 };
@@ -30,7 +33,7 @@ export async function salaryReport(employeeId: string, from: string, to: string)
   const start = new Date(`${from}T00:00:00+03:00`);
   const end = new Date(`${to}T23:59:59.999+03:00`);
   const [employee, orders, extra] = await Promise.all([
-    prisma.user.findUnique({ where: { id: employeeId }, select: { salaryPercent: true } }),
+    prisma.user.findUnique({ where: { id: employeeId }, select: { salaryPercent: true, salary: true } }),
     prisma.order.findMany({
       where: {
         managerId: employeeId,
@@ -107,5 +110,9 @@ export async function salaryReport(employeeId: string, from: string, to: string)
 
   const profit = sales - costOfSales - costs;
   const percent = employee?.salaryPercent ?? null;
-  return { sales, costOfSales, costs, profit, percent, payout: percent === null ? 0 : Math.round((profit * percent) / 100), rows };
+  // The plan of each month the period touches (a part of a month counts in full).
+  const months = (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + Number(to.slice(5, 7)) - Number(from.slice(5, 7)) + 1;
+  const plan = Math.round((employee?.salary ?? 0) * 2.25 * months);
+  const payout = percent === null ? 0 : Math.max(0, Math.round(((profit - plan) * percent) / 100));
+  return { sales, costOfSales, costs, profit, percent, plan, payout, rows };
 }

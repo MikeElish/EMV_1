@@ -28,6 +28,7 @@ function parseVehicleFormData(formData: FormData) {
     ptsIssueDate: formData.get("ptsIssueDate"),
     stsNumber: formData.get("stsNumber"),
     stsIssueDate: formData.get("stsIssueDate"),
+    leasingMonthly: String(formData.get("leasingMonthly") ?? ""),
   });
 }
 
@@ -43,6 +44,7 @@ function toVehicleData(data: VehicleInput) {
     ptsIssueDate: new Date(data.ptsIssueDate),
     stsNumber: data.stsNumber,
     stsIssueDate: new Date(data.stsIssueDate),
+    leasingMonthly: data.leasingMonthly === null ? null : Math.round(data.leasingMonthly * 100),
   };
 }
 

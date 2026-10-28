@@ -20,6 +20,7 @@ import {
 } from "@/actions/admin/payment-requests";
 import { PAYMENT_REQUEST_STATUSES, type PaymentRequestInput } from "@/lib/validators/payment-requests";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
+import { FUNDS, FUND_LABELS, type Fund } from "@/lib/fund-labels";
 
 export type PaymentRequestRow = {
   id: string;
@@ -34,6 +35,7 @@ export type PaymentRequestRow = {
   source: string | null;
   amount: number;
   purpose: string | null;
+  fund: string;
   status: string;
   paidAt: string | null;
   payment: string | null;
@@ -105,6 +107,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
   const [data, setData] = useState<PaymentRequestFormData | null>(null);
   const [companyId, setCompanyId] = useState(request?.companyId ?? "");
   const [orderId, setOrderId] = useState(request?.orderId ?? "");
+  const [fund, setFund] = useState(request?.fund ?? "FREE");
   const [inn, setInn] = useState("");
   const [innNote, setInnNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +145,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
       orderId: orderId || null,
       amount,
       purpose: String(form.get("purpose") ?? ""),
+      fund,
     };
     const body = new FormData();
     body.set("data", JSON.stringify(input));
@@ -220,6 +224,17 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
               <input name="purpose" defaultValue={request?.purpose ?? ""} className={inputClass} />
             </div>
           </div>
+          <div className="max-w-sm">
+            <label className="text-sm text-foreground/60">Фонд *</label>
+            <select value={fund} onChange={(e) => setFund(e.target.value)} className={inputClass}>
+              {FUNDS.map((f) => (
+                <option key={f} value={f}>
+                  {FUND_LABELS[f]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-foreground/50">Оплатить заявку можно, только если в фонде хватает денег (Финансы → Фонды).</p>
+          </div>
           <div>
             <label className="text-sm text-foreground/60">Счёт (файл)</label>
             <input name="file" type="file" className="mt-2 block w-full text-sm" />
@@ -252,13 +267,17 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
 function StatusSelect({ request }: { request: PaymentRequestRow }) {
   const [pending, startTransition] = useTransition();
   return (
+    <>
     <select
       value={request.status}
       disabled={pending}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => {
         const next = e.target.value;
-        startTransition(async () => void (await setPaymentRequestStatus(request.id, next)));
+        startTransition(async () => {
+          const r = await setPaymentRequestStatus(request.id, next);
+          if (!r.ok) alert(r.error);
+        });
       }}
       className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none ${STATUS_STYLES[request.status] ?? ""}`}
     >
@@ -266,6 +285,8 @@ function StatusSelect({ request }: { request: PaymentRequestRow }) {
         <option key={s}>{s}</option>
       ))}
     </select>
+    <div className="mt-0.5 text-[11px] text-foreground/50">{FUND_LABELS[request.fund as Fund] ?? FUND_LABELS.FREE}</div>
+    </>
   );
 }
 

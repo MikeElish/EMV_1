@@ -38,7 +38,13 @@ export const ACCESS_GROUPS: AccessGroup[] = [
   {
     label: "Финансы",
     path: "/admin/finance",
-    sections: [{ key: "finance.payment-requests", label: "Заявки на оплату", path: "/admin/finance/payment-requests" }],
+    sections: [
+      { key: "finance.payment-requests", label: "Заявки на оплату", path: "/admin/finance/payment-requests" },
+      { key: "finance.summary", label: "Сводный отчёт", path: "/admin/finance/summary" },
+      { key: "finance.funds", label: "Фонды", path: "/admin/finance/funds" },
+      { key: "finance.payroll", label: "Зарплата", path: "/admin/finance/payroll" },
+      { key: "finance.taxes", label: "Налоги", path: "/admin/finance/taxes" },
+    ],
   },
   { label: "Склад", path: "/admin/warehouse", sections: [{ key: "warehouse", label: "Склад", path: "/admin/warehouse" }] },
   {
@@ -62,7 +68,6 @@ export const ACCESS_GROUPS: AccessGroup[] = [
     label: "Отчёты",
     path: "/admin/reports",
     sections: [
-      { key: "reports.funds", label: "Фонды", path: "/admin/reports/funds" },
       { key: "reports.salary", label: "Бонусы", path: "/admin/reports/bonuses" },
       { key: "reports.execution", label: "Выполнение", path: "/admin/reports/execution" },
       { key: "reports.analytics", label: "Аналитика", path: "/admin/reports/analytics" },

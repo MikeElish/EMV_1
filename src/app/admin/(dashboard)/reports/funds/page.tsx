@@ -1,5 +1,6 @@
-import { SectionStub } from "@/components/admin/SectionStub";
+import { redirect } from "next/navigation";
 
-export default function ReportsFundsPage() {
-  return <SectionStub title="Фонды" />;
+/** Фонды moved to Финансы. */
+export default function OldFundsPage() {
+  redirect("/admin/finance/funds");
 }

@@ -8,4 +8,6 @@ export type PaymentRequestInput = {
   /** kopecks */
   amount: number;
   purpose: string;
+  /** Финансы → Фонды: the fund it is paid from. */
+  fund: string;
 };

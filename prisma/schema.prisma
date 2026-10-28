@@ -550,6 +550,10 @@ model User {
   extraCosts            ExtraCost[]     @relation("ExtraCostEmployee")
   // Отчёты → Зарплата: «К выплате» = this % of the profit of the period.
   salaryPercent         Float?
+  // Финансы → Зарплата: «Оклад» (kopecks a month) and «Должность».
+  salary                Int?
+  position              String?
+  payrollRows           PayrollRow[]
   // Saved from the customer's own "Настройки" card and pre-filled into new
   // checkouts -- independent of the checkout page's own localStorage memory.
   defaultDeliveryMethod DeliveryMethod?
@@ -726,25 +730,27 @@ enum VehicleStatus {
 }
 
 model Vehicle {
-  id           String            @id @default(cuid())
-  brand        String
-  model        String
-  licensePlate String            @unique
-  vin          String            @unique
-  color        String
-  year         Int
-  ptsNumber    String
-  ptsIssueDate DateTime
-  stsNumber    String
-  stsIssueDate DateTime
+  id             String            @id @default(cuid())
+  brand          String
+  model          String
+  licensePlate   String            @unique
+  vin            String            @unique
+  color          String
+  year           Int
+  ptsNumber      String
+  ptsIssueDate   DateTime
+  stsNumber      String
+  stsIssueDate   DateTime
   // Status transition logic isn't defined yet -- every vehicle is created as
   // FREE for now.
-  status       VehicleStatus     @default(FREE)
-  documents    VehicleDocument[]
-  fuelReceipts FuelReceipt[]
-  repairs      Repair[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  status         VehicleStatus     @default(FREE)
+  // Финансы → Фонды «Лизинг»: the monthly lease payment, kopecks.
+  leasingMonthly Int?
+  documents      VehicleDocument[]
+  fuelReceipts   FuelReceipt[]
+  repairs        Repair[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([status])
 }
@@ -1190,6 +1196,8 @@ model PaymentRequest {
   purpose           String?
   // Требуется оплата, Оплачено, Отменено.
   status            String               @default("Требуется оплата")
+  // Финансы → Фонды: the fund it is paid from (src/lib/funds.ts FUNDS).
+  fund              String               @default("FREE")
   paidAt            DateTime?
   bankTransactionId String?              @unique
   bankTransaction   BankTransaction?     @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
@@ -1214,4 +1222,39 @@ model PaymentRequestFile {
   createdAt DateTime       @default(now())
 
   @@index([requestId])
+}
+
+// Финансы → Зарплата: an employee's line of a month, worked out from the rule
+// (src/lib/payroll.ts) and kept once corrected or the payslips are made.
+model PayrollRow {
+  id          String   @id @default(cuid())
+  // "2026-10".
+  month       String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position    String?
+  // How it was counted, as shown in «Расчет».
+  calculation String
+  // Kopecks: «Начислено» and the part paid in cash («Наличные»).
+  accrued     Int
+  cash        Int      @default(0)
+  // A driver's «выработка» of the month (his % is of it), typed in.
+  output      Int?
+  // Corrected by hand: not recounted.
+  manual      Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([month, userId])
+}
+
+// Финансы → Налоги: what the statements don't tell (one row).
+model TaxSettings {
+  id             Int       @id @default(1)
+  // Патент (такси): its cost and term.
+  patentCost     Int       @default(0)
+  patentFrom     DateTime?
+  patentTo       DateTime?
+  // Фиксированные взносы ИП of the year, kopecks.
+  insuranceFixed Int       @default(5739000)
+  updatedAt      DateTime  @updatedAt
 }

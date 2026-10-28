@@ -118,3 +118,50 @@ export async function getGlonassVehicles(): Promise<GlonassVehicle[]> {
   });
   return data;
 }
+
+export type GlonassMileage = { vehicleId: number; number: string; km: number };
+
+const mileageCache = new Map<string, { at: number; data: GlonassMileage[] }>();
+
+/**
+ * Пробег of every object of the account between two moments
+ * (`POST /api/v3/vehicles/mileageAndMotohours`). A finished month is kept for
+ * a day, a running one for 10 minutes.
+ */
+export async function getGlonassMileage(from: Date, to: Date): Promise<GlonassMileage[]> {
+  const settings = await loadSettings();
+  const key = `${settings.key}|${from.toISOString()}|${to.toISOString()}`;
+  const kept = mileageCache.get(key);
+  const ttl = to.getTime() < Date.now() ? 24 * 3600 * 1000 : 10 * 60 * 1000;
+  if (kept && Date.now() - kept.at < ttl) return kept.data;
+
+  const vehicles = await getGlonassVehicles();
+  if (!vehicles.length) return [];
+  const fmt = (d: Date) => d.toISOString().slice(0, 19);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const authId = session?.key === settings.key ? session.authId : await login(settings);
+    const response = await fetch(`${settings.serverUrl}/api/v3/vehicles/mileageAndMotohours`, {
+      method: "POST",
+      headers: { "X-Auth": authId, "Content-Type": "application/json" },
+      body: JSON.stringify({ vehicleIds: vehicles.map((v) => v.vehicleId), from: fmt(from), to: fmt(to > new Date() ? new Date() : to) }),
+      signal: AbortSignal.timeout(30000),
+      cache: "no-store",
+    }).catch(() => {
+      throw new GlonassError(`Сервер ${settings.serverUrl} не отвечает`);
+    });
+    if (response.status === 401 || response.status === 403) {
+      session = null;
+      continue;
+    }
+    if (!response.ok) throw new GlonassError(`ГЛОНАСС вернул ошибку пробега (HTTP ${response.status})`);
+    const body = (await response.json()) as { vehicleId: number; name?: string; periods?: { mileage?: number | null }[] }[];
+    const data = body.map((v) => ({
+      vehicleId: v.vehicleId,
+      number: v.name ?? String(v.vehicleId),
+      km: Math.round((v.periods ?? []).reduce((s, p) => s + (p.mileage ?? 0), 0)),
+    }));
+    mileageCache.set(key, { at: Date.now(), data });
+    return data;
+  }
+  throw new GlonassError("ГЛОНАСС не принял авторизацию");
+}

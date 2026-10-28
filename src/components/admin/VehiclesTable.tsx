@@ -109,6 +109,7 @@ export function VehiclesTable({
               ptsIssueDate: toInputValue(selected.ptsIssueDate),
               stsNumber: selected.stsNumber,
               stsIssueDate: toInputValue(selected.stsIssueDate),
+              leasingMonthly: selected.leasingMonthly ? String(selected.leasingMonthly / 100).replace(".", ",") : "",
             }}
             onSubmit={(formData) => updateVehicle(selected.id, formData)}
             onSuccess={close}

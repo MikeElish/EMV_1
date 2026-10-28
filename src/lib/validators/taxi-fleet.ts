@@ -37,5 +37,12 @@ export const vehicleSchema = z.object({
   ptsIssueDate: z.string().trim().min(1, "Укажите дату выдачи ПТС"),
   stsNumber: z.string().trim().min(1, "Укажите номер СТС"),
   stsIssueDate: z.string().trim().min(1, "Укажите дату выдачи СТС"),
+  // Финансы → Фонды «Лизинг»: rubles a month, empty -- none.
+  leasingMonthly: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? Number(v.replace(/s/g, "").replace(",", ".")) : null))
+    .refine((v) => v === null || (Number.isFinite(v) && v >= 0), "Лизинг — сумма в рублях"),
 });
 export type VehicleInput = z.infer<typeof vehicleSchema>;

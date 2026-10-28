@@ -7,6 +7,12 @@ import type { ActionResult } from "@/actions/crm/users";
 
 type Company = { id: string; name: string; isOwn?: boolean };
 
+/** «30 000» → 3000000 kopecks; empty -- not set. */
+function rublesOf(raw: string): number | undefined {
+  const s = raw.replace(/s/g, "").replace(",", ".");
+  return s ? Math.round(Number(s) * 100) : undefined;
+}
+
 /** «10,5» → 10.5; empty -- not set. */
 function percentOf(raw: string): number | undefined {
   const s = raw.trim().replace(",", ".");
@@ -44,6 +50,11 @@ export function UserForm({
       setError("Укажите % от прибыли числом");
       return;
     }
+    if (Number.isNaN(rublesOf(String(formData.get("salary") ?? "")))) {
+      setSubmitting(false);
+      setError("Укажите оклад числом");
+      return;
+    }
     const result = await onSubmit({
       lastName: String(formData.get("lastName") ?? "") || undefined,
       firstName: String(formData.get("firstName") ?? "") || undefined,
@@ -54,6 +65,8 @@ export function UserForm({
       companyId: String(formData.get("companyId") ?? "") || undefined,
       password: String(formData.get("password") ?? "") || undefined,
       salaryPercent: percentOf(String(formData.get("salaryPercent") ?? "")),
+      salary: rublesOf(String(formData.get("salary") ?? "")),
+      position: String(formData.get("position") ?? "").trim() || undefined,
     });
 
     setSubmitting(false);
@@ -192,19 +205,53 @@ export function UserForm({
       </div>
 
       {isEmployee && !isOwner && (
-        <div>
-          <label htmlFor="salaryPercent" className="text-sm text-foreground/60">
-            % от прибыли (Отчёты → Бонусы)
-          </label>
-          <input
-            id="salaryPercent"
-            name="salaryPercent"
-            inputMode="decimal"
-            placeholder="например, 10"
-            defaultValue={initial?.salaryPercent}
-            className="mt-1 w-40 rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          />
-        </div>
+        <fieldset className="rounded-md border border-foreground/10 p-3">
+          <legend className="px-1 text-sm text-foreground/60">Зарплата (Финансы → Зарплата)</legend>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="position" className="text-sm text-foreground/60">
+                Должность
+              </label>
+              <input
+                id="position"
+                name="position"
+                defaultValue={initial?.position}
+                className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+              />
+            </div>
+            <div>
+              <label htmlFor="salary" className="text-sm text-foreground/60">
+                Оклад, ₽
+              </label>
+              <input
+                id="salary"
+                name="salary"
+                inputMode="decimal"
+                placeholder="0"
+                defaultValue={initial?.salary ? String(initial.salary / 100) : undefined}
+                className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+              />
+            </div>
+            <div>
+              <label htmlFor="salaryPercent" className="text-sm text-foreground/60">
+                {role === "DRIVER" ? "% от выработки" : "% от прибыли"}
+              </label>
+              <input
+                id="salaryPercent"
+                name="salaryPercent"
+                inputMode="decimal"
+                placeholder="например, 10"
+                defaultValue={initial?.salaryPercent}
+                className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+              />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-foreground/50">
+            {role === "DRIVER"
+              ? "Водителю начисляется % от выработки месяца (вносится в ведомости)."
+              : "План = оклад × 1,5 × 1,5. Пока прибыль не выше плана — только оклад; с прибыли сверх плана — указанный %."}
+          </p>
+        </fieldset>
       )}
 
       <div>

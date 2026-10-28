@@ -38,6 +38,9 @@ export const userSchema = z.object({
   password: z.union([z.string().min(6, "Минимум 6 символов"), z.literal("")]).optional(),
   // Отчёты → Бонусы: «К выплате» = this % of the profit.
   salaryPercent: z.number().min(0, "Процент не может быть отрицательным").max(100, "Не больше 100%").optional(),
+  // Финансы → Зарплата: «Оклад» (kopecks) and «Должность».
+  salary: z.number().int().min(0, "Оклад не может быть отрицательным").optional(),
+  position: z.string().trim().max(100).optional(),
 });
 export type UserInput = z.infer<typeof userSchema>;
 

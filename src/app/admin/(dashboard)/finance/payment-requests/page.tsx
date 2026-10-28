@@ -31,6 +31,7 @@ export default async function PaymentRequestsPage() {
           source: r.purchase ? `Заказ поставщику № ${r.purchase.number}` : r.extraCost ? `Доп.расход: ${r.extraCost.kind}` : null,
           amount: r.amount,
           purpose: r.purpose,
+          fund: r.fund,
           status: r.status,
           paidAt: r.paidAt?.toISOString() ?? null,
           payment: r.bankTransaction

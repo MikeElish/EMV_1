@@ -19,6 +19,8 @@ export default async function CrmUsersPage() {
         email: true,
         phone: true,
         salaryPercent: true,
+        salary: true,
+        position: true,
         role: true,
         companyId: true,
         company: { select: { name: true } },

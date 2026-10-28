@@ -16,6 +16,8 @@ export type VehicleFormInitial = {
   ptsIssueDate?: string;
   stsNumber?: string;
   stsIssueDate?: string;
+  /** Rubles a month. */
+  leasingMonthly?: string;
 };
 
 const inputClassName =
@@ -190,6 +192,20 @@ export function VehicleForm({
           </div>
         </div>
       </fieldset>
+
+      <div>
+        <label htmlFor="leasingMonthly" className="text-sm text-foreground/60">
+          Лизинг, ₽ в месяц (Финансы → Фонды)
+        </label>
+        <input
+          id="leasingMonthly"
+          name="leasingMonthly"
+          inputMode="decimal"
+          placeholder="не в лизинге"
+          defaultValue={initial?.leasingMonthly}
+          className={`${inputClassName} max-w-48`}
+        />
+      </div>
 
       {!vehicleId && (
         <div>

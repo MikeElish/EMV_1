@@ -25,6 +25,8 @@ type Row = {
   email: string | null;
   phone: string | null;
   salaryPercent: number | null;
+  salary: number | null;
+  position: string | null;
   role: Role;
   companyId: string | null;
   company: { name: string } | null;
@@ -187,6 +189,8 @@ export function UsersTable({
               email: selected.email ?? undefined,
               phone: selected.phone ?? undefined,
               salaryPercent: selected.salaryPercent ?? undefined,
+              salary: selected.salary ?? undefined,
+              position: selected.position ?? undefined,
               role: (selected.role === "OWNER" ? "ADMIN" : selected.role) as UserInput["role"],
               companyId: selected.companyId ?? undefined,
             }}
