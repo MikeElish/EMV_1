@@ -557,11 +557,19 @@ export function OrdersTable({
                         </td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
                           {manual && !item.cancelled ? (
-                            <LinePriceCell itemId={item.id} current={item.priceSnapshot} />
+                            <LinePriceCell itemId={item.id} current={item.priceSnapshot - item.surcharge} />
                           ) : item.priceSnapshot <= 0 && !item.cancelled ? (
                             <LinePriceCell itemId={item.id} />
                           ) : (
                             formatRub(item.priceSnapshot)
+                          )}
+                          {item.surcharge > 0 && !item.cancelled && (
+                            <div
+                              className="whitespace-nowrap text-xs text-foreground/50"
+                              title="Заказ «Под заказ» меньше 10 000 ₽ — +1 500 ₽; маржа меньше 2 000 ₽ — до 2 500 ₽; поровну на позиции «Под заказ»"
+                            >
+                              {manual ? "+ " : "в т.ч. "}надбавка {formatRub(item.surcharge)}
+                            </div>
                           )}
                         </td>
                         <td className={`whitespace-nowrap py-2 pr-4 ${cancelledCellClass}`}>

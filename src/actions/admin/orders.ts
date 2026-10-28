@@ -11,6 +11,7 @@ import {
 import { applyPaymentTerms, refreshOrder, releaseAwaitingSupply, setLineStatuses, targetLines } from "@/lib/order-status";
 import { sendDeliveryChangeLetter } from "@/lib/order-notifications";
 import { issueOrderInvoice } from "@/lib/order-invoice";
+import { applyOrderSurcharges } from "@/lib/order-surcharge";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -43,6 +44,8 @@ export async function updateOrderItemStatus(
     target.ids.map((id) => ({ itemId: id, status })),
     { notify: true }
   );
+  // A cancelled line «Под заказ» changes what the others share.
+  if (status === "CANCELLED") await applyOrderSurcharges(target.orderId);
   revalidateOrders();
   return { ok: true };
 }
@@ -74,7 +77,8 @@ export async function updateLinePayment(
 
 /**
  * The price of a line ordered «По запросу» (or any line not paid yet): the
- * order total follows. Price in kopecks.
+ * order total follows. Price in kopecks, without the surcharge of the lines
+ * «Под заказ» -- that is counted again on top.
  */
 export async function updateLinePrice(itemId: string, price: number): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
@@ -84,8 +88,9 @@ export async function updateLinePrice(itemId: string, price: number): Promise<Ac
   if (!item) return { ok: false, error: "Позиция не найдена" };
   // The owner corrects any line («Ручное редактирование»); others only unpaid ones.
   if (item.paid && (await ownerOnly())) return { ok: false, error: "Позиция уже оплачена — цену не меняем" };
-  await prisma.orderItem.update({ where: { id: itemId }, data: { priceSnapshot: price } });
+  await prisma.orderItem.update({ where: { id: itemId }, data: { priceSnapshot: price, surcharge: 0 } });
   await refreshOrder(prisma, item.orderId);
+  await applyOrderSurcharges(item.orderId);
   revalidateOrders();
   return { ok: true };
 }

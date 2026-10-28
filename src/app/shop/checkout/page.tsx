@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cartKey, useCart } from "@/components/shop/CartProvider";
-import { createOrder } from "@/actions/shop/checkout";
+import { createOrder, quoteCheckout } from "@/actions/shop/checkout";
+import { checkoutTermsText } from "@/lib/supply-terms";
 import { getMyProfile } from "@/actions/shop/settings";
 import { checkCustomerEmailExists, registerOrLoginCustomer } from "@/actions/shop/auth";
 import { setMyNewsletter } from "@/actions/shop/newsletter";
@@ -66,6 +67,12 @@ export default function CheckoutPage() {
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
   const [consent, setConsent] = useState(false);
+  // A private customer (not a client company's employee) agrees to the terms of supply.
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  // What the lines «Под заказ» add (small order / minimum margin), per cart line.
+  const [surcharges, setSurcharges] = useState<number[]>([]);
   // Off until ticked: an advertising consent can't be pre-checked.
   const [newsletter, setNewsletter] = useState(false);
 
@@ -86,7 +93,26 @@ export default function CheckoutPage() {
   const [codeSendError, setCodeSendError] = useState<string | undefined>();
   const [authStep, setAuthStep] = useState<"password" | "code">("password");
 
-  const ndsAmount = Math.round(totalAmount * 0.22);
+  const surchargeTotal = surcharges.reduce((sum, x, n) => sum + x * (items[n]?.quantity ?? 0), 0);
+  const orderTotal = totalAmount + surchargeTotal;
+  // «в т.ч.»: the VAT inside the prices, not on top of them.
+  const ndsAmount = Math.round((orderTotal * 22) / 122);
+  const privateCustomer = !companyName;
+
+  const cartSignature = items.map((i) => `${i.productId}:${i.offerId ?? ""}:${i.quantity}`).join(",");
+  useEffect(() => {
+    let cancelled = false;
+    if (!items.length) return;
+    quoteCheckout(items.map((i) => ({ productId: i.productId, offerId: i.offerId, quantity: i.quantity })))
+      .then((quote) => {
+        if (!cancelled) setSurcharges(quote.ok ? quote.surcharges : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSignature]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +138,7 @@ export default function CheckoutPage() {
     getMyProfile().then((profile) => {
       if (cancelled) return;
       setIsCustomer(profile !== null);
+      setCompanyName(profile?.companyName ?? null);
       if (profile && !profile.emailVerified) setUnverifiedEmail(profile.email);
       // A signed-in customer's own contact details win over the last order
       // typed on this browser (which may have been someone else's).
@@ -179,6 +206,7 @@ export default function CheckoutPage() {
       customerPhone: formatRuPhone(phoneDigits),
       customerEmail,
       deliveryNote: deliveryNoteLines.join("\n"),
+      termsAccepted,
       items: items.map((i) => ({
         productId: i.productId,
         offerId: i.offerId,
@@ -213,7 +241,7 @@ export default function CheckoutPage() {
       // ignore storage write failures (private mode, quota, etc.)
     }
 
-    trackPurchase(result.orderNumber, totalAmount, items);
+    trackPurchase(result.orderNumber, orderTotal, items);
     clear();
     // Order numbers contain a literal "/" (ДДММГГ/N); /shop/order/[...orderNumber]
     // is a catch-all route so this naturally lands as two segments.
@@ -234,6 +262,10 @@ export default function CheckoutPage() {
     }
     if (!isCustomer && !consent) {
       setError("Необходимо согласие на обработку персональных данных");
+      return;
+    }
+    if (privateCustomer && !termsAccepted) {
+      setError("Необходимо согласие с условиями поставки");
       return;
     }
 
@@ -313,18 +345,24 @@ export default function CheckoutPage() {
         <div>
           <h2 className="text-lg font-semibold">Ваш заказ</h2>
           <div className="mt-3 rounded-lg border border-foreground/10 p-4 text-sm">
-            {items.map((item) => (
+            {items.map((item, n) => (
               <div key={cartKey(item)} className="flex justify-between py-1">
                 <span>
                   {item.name}
                   {item.offerLabel && <span className="text-xs text-foreground/50"> · {item.offerLabel}</span>} × {item.quantity}
                 </span>
-                <span>{formatShopPrice(item.price * item.quantity)}</span>
+                <span>{formatShopPrice((item.price + (surcharges[n] ?? 0)) * item.quantity)}</span>
               </div>
             ))}
+            {surchargeTotal > 0 && (
+              <div className="flex justify-between pt-1 text-foreground/60">
+                <span>в т.ч. доплата за поставку позиций «Под заказ»</span>
+                <span>{formatRub(surchargeTotal)}</span>
+              </div>
+            )}
             <div className="mt-2 flex justify-between border-t border-foreground/10 pt-2 font-semibold">
               <span>Итого</span>
-              <span>{formatRub(totalAmount)}</span>
+              <span>{formatRub(orderTotal)}</span>
             </div>
             <div className="flex justify-between pt-1 text-foreground/50">
               <span>в т.ч. НДС 22%</span>
@@ -487,6 +525,27 @@ export default function CheckoutPage() {
                   </span>
                 </label>
               )}
+              {privateCustomer && (
+                <label className="flex items-start gap-2 text-sm text-foreground/70">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Согласие с{" "}
+                    <button
+                      type="button"
+                      onClick={() => setTermsOpen(true)}
+                      className="text-foreground underline underline-offset-4 hover:opacity-80"
+                    >
+                      условиями поставки
+                    </button>{" "}
+                    *
+                  </span>
+                </label>
+              )}
               <label className="flex items-start gap-2 text-sm text-foreground/70">
                 <input
                   type="checkbox"
@@ -518,6 +577,35 @@ export default function CheckoutPage() {
           </p>
         </form>
       </div>
+
+      {termsOpen && (
+        <Modal onClose={() => setTermsOpen(false)} maxWidthClassName="max-w-2xl">
+          <h2 className="text-lg font-bold">Условия поставки</h2>
+          <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto pr-1 text-sm text-foreground/80">
+            <p>Оплата заказа означает согласие с условиями поставки товара:</p>
+            {checkoutTermsText(
+              deliveryMethod === "address" ? "ADDRESS" : deliveryMethod === "terminal" ? "TERMINAL" : "PICKUP",
+              deliveryMethod === "terminal"
+                ? terminal.trim()
+                : [settlement.trim(), street.trim(), house.trim() && `д. ${house.trim()}`, apartment.trim() && `оф./кв. ${apartment.trim()}`]
+                    .filter(Boolean)
+                    .join(", ")
+            ).map((t) => (
+              <p key={t}>{t}</p>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setTermsAccepted(true);
+              setTermsOpen(false);
+            }}
+            className="mt-4 w-full rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90"
+          >
+            Согласен
+          </button>
+        </Modal>
+      )}
 
       {passwordModalOpen && (
         <Modal onClose={() => setPasswordModalOpen(false)} maxWidthClassName="max-w-sm">

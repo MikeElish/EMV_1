@@ -288,6 +288,8 @@ model Order {
   handover           String?
   handoverAt         DateTime?
   handoverNote       String?
+  // A private customer ticked «Согласие с условиями поставки» at checkout.
+  termsAcceptedAt    DateTime?
   userId             String?
   user               User?              @relation(fields: [userId], references: [id])
   items              OrderItem[]
@@ -397,6 +399,9 @@ model OrderItem {
   product                Product             @relation(fields: [productId], references: [id])
   nameSnapshot           String
   priceSnapshot          Int
+  // Part of priceSnapshot (per unit) added by the small-order / minimum-margin
+  // rules for lines «Под заказ» (src/lib/order-surcharge.ts).
+  surcharge              Int                 @default(0)
   quantity               Int
   cancelled              Boolean             @default(false)
   // Each line moves through the statuses on its own; cancelled mirrors
