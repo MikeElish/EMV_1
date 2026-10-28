@@ -283,6 +283,7 @@ model Order {
   items              OrderItem[]
   documents          OrderDocument[]
   extraCosts         ExtraCost[]
+  priceRequests      PriceRequest[]
   payment            Payment?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
@@ -565,11 +566,15 @@ model Company {
   priceType           CompanyPriceType    @default(WHOLESALE)
   // INDIVIDUAL only: % over the purchase price.
   individualMarkup    Float?
+  // Who gets the price requests (Проценка по почте) and supplier orders.
+  contactName         String?
+  contactEmail        String?
   documents           CompanyDocument[]
   suppliedProducts    ProductPricing[]
   supplierOffers      SupplierOffer[]
   supplierOrderLines  SupplierOrderLine[]
   extraCosts          ExtraCost[]         @relation("ExtraCostSupplier")
+  priceRequests       PriceRequest[]      @relation("PriceRequestSupplier")
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
   oneCRef             String?             @unique
@@ -857,4 +862,33 @@ model RepairDocument {
   uploadedAt DateTime @default(now())
 
   @@index([repairId])
+}
+
+/**
+ * Проценка по почте: a supplier asked for prices of an order's lines. The
+ * reply's table becomes offers; a day without one -- a reminder; two days --
+ * the summary to the shop's mailbox (src/lib/price-requests.ts).
+ */
+model PriceRequest {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId    String
+  supplier      Company   @relation("PriceRequestSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+  email         String
+  contactName   String?
+  // [{ productId, quantity }] asked.
+  items         Json
+  // Message-ID of the letter: the reply refers to it.
+  messageId     String?
+  sentAt        DateTime  @default(now())
+  remindedAt    DateTime?
+  answeredAt    DateTime?
+  // What the reply gave: «3 позиции загружено» or why nothing was.
+  answerNote    String?
+  summarySentAt DateTime?
+
+  @@index([orderId])
+  @@index([supplierId])
+  @@index([answeredAt])
 }

@@ -1,14 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { parse } from "csv-parse/sync";
-import { read, utils } from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
-import { findCanonicalBrand } from "@/lib/normalize-brand";
-import { buildProductSlug } from "@/lib/slug";
 import { uploadOfferFile, deleteOfferFile } from "@/lib/offer-file-storage";
-import { selectOffer, syncSelectedOffer, upsertSupplierOffer } from "@/lib/supplier-offers";
+import { selectOffer, syncSelectedOffer } from "@/lib/supplier-offers";
+import { sendPriceRequests } from "@/lib/price-requests";
+import { analyzeOfferRows, sheetRows, writeOfferRows, type OfferImportRow, type OfferRowsAnalysis, type OfferWriteResult } from "@/lib/offer-import";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -18,12 +16,6 @@ const num = (v: unknown) => {
   const n = Number(String(v ?? "").replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(n) ? n : NaN;
 };
-/** «3», «3 дн.», «2-3 дня» → days (the longer end of a range). */
-function parseDays(v: unknown): number | null {
-  const nums = String(v ?? "").match(/\d+/g);
-  return nums ? Math.max(...nums.map(Number)) : null;
-}
-const skuKey = (s: string) => s.toUpperCase().replace(/[\s\-_.\/\\]/g, "");
 
 function revalidate() {
   revalidatePath("/admin/crm/price-check");
@@ -170,67 +162,9 @@ export async function orderFromOffer(offerId: string, quantity: number): Promise
 
 // ---- Excel upload ------------------------------------------------------------
 
-export type OfferImportRow = {
-  row: number;
-  brand: string;
-  name: string;
-  sku: string;
-  price: number; // kopecks
-  deliveryDays: number | null;
-  /** As the site names it («Оригинал», «Аналог (OEM)», «Аналог»); null: not given -- the offer keeps its own. */
-  quality: string | null;
-  productId: string | null;
-  productName: string | null;
-  /** update: the supplier already has an offer; add: new offer; missing: no such article. */
-  kind: "update" | "add" | "missing";
-  oldPrice: number | null;
-};
+export type { OfferImportRow };
 
-export type OfferImportAnalysis =
-  | { ok: true; rows: OfferImportRow[]; errors: { row: number; message: string }[]; duplicates: string[] }
-  | { ok: false; error: string };
-
-async function fileRows(file: File): Promise<unknown[][]> {
-  if (/\.(xlsx|xls|ods)$/i.test(file.name)) {
-    const workbook = read(Buffer.from(await file.arrayBuffer()), { type: "buffer" });
-    return utils.sheet_to_json<unknown[]>(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" });
-  }
-  return parse(await file.text(), { columns: false, skip_empty_lines: true, trim: true });
-}
-
-const IMPORT_COLUMNS: RegExp[] = [
-  /^бренд|^производител/,
-  /^наименование/,
-  /^артикул/,
-  /^кол/,
-  /^цена/,
-  /^итого|^всего|^сумма/,
-  /^срок/,
-  /^качеств/,
-];
-
-/** «Качество» of a supplier's file (the request sheet offers Original / OEM / Analog) → the site's words. */
-function parseQuality(raw: unknown): string | null {
-  const value = String(raw ?? "").trim();
-  if (!value) return null;
-  const v = value.toLowerCase();
-  if (/^(original|orig|оригинал)/.test(v)) return "Оригинал";
-  if (/oem|оем/.test(v)) return "Аналог (OEM)";
-  if (/^(analog|аналог)/.test(v)) return "Аналог";
-  if (/б\/у|used/.test(v)) return "Б/у";
-  return value.slice(0, 40);
-}
-
-/**
- * Where Бренд, Наименование, Артикул, Количество, Цена, Итого, Срок поставки,
- * Качество are: found by the header row, or in this order when the headers
- * aren't recognised.
- */
-function columnPositions(header: unknown[]): number[] {
-  const names = header.map((h) => String(h ?? "").trim().toLowerCase());
-  const found = IMPORT_COLUMNS.map((re) => names.findIndex((n) => re.test(n)));
-  return found[2] >= 0 && (found[4] >= 0 || found[5] >= 0) ? found : IMPORT_COLUMNS.map((_, i) => i);
-}
+export type OfferImportAnalysis = ({ ok: true } & OfferRowsAnalysis) | { ok: false; error: string };
 
 /**
  * Reads a supplier price file -- columns Бренд, Наименование, Артикул, Количество,
@@ -247,122 +181,26 @@ export async function analyzeOfferImport(formData: FormData): Promise<OfferImpor
 
   let raw: unknown[][];
   try {
-    raw = await fileRows(file);
+    raw = sheetRows(Buffer.from(await file.arrayBuffer()), file.name);
   } catch (e) {
     return { ok: false, error: `Не удалось разобрать файл: ${(e as Error).message}` };
   }
-
-  const errors: { row: number; message: string }[] = [];
-  const parsed: Omit<OfferImportRow, "productId" | "productName" | "kind" | "oldPrice">[] = [];
-  const at = columnPositions(raw[0] ?? []);
-  raw.slice(1).forEach((cells, i) => {
-    const row = i + 2;
-    if (cells.every((c) => c === "" || c == null)) return;
-    const [brandRaw, nameRaw, skuRaw, qtyRaw, priceRaw, totalRaw, daysRaw, qualityRaw] = at.map((p) => (p < 0 ? "" : cells[p]));
-    const sku = String(skuRaw ?? "").trim();
-    const name = String(nameRaw ?? "").trim();
-    const brand = String(brandRaw ?? "").trim();
-    // «Цена»; when the file has only «Итого», that one -- per piece when «Количество» is given.
-    const qty = num(qtyRaw);
-    const price = String(priceRaw ?? "").trim() ? num(priceRaw) : qty > 0 ? num(totalRaw) / qty : num(totalRaw);
-    if (!sku) return errors.push({ row, message: "Нет артикула" });
-    if (!(price > 0)) return errors.push({ row, message: `Артикул ${sku}: нет цены` });
-    parsed.push({ row, brand: findCanonicalBrand(brand) ?? brand, name, sku, price: kopecks(price), deliveryDays: parseDays(daysRaw), quality: parseQuality(qualityRaw) });
-  });
-
-  // The same article twice in the file: the last line wins.
-  const bySku = new Map<string, (typeof parsed)[number]>();
-  const duplicates = new Set<string>();
-  for (const r of parsed) {
-    const key = skuKey(r.sku) + "|" + r.brand.toUpperCase();
-    if (bySku.has(key)) duplicates.add(r.sku);
-    bySku.set(key, r);
-  }
-
-  const products = await prisma.product.findMany({ select: { id: true, sku: true, brand: true, name: true } });
-  const productsBySku = new Map<string, typeof products>();
-  for (const p of products) productsBySku.set(skuKey(p.sku), [...(productsBySku.get(skuKey(p.sku)) ?? []), p]);
-  const offers = await prisma.supplierOffer.findMany({ where: { supplierId }, select: { productId: true, price: true } });
-  const offerOf = new Map(offers.map((o) => [o.productId, o.price]));
-
-  const rows: OfferImportRow[] = [...bySku.values()].map((r) => {
-    const candidates = productsBySku.get(skuKey(r.sku)) ?? [];
-    // Same article in several brands: the brand decides.
-    const product =
-      candidates.length === 1
-        ? candidates[0]
-        : candidates.find((p) => (p.brand ?? "").toUpperCase() === r.brand.toUpperCase()) ?? null;
-    if (!product) return { ...r, productId: null, productName: null, kind: "missing", oldPrice: null };
-    const old = offerOf.get(product.id);
-    return { ...r, productId: product.id, productName: product.name, kind: old === undefined ? "add" : "update", oldPrice: old ?? null };
-  });
-  return { ok: true, rows, errors, duplicates: [...duplicates] };
+  return { ok: true, ...(await analyzeOfferRows(raw, supplierId)) };
 }
 
-const NEW_FROM_PRICE_CHECK = { slug: "iz-procenki", name: "Из проценки — не распределено" };
-
-/**
- * Writes the analysed file: offers of the supplier are added or updated;
- * with `createMissing`, unknown articles become new inactive products
- * (category «Из проценки — не распределено») with this offer.
- */
+/** Writes the analysed file (src/lib/offer-import.ts → writeOfferRows). */
 export async function commitOfferImport(input: {
   supplierId: string;
   rows: OfferImportRow[];
   createMissing: boolean;
-}): Promise<{ ok: true; updated: number; added: number; created: number; skipped: number } | { ok: false; error: string }> {
+}): Promise<({ ok: true } & OfferWriteResult) | { ok: false; error: string }> {
   const denied = await accessDenied("crm.price-check");
   if (denied) return denied;
   const supplier = await prisma.company.findUnique({ where: { id: input.supplierId }, select: { id: true } });
   if (!supplier) return { ok: false, error: "Поставщик не найден" };
-
-  let updated = 0;
-  let added = 0;
-  let created = 0;
-  let skipped = 0;
-  let categoryId: string | null = null;
-
-  for (const r of input.rows) {
-    if (!(r.price > 0)) continue;
-    let productId = r.productId;
-    if (!productId) {
-      if (!input.createMissing || !r.name) {
-        skipped++;
-        continue;
-      }
-      if (!categoryId) {
-        categoryId = (
-          await prisma.category.upsert({
-            where: { slug: NEW_FROM_PRICE_CHECK.slug },
-            create: { ...NEW_FROM_PRICE_CHECK, isActive: false },
-            update: {},
-          })
-        ).id;
-      }
-      const slug = buildProductSlug(r.brand || undefined, r.sku);
-      if (await prisma.product.findFirst({ where: { OR: [{ sku: r.sku }, { slug }] }, select: { id: true } })) {
-        skipped++;
-        continue;
-      }
-      productId = (
-        await prisma.product.create({
-          data: { sku: r.sku, name: r.name, slug, brand: r.brand || null, price: 0, isActive: false, categoryId },
-        })
-      ).id;
-      created++;
-    } else if (r.kind === "update") updated++;
-    else added++;
-
-    await upsertSupplierOffer(prisma, productId, {
-      supplierId: input.supplierId,
-      price: r.price,
-      deliveryDays: r.deliveryDays,
-      ...(r.quality ? { quality: String(r.quality).slice(0, 40) } : {}),
-    });
-    await syncSelectedOffer(prisma, productId);
-  }
+  const result = await writeOfferRows(input.supplierId, input.rows, input.createMissing);
   revalidate();
-  return { ok: true, updated, added, created, skipped };
+  return { ok: true, ...result };
 }
 
 export async function deleteSupplierOrderLine(id: string): Promise<ActionResult> {
@@ -371,4 +209,62 @@ export async function deleteSupplierOrderLine(id: string): Promise<ActionResult>
   await prisma.supplierOrderLine.deleteMany({ where: { id } });
   revalidatePath("/admin/crm/supplier-orders");
   return { ok: true };
+}
+
+// ---- Запросы КП по почте ----------------------------------------------------------
+
+export type PriceRequestView = {
+  id: string;
+  orderNumber: string;
+  supplier: string;
+  email: string;
+  sentAt: string;
+  remindedAt: string | null;
+  answeredAt: string | null;
+  answerNote: string | null;
+  summarySentAt: string | null;
+  lines: number;
+};
+
+/** The latest requests (src/lib/price-requests.ts), newest first. */
+export async function listPriceRequests(): Promise<PriceRequestView[]> {
+  await requireSection("crm.price-check", "view");
+  const rows = await prisma.priceRequest.findMany({
+    orderBy: { sentAt: "desc" },
+    take: 300,
+    include: { order: { select: { orderNumber: true } }, supplier: { select: { name: true } } },
+  });
+  const iso = (d: Date | null) => d?.toISOString() ?? null;
+  return rows.map((r) => ({
+    id: r.id,
+    orderNumber: r.order.orderNumber,
+    supplier: r.supplier.name,
+    email: r.email,
+    sentAt: r.sentAt.toISOString(),
+    remindedAt: iso(r.remindedAt),
+    answeredAt: iso(r.answeredAt),
+    answerNote: r.answerNote,
+    summarySentAt: iso(r.summarySentAt),
+    lines: Array.isArray(r.items) ? r.items.length : 0,
+  }));
+}
+
+/** «Запросить КП» by an order number: suppliers not asked yet for its lines in «Проверка заказа». */
+export async function requestPricesForOrder(orderNumber: string): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const denied = await accessDenied("crm.price-check");
+  if (denied) return denied;
+  const order = await prisma.order.findFirst({ where: { orderNumber: String(orderNumber).trim() }, select: { id: true } });
+  if (!order) return { ok: false, error: "Заказ не найден" };
+  try {
+    const r = await sendPriceRequests(order.id);
+    const parts = [
+      r.sent.length ? `Отправлено: ${r.sent.join(", ")}` : "Новых запросов нет",
+      r.already.length && `уже запрошены: ${r.already.join(", ")}`,
+      r.noContact.length && `нет e-mail в карточке: ${r.noContact.join(", ")}`,
+      r.noSupplier.length && `нет поставщика у артикулов: ${r.noSupplier.join(", ")}`,
+    ];
+    return { ok: true, message: parts.filter(Boolean).join("; ") };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Письма не отправлены" };
+  }
 }

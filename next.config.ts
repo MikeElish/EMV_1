@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // pdfkit reads its font data from its own folder at run time.
-  serverExternalPackages: ["pdfkit"],
+  // pdfkit reads its font data from its own folder at run time; exceljs is node-only too.
+  serverExternalPackages: ["pdfkit", "exceljs"],
   // The old «Магазин запчастей» stub page: old links land in the shop.
   async redirects() {
     return [{ source: "/p", destination: "/shop", permanent: true }];

@@ -105,6 +105,8 @@ export function CompanyForm({
       paymentDeferralDays: deferralDaysRaw ? Number(deferralDaysRaw) : undefined,
       priceType,
       individualMarkup: markupRaw ? Number(markupRaw.replace(",", ".")) : undefined,
+      contactName: String(formData.get("contactName") ?? "") || undefined,
+      contactEmail: String(formData.get("contactEmail") ?? "").trim(),
     });
 
     setSubmitting(false);
@@ -195,6 +197,34 @@ export function CompanyForm({
           {...field("address")}
           className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="contactName" className="text-sm text-foreground/60">
+            Контактное лицо
+          </label>
+          <input
+            id="contactName"
+            name="contactName"
+            placeholder="Как обращаться в письме"
+            defaultValue={initial?.contactName}
+            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+        </div>
+        <div>
+          <label htmlFor="contactEmail" className="text-sm text-foreground/60">
+            E-mail для запросов
+          </label>
+          <input
+            id="contactEmail"
+            name="contactEmail"
+            type="email"
+            placeholder="Запросы КП и заказы поставщику"
+            defaultValue={initial?.contactEmail}
+            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

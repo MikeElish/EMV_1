@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
 import { deliveryMethodFromNote } from "@/lib/delivery";
+import { sendPriceRequests } from "@/lib/price-requests";
 import { manualOrderSchema, type ManualOrderInput } from "@/lib/validators/manual-order";
 
 export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false; error: string };
@@ -71,6 +72,7 @@ export async function createManualOrderRecord(input: ManualOrderInput): Promise<
   });
 
   await orderMissingFromSuppliers(created.id);
+  void sendPriceRequests(created.id).catch((error) => console.error("[price-requests] order", orderNumber, error));
   revalidatePath("/admin/crm/orders");
   revalidatePath("/admin/crm/supplier-orders");
   revalidatePath("/shop/orders");

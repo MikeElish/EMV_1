@@ -68,6 +68,8 @@ export const companySchema = z
     paymentDeferralDays: z.coerce.number().int().positive().optional(),
     priceType: z.enum(COMPANY_PRICE_TYPES).default("WHOLESALE"),
     individualMarkup: z.coerce.number().min(0, "Наценка не может быть отрицательной").max(1000).optional(),
+    contactName: z.string().trim().max(120).optional(),
+    contactEmail: z.union([z.literal(""), z.string().trim().email("Некорректный e-mail контактного лица")]).optional(),
   })
   .refine((data) => data.paymentType !== "DEFERRED" || !!data.paymentDeferralDays, {
     message: "Укажите количество дней отсрочки",

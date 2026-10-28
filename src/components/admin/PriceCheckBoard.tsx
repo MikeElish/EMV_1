@@ -15,6 +15,7 @@ import {
 } from "@/actions/admin/price-check";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { QUALITY_SUGGESTIONS } from "@/components/admin/ProductPricesPanel";
+import { PriceRequestsModal } from "@/components/admin/PriceRequestsModal";
 import { Modal } from "@/components/Modal";
 import { exportPriceCheck } from "@/actions/admin/supplier-orders";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
@@ -528,6 +529,7 @@ export function PriceCheckBoard({
   const [offers, setOffers] = useState<OfferView[] | null>(null);
   const [editing, setEditing] = useState<OfferView | "new" | null>(null);
   const [ordering, setOrdering] = useState<OfferView | null>(null);
+  const [requests, setRequests] = useState(false);
   const [importing, setImporting] = useState(false);
 
   // Windows program: price lists dropped into its folder open here one by one.
@@ -827,6 +829,7 @@ export function PriceCheckBoard({
         />
       )}
       {ordering && <OrderModal offer={ordering} onClose={() => setOrdering(null)} />}
+      {requests && <PriceRequestsModal onClose={() => setRequests(false)} />}
       {importing && (
         <ImportModal
           key={desktopImport?.file.id ?? "manual"}

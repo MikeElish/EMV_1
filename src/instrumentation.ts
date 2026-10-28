@@ -9,5 +9,8 @@ export async function register() {
     // Наличие товаров из остатков 1С, at 06:00 and 18:00 Moscow time.
     const { startOneCStockTimer } = await import("@/lib/onec-stock");
     startOneCStockTimer();
+    // Проценка по почте: replies, reminders, summaries, every half hour.
+    const { startPriceRequestTimer } = await import("@/lib/price-requests");
+    startPriceRequestTimer();
   }
 }

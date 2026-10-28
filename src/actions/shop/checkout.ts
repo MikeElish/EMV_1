@@ -6,6 +6,7 @@ import { getAdminSession } from "@/lib/session";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
+import { sendPriceRequests } from "@/lib/price-requests";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { deliveryMethodFromNote } from "@/lib/delivery";
 import { sessionPriceTier } from "@/lib/customer-pricing";
@@ -126,5 +127,7 @@ export async function createOrder(
   });
 
   await orderMissingFromSuppliers(order.id);
+  // Lines not in stock: their suppliers are asked for prices by mail, in the background.
+  void sendPriceRequests(order.id).catch((error) => console.error("[price-requests] order", order.orderNumber, error));
   return { ok: true, orderNumber: order.orderNumber };
 }

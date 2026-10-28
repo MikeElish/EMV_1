@@ -3,13 +3,23 @@ import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/secret-box";
 
-export type SiteMail = { to: string; subject: string; text: string; html?: string };
+export type SiteMail = {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  cc?: string;
+  attachments?: { filename: string; content: Buffer }[];
+  /** Message-ID of the letter this one follows (a reminder in the same thread). */
+  inReplyTo?: string;
+};
 
 /**
  * Sends an e-mail from the site's own mailbox (Настройки → Почта). Throws
  * if the mailbox isn't configured or the SMTP server rejects the message.
+ * Returns the letter's Message-ID.
  */
-export async function sendSiteMail(mail: SiteMail) {
+export async function sendSiteMail(mail: SiteMail): Promise<string> {
   const settings = await prisma.mailSettings.findUnique({ where: { id: 1 } });
   if (!settings) throw new Error("Почтовый ящик сайта не настроен");
 
@@ -21,10 +31,13 @@ export async function sendSiteMail(mail: SiteMail) {
     auth: { user: settings.login, pass: decryptSecret(settings.passwordEnc) },
   });
 
-  await transport.sendMail({
+  const { inReplyTo, ...letter } = withSignature(mail, settings.senderEmail);
+  const info = await transport.sendMail({
     from: { name: settings.senderName || "EMV", address: settings.senderEmail },
-    ...withSignature(mail, settings.senderEmail),
+    ...letter,
+    ...(inReplyTo ? { inReplyTo, references: inReplyTo } : {}),
   });
+  return info.messageId;
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
