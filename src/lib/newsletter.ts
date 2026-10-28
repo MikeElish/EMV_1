@@ -104,7 +104,9 @@ export const joinUrl = (email: string) =>
  */
 export async function sendInviteLetter(email: string, name: string | null) {
   const link = joinUrl(email);
-  const hello = name ? `Здравствуйте, ${name}!` : "Здравствуйте!";
+  // «Имя (Компания)» / «Имя, Компания» in the list: the letter greets by the name only.
+  const person = name?.split(/\s*[(,]/)[0].trim();
+  const hello = person ? `Здравствуйте, ${person}!` : "Здравствуйте!";
   await sendSiteMail({
     to: email,
     subject: "EMV Запчасти: наличие на складе и ваши цены на сайте",
