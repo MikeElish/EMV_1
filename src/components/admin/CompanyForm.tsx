@@ -107,6 +107,7 @@ export function CompanyForm({
       individualMarkup: markupRaw ? Number(markupRaw.replace(",", ".")) : undefined,
       contactName: String(formData.get("contactName") ?? "") || undefined,
       contactEmail: String(formData.get("contactEmail") ?? "").trim(),
+      contactPhone: String(formData.get("contactPhone") ?? "").trim() || undefined,
     });
 
     setSubmitting(false);
@@ -225,6 +226,20 @@ export function CompanyForm({
             className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
           />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="contactPhone" className="text-sm text-foreground/60">
+          Телефон контактного лица
+        </label>
+        <input
+          id="contactPhone"
+          name="contactPhone"
+          type="tel"
+          placeholder="+7 (900) 000-00-00"
+          defaultValue={initial?.contactPhone}
+          className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -178,6 +178,7 @@ export function CompaniesTable({
                   individualMarkup: selected.individualMarkup ?? undefined,
                   contactName: selected.contactName ?? undefined,
                   contactEmail: selected.contactEmail ?? undefined,
+                  contactPhone: selected.contactPhone ?? undefined,
                 }}
                 onSubmit={(input) => updateCompany(selected.id, input)}
                 onSuccess={close}

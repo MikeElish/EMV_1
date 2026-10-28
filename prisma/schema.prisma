@@ -588,6 +588,7 @@ model Company {
   // Who gets the price requests (Проценка по почте) and supplier orders.
   contactName         String?
   contactEmail        String?
+  contactPhone        String?
   documents           CompanyDocument[]
   suppliedProducts    ProductPricing[]
   supplierOffers      SupplierOffer[]

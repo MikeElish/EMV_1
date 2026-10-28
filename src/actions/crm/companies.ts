@@ -32,6 +32,7 @@ function toCompanyData(data: CompanyInput) {
     individualMarkup: data.priceType === "INDIVIDUAL" ? data.individualMarkup ?? null : null,
     contactName: data.contactName || null,
     contactEmail: data.contactEmail?.toLowerCase() || null,
+    contactPhone: data.contactPhone || null,
   };
 }
 
