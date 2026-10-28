@@ -5,7 +5,7 @@ import { formatRub } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
-import { handOver } from "@/actions/admin/receipts";
+import { handOver, issueUpd } from "@/actions/admin/receipts";
 import { HANDOVER_KINDS, type HandoverKind } from "@/lib/validators/receipts";
 
 export type HandoverRow = {
@@ -21,7 +21,9 @@ export type HandoverRow = {
   handover: string | null;
   handoverAt: string | null;
   handoverNote: string | null;
-  waybills: { id: string; fileName: string; fileUrl: string }[];
+  documents: { id: string; label: string; fileName: string; fileUrl: string }[];
+  /** Handed over here, its УПД not made (1С failed). */
+  updPending: boolean;
 };
 
 const inputClass =
@@ -33,7 +35,17 @@ const STATE_STYLES: Record<string, string> = {
   "Передан в ТК": "bg-blue-600/10 text-blue-700 dark:text-blue-400",
 };
 
-function HandoverCard({ order, kind, onClose }: { order: HandoverRow; kind: HandoverKind; onClose: () => void }) {
+function HandoverCard({
+  order,
+  kind,
+  onClose,
+  onDone,
+}: {
+  order: HandoverRow;
+  kind: HandoverKind;
+  onClose: () => void;
+  onDone: (message: string) => void;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const tk = kind === "Передан в ТК";
@@ -47,7 +59,7 @@ function HandoverCard({ order, kind, onClose }: { order: HandoverRow; kind: Hand
     startTransition(async () => {
       const r = await handOver(body);
       if (!r.ok) setError(r.error);
-      else onClose();
+      else onDone(r.message);
     });
   }
 
@@ -69,7 +81,8 @@ function HandoverCard({ order, kind, onClose }: { order: HandoverRow; kind: Hand
           <input name="file" type="file" className="mt-2 block w-full text-sm" />
         </div>
         <p className="text-xs text-foreground/50">
-          Оплаченные позиции станут «Завершено», на отсрочке — «Отгружено, требуется оплата». Клиенту уйдёт письмо о смене статуса.
+          Оплаченные позиции станут «Завершено», на отсрочке — «Отгружено, требуется оплата». Клиенту уйдёт письмо о смене статуса. В 1С
+          проведутся реализация и счёт-фактура, УПД (PDF) вложится в заказ.
         </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-3">
@@ -77,7 +90,7 @@ function HandoverCard({ order, kind, onClose }: { order: HandoverRow; kind: Hand
             Отмена
           </button>
           <button type="submit" disabled={pending} className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50">
-            {pending ? "Сохраняем..." : kind}
+            {pending ? "Проводим в 1С..." : kind}
           </button>
         </div>
       </form>
@@ -85,8 +98,28 @@ function HandoverCard({ order, kind, onClose }: { order: HandoverRow; kind: Hand
   );
 }
 
+function UpdButton({ orderId, onDone }: { orderId: string; onDone: (message: string) => void }) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const r = await issueUpd(orderId);
+          onDone(r.ok ? r.message : r.error);
+        })
+      }
+      className="ml-2 rounded-md border border-amber-500/40 px-2 py-1 text-xs text-amber-700 hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
+    >
+      {pending ? "Проводим..." : "Сформировать УПД"}
+    </button>
+  );
+}
+
 export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
   const [search, setSearch] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
   const [acting, setActing] = useState<{ order: HandoverRow; kind: HandoverKind } | null>(null);
 
   const rows = useMemo(() => {
@@ -94,7 +127,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
     return orders
       .map((o) => ({ ...o, state: o.ready.length ? "Готов к выдаче" : (o.handover ?? "—") }))
       .filter((o) => !q || [o.orderNumber, o.customer, o.phone, o.delivery, o.state, o.handoverNote].filter(Boolean).join(" ").toLowerCase().includes(q))
-      .sort((a, b) => Number(!a.ready.length) - Number(!b.ready.length));
+      .sort((a, b) => Number(!a.ready.length && !a.updPending) - Number(!b.ready.length && !b.updPending));
   }, [orders, search]);
 
   return (
@@ -102,6 +135,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
       <div className="flex shrink-0 flex-wrap items-center gap-3">
         <h1 className="text-lg font-semibold">Выдача</h1>
         <span className="text-sm text-foreground/50">готово к выдаче: {orders.filter((o) => o.ready.length).length}</span>
+        {message && <span className="text-sm text-foreground/80">{message}</span>}
         <div className="ml-auto">
           <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
         </div>
@@ -120,7 +154,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                 <th className="py-2 pr-4 text-right">Сумма</th>
                 <th className="py-2 pr-4">Оплата</th>
                 <th className="py-2 pr-4">Статус</th>
-                <th className="py-2 pr-4">ТН</th>
+                <th className="py-2 pr-4">Документы</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -155,14 +189,15 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                       </div>
                     )}
                   </td>
-                  <td className="max-w-40 py-2 pr-4">
-                    {o.waybills.map((w) => (
-                      <a key={w.id} href={w.fileUrl} download={w.fileName} className="block truncate text-blue-600 hover:underline dark:text-blue-400">
-                        {w.fileName}
+                  <td className="max-w-48 py-2 pr-4">
+                    {o.documents.map((d) => (
+                      <a key={d.id} href={d.fileUrl} download={d.fileName} title={d.fileName} className="block truncate text-blue-600 hover:underline dark:text-blue-400">
+                        {d.label}: {d.fileName}
                       </a>
                     ))}
                   </td>
                   <td className="whitespace-nowrap py-2">
+                    {o.updPending && <UpdButton orderId={o.id} onDone={setMessage} />}
                     {o.ready.length > 0 &&
                       HANDOVER_KINDS.map((kind) => (
                         <button
@@ -182,7 +217,17 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
         </CrmTableScroll>
       )}
 
-      {acting && <HandoverCard order={acting.order} kind={acting.kind} onClose={() => setActing(null)} />}
+      {acting && (
+        <HandoverCard
+          order={acting.order}
+          kind={acting.kind}
+          onClose={() => setActing(null)}
+          onDone={(m) => {
+            setActing(null);
+            setMessage(m);
+          }}
+        />
+      )}
     </>
   );
 }

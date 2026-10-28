@@ -116,6 +116,8 @@ export async function handOverOrder(input: {
     items.map((i) => ({ itemId: i.id, status: (i.paid ? "DONE" : "SHIPPED_AWAITING_PAYMENT") as OrderStatus })),
     { notify: true }
   );
+  // "" -- waits for its УПД (src/lib/order-upd.ts).
+  await prisma.orderItem.updateMany({ where: { id: { in: items.map((i) => i.id) } }, data: { saleRef: "" } });
   await prisma.order.update({
     where: { id: input.orderId },
     data: { handover: input.kind, handoverAt: new Date(), handoverNote: input.note || null },

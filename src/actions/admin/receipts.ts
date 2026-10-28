@@ -8,6 +8,7 @@ import { supplierVatRate } from "@/lib/onec-purchase";
 import { counterpartyRef } from "@/lib/onec-invoice";
 import { handOverOrder, receiveGoods, RECEIVABLE } from "@/lib/supplier-receipts";
 import { HANDOVER_KINDS, type HandoverKind } from "@/lib/validators/receipts";
+import { issueOrderUpd } from "@/lib/order-upd";
 
 export type ReceiptResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -113,15 +114,33 @@ export async function handOver(formData: FormData): Promise<ReceiptResult> {
   const kind = String(formData.get("kind") ?? "") as HandoverKind;
   if (!HANDOVER_KINDS.includes(kind)) return { ok: false, error: "Некорректный вид выдачи" };
   try {
-    const n = await handOverOrder({
-      orderId: String(formData.get("orderId") ?? ""),
-      kind,
-      note: String(formData.get("note") ?? "").trim().slice(0, 300),
-      file: await fileOf(formData),
-    });
+    const orderId = String(formData.get("orderId") ?? "");
+    const n = await handOverOrder({ orderId, kind, note: String(formData.get("note") ?? "").trim().slice(0, 300), file: await fileOf(formData) });
     revalidate();
-    return { ok: true, message: `${kind}: позиций ${n}` };
+    // The УПД follows; if 1С fails, «Сформировать УПД» in the row repeats it.
+    try {
+      const upd = await issueOrderUpd(orderId);
+      revalidate();
+      return { ok: true, message: `${kind}: позиций ${n}; УПД № ${upd.number} проведён в 1С и вложен в заказ` };
+    } catch (error) {
+      console.error("[upd]", error);
+      return { ok: true, message: `${kind}: позиций ${n}. УПД не сформирован: ${error instanceof Error ? error.message : "1С не ответила"} — повторите кнопкой «Сформировать УПД»` };
+    }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Не получилось" };
+  }
+}
+
+/** «Сформировать УПД»: the shipped lines without one. */
+export async function issueUpd(orderId: string): Promise<ReceiptResult> {
+  const denied = await accessDenied("warehouse");
+  if (denied) return denied;
+  try {
+    const upd = await issueOrderUpd(String(orderId));
+    revalidate();
+    return { ok: true, message: `УПД № ${upd.number} проведён в 1С и вложен в заказ` };
+  } catch (error) {
+    console.error("[upd]", error);
+    return { ok: false, error: error instanceof Error ? error.message : "УПД не сформирован" };
   }
 }

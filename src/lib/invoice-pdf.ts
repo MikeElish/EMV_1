@@ -8,12 +8,12 @@ import { rublesInWords } from "@/lib/money-words";
 // оплату № 498 …xlsx): bank block with the logo, parties, lines, totals, the
 // terms and the signature with the stamp. Amounts in kopecks.
 
-const FONT = path.join(process.cwd(), "assets", "fonts", "PTSans-Regular.ttf");
-const FONT_BOLD = path.join(process.cwd(), "assets", "fonts", "PTSans-Bold.ttf");
+export const FONT = path.join(process.cwd(), "assets", "fonts", "PTSans-Regular.ttf");
+export const FONT_BOLD = path.join(process.cwd(), "assets", "fonts", "PTSans-Bold.ttf");
 const LOGO = path.join(process.cwd(), "assets", "invoice-logo.png");
 // Kept off git and off the public folder: copied to the server by hand.
-const STAMP = path.join(process.cwd(), "private", "invoice", "stamp.png");
-const SIGNATURE = path.join(process.cwd(), "private", "invoice", "signature.png");
+export const STAMP = path.join(process.cwd(), "private", "invoice", "stamp.png");
+export const SIGNATURE = path.join(process.cwd(), "private", "invoice", "signature.png");
 
 export const SELLER = {
   bank: 'ООО "Банк Точка" г. Москва',
@@ -23,6 +23,7 @@ export const SELLER = {
   inn: "222330730938",
   name: "Елишев Михаил Владимирович (ИП)",
   details: "Елишев Михаил Владимирович (ИП),  ИНН 222330730938,  190020, Город Санкт-Петербург, Нарвский пр-кт, д. 16, кв. 33,  тел.: +7-981-039-77-72",
+  address: "190020, Город Санкт-Петербург, Нарвский пр-кт, д. 16, кв. 33",
   signer: "Елишев М. В.",
   signerTitle: "Предприниматель",
 };

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSection } from "@/lib/access-server";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { HandoverTable } from "@/components/admin/HandoverTable";
+import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -11,11 +12,15 @@ export default async function HandoverPage() {
   await requireSection("warehouse", "view");
   // Ready to hand over, and what was handed over in the last month.
   const orders = await prisma.order.findMany({
-    where: { OR: [{ items: { some: { status: "READY_TO_SHIP" } } }, { handoverAt: { gte: monthAgo() } }] },
+    where: {
+      OR: [{ items: { some: { status: "READY_TO_SHIP" } } }, { items: { some: { saleRef: "" } } }, { handoverAt: { gte: monthAgo() } }],
+    },
     orderBy: { createdAt: "asc" },
     include: {
-      items: { select: { status: true, quantity: true, priceSnapshot: true, paid: true, deferred: true, product: { select: { brand: true, name: true, sku: true } } } },
-      documents: { where: { category: "WAYBILL" }, select: { id: true, fileName: true, fileUrl: true } },
+      items: {
+        select: { status: true, quantity: true, priceSnapshot: true, paid: true, deferred: true, saleRef: true, product: { select: { brand: true, name: true, sku: true } } },
+      },
+      documents: { where: { category: { in: ["WAYBILL", "UPD"] } }, select: { id: true, category: true, fileName: true, fileUrl: true } },
     },
   });
   return (
@@ -36,7 +41,9 @@ export default async function HandoverPage() {
             handover: o.handover,
             handoverAt: o.handoverAt?.toISOString() ?? null,
             handoverNote: o.handoverNote,
-            waybills: o.documents,
+            documents: o.documents.map((d) => ({ id: d.id, label: d.category === "UPD" ? "УПД" : "ТН", fileName: d.fileName, fileUrl: d.fileUrl })),
+            // Shipped here, the УПД not made yet.
+            updPending: o.items.some((i) => SHIPPED_STATUSES.includes(i.status) && i.saleRef === ""),
           };
         })}
       />

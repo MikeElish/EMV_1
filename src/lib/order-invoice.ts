@@ -25,13 +25,13 @@ const TERMS_4_7 = [
 const BLANK = "____";
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 /** «21 сентября 2026 г.» in Moscow time. */
-function dateText(date: Date) {
+export function dateText(date: Date) {
   const [y, m, d] = date.toLocaleDateString("sv-SE", { timeZone: "Europe/Moscow" }).split("-").map(Number);
   return `${d} ${MONTHS[m - 1]} ${y} г.`;
 }
 
 /** «Населённый пункт: …\nУлица: …» of the checkout → one line of address. */
-function noteAddress(note: string | null) {
+export function noteAddress(note: string | null) {
   const pick = (label: string) => note?.match(new RegExp(`${label}: ([^\\n]+)`))?.[1]?.trim();
   return [pick("Населённый пункт"), pick("Улица"), pick("Дом") && `д. ${pick("Дом")}`, pick("Офис/квартира") && `оф./кв. ${pick("Офис/квартира")}`]
     .filter(Boolean)

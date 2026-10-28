@@ -423,6 +423,9 @@ model OrderItem {
   deliveryMethod         DeliveryMethod?
   deliveryPrevMethod     DeliveryMethod?
   deliveryConfirmPending Boolean             @default(false)
+  // Склад → Выдача: the 1С «Реализация» (УПД) it was shipped by; "" --
+  // handed over there, the УПД not made yet; null -- not shipped by the site.
+  saleRef                String?
 
   @@index([orderId])
   @@index([productId, status])
