@@ -221,6 +221,10 @@ async function matchPayment(tx: { id: string; amount: number; date: Date; counte
       return `Заказ ${settled.orderNumber} уже отмечен оплаченным`;
     }
   }
+  // A number is named but matches nothing: by hand, not by the sum.
+  if (!order && (invoices.length || orderNumbers.length)) {
+    return `В назначении счёт/заказ ${[...invoices, ...orderNumbers].join(", ")} — такого неоплаченного на сайте нет, проверьте вручную`;
+  }
   if (!order) {
     const sameSum = [];
     for (const o of orders) if (Math.abs((await unpaidOf(o.id)) - tx.amount) < 100) sameSum.push(o);
