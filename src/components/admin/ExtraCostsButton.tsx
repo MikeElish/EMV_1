@@ -10,6 +10,7 @@ export type ExtraCostRow = {
   number: string;
   date: Date;
   amount: number;
+  kind: string;
   service: { name: string } | null;
 };
 
@@ -44,7 +45,7 @@ export function ExtraCostsButton({
             <thead>
               <tr className="border-b border-foreground/10 text-left text-foreground/50">
                 <th className="py-2 pr-4">Документ</th>
-                <th className="py-2 pr-4">Услуга</th>
+                <th className="py-2 pr-4">Вид</th>
                 <th className="py-2 text-right">Сумма</th>
               </tr>
             </thead>
@@ -53,16 +54,16 @@ export function ExtraCostsButton({
                 <tr key={c.id} className="border-b border-foreground/10">
                   <td className="py-2 pr-4">
                     <Link
-                      href={`/admin/crm/extra-costs?number=${encodeURIComponent(c.number)}`}
+                      href={`/admin/crm/extra-costs?number=${encodeURIComponent(c.number || orderNumber)}`}
                       className="font-medium underline underline-offset-4 hover:opacity-80"
                     >
-                      № {c.number}
+                      {c.number ? `№ ${c.number}` : "Документ"}
                     </Link>
                     <span className="ml-2 text-xs text-foreground/50">
                       от {new Date(c.date).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" })}
                     </span>
                   </td>
-                  <td className="py-2 pr-4 text-foreground/70">{c.service?.name ?? "—"}</td>
+                  <td className="py-2 pr-4 text-foreground/70">{c.service?.name ?? c.kind}</td>
                   <td className="py-2 text-right">{formatRub(c.amount)}</td>
                 </tr>
               ))}

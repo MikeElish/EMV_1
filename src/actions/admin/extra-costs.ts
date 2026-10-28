@@ -1,0 +1,149 @@
+"use server";
+
+import path from "path";
+import { mkdir, unlink, writeFile } from "fs/promises";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
+import { accessDenied, requireSection } from "@/lib/access-server";
+import { DadataError, findPartyByInn } from "@/lib/dadata";
+import { EXTRA_COST_KINDS, EXTRA_COST_STATUSES, type ExtraCostInput } from "@/lib/validators/extra-costs";
+
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const FILES_DIR = path.join(process.cwd(), "public", "uploads", "extra-costs");
+
+function revalidate() {
+  revalidatePath("/admin/crm/extra-costs");
+  revalidatePath("/admin/crm/orders");
+}
+
+/** Loaded when the card opens: companies, orders, catalogue products and services. */
+export async function getExtraCostFormData() {
+  await requireSection("crm.extra-costs", "view");
+  const [companies, orders, products, services] = await Promise.all([
+    prisma.company.findMany({ where: { isOwn: false }, select: { id: true, name: true, inn: true, kpp: true }, orderBy: { name: "asc" } }),
+    prisma.order.findMany({
+      select: { id: true, orderNumber: true, customerName: true, status: true },
+      orderBy: { createdAt: "desc" },
+      take: 1000,
+    }),
+    prisma.product.findMany({ select: { id: true, sku: true, name: true, brand: true }, orderBy: { name: "asc" } }),
+    prisma.service.findMany({ where: { isActive: true }, select: { id: true, name: true, unit: true, price: true }, orderBy: { name: "asc" } }),
+  ]);
+  return { companies, orders, products, services };
+}
+export type ExtraCostFormData = Awaited<ReturnType<typeof getExtraCostFormData>>;
+
+export type SupplierLookup = { ok: true; company: { id: string; name: string; inn: string | null; kpp: string | null }; created: boolean } | { ok: false; error: string };
+
+/** «Контрагент по ИНН»: a company of the site with it, else from ЕГРЮЛ/ЕГРИП as a new Поставщик. */
+export async function supplierByInn(inn: string): Promise<SupplierLookup> {
+  const denied = await accessDenied("crm.extra-costs");
+  if (denied) return denied;
+  const digits = String(inn).replace(/\D/g, "");
+  if (digits.length !== 10 && digits.length !== 12) return { ok: false, error: "ИНН — 10 цифр у организации или 12 у ИП" };
+  const select = { id: true, name: true, inn: true, kpp: true } as const;
+  const known = await prisma.company.findFirst({ where: { inn: digits, isOwn: false }, select });
+  if (known) return { ok: true, company: known, created: false };
+  try {
+    const party = await findPartyByInn(digits);
+    if (!party) return { ok: false, error: "В ЕГРЮЛ/ЕГРИП нет организации с таким ИНН" };
+    const company = await prisma.company.create({
+      data: { name: party.name, inn: digits, kpp: party.kpp, ogrn: party.ogrn, address: party.address, type: "Поставщик" },
+      select,
+    });
+    revalidatePath("/admin/crm/companies");
+    return { ok: true, company, created: true };
+  } catch (error) {
+    if (error instanceof DadataError) return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
+/** The card's «Сохранить»: the cost with its lines (JSON in `data`) and, optionally, a file. */
+export async function saveExtraCost(formData: FormData): Promise<ActionResult> {
+  const denied = await accessDenied("crm.extra-costs");
+  if (denied) return denied;
+  let input: ExtraCostInput;
+  try {
+    input = JSON.parse(String(formData.get("data") ?? ""));
+  } catch {
+    return { ok: false, error: "Некорректные данные" };
+  }
+  if (!(EXTRA_COST_KINDS as readonly string[]).includes(input.kind)) return { ok: false, error: "Выберите вид расходов" };
+  if (!(EXTRA_COST_STATUSES as readonly string[]).includes(input.status)) return { ok: false, error: "Некорректный статус" };
+  const date = new Date(`${input.date}T12:00:00+03:00`);
+  if (Number.isNaN(date.getTime())) return { ok: false, error: "Укажите дату" };
+
+  const lines = (Array.isArray(input.lines) ? input.lines : [])
+    .filter((l) => String(l.name ?? "").trim())
+    .map((l) => {
+      const quantity = Number(l.quantity);
+      const price = Math.round(Number(l.price));
+      return {
+        kind: l.kind === "SERVICE" ? "SERVICE" : "GOODS",
+        productId: l.kind === "GOODS" ? l.productId || null : null,
+        serviceId: l.kind === "SERVICE" ? l.serviceId || null : null,
+        name: String(l.name).trim().slice(0, 300),
+        quantity,
+        price,
+        sum: Math.round(quantity * price),
+      };
+    });
+  if (lines.some((l) => !(l.quantity > 0) || !(l.price >= 0))) return { ok: false, error: "Проверьте количество и цену в строках" };
+  const amount = lines.length ? lines.reduce((s, l) => s + l.sum, 0) : Math.round(Number(input.amount));
+  if (!(amount > 0)) return { ok: false, error: "Укажите сумму или строки" };
+
+  const file = formData.get("file");
+  if (file instanceof File && file.size > MAX_FILE_SIZE) return { ok: false, error: "Файл больше 20 МБ" };
+
+  const data = {
+    kind: input.kind,
+    number: String(input.number ?? "").trim().slice(0, 60),
+    date,
+    orderId: input.orderId || null,
+    supplierId: input.supplierId || null,
+    status: input.status,
+    note: String(input.note ?? "").trim().slice(0, 1000) || null,
+    amount,
+  };
+  const saved = input.id
+    ? await prisma.$transaction(async (tx) => {
+        await tx.extraCostLine.deleteMany({ where: { extraCostId: input.id! } });
+        return tx.extraCost.update({ where: { id: input.id! }, data: { ...data, lines: { create: lines } } });
+      })
+    : await prisma.extraCost.create({ data: { ...data, lines: { create: lines } } });
+
+  if (file instanceof File && file.size > 0) {
+    const dir = path.join(FILES_DIR, saved.id);
+    await mkdir(dir, { recursive: true });
+    const stored = `${Date.now()}-${crypto.randomUUID()}${path.extname(file.name)}`;
+    await writeFile(path.join(dir, stored), Buffer.from(await file.arrayBuffer()));
+    if (saved.fileUrl) await unlink(path.join(process.cwd(), "public", saved.fileUrl)).catch(() => {});
+    await prisma.extraCost.update({
+      where: { id: saved.id },
+      data: { fileName: file.name, fileUrl: `/uploads/extra-costs/${saved.id}/${stored}` },
+    });
+  }
+  revalidate();
+  return { ok: true };
+}
+
+export async function setExtraCostStatus(id: string, status: string): Promise<ActionResult> {
+  const denied = await accessDenied("crm.extra-costs");
+  if (denied) return denied;
+  if (!(EXTRA_COST_STATUSES as readonly string[]).includes(status)) return { ok: false, error: "Некорректный статус" };
+  await prisma.extraCost.update({ where: { id: String(id) }, data: { status } });
+  revalidate();
+  return { ok: true };
+}
+
+export async function deleteExtraCost(id: string): Promise<ActionResult> {
+  const denied = await accessDenied("crm.extra-costs");
+  if (denied) return denied;
+  const cost = await prisma.extraCost.delete({ where: { id: String(id) } }).catch(() => null);
+  if (cost?.fileUrl) await unlink(path.join(process.cwd(), "public", cost.fileUrl)).catch(() => {});
+  revalidate();
+  return { ok: true };
+}

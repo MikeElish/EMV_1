@@ -81,6 +81,7 @@ model Product {
   offers             SupplierOffer[]
   supplierOrderLines SupplierOrderLine[]
   repairLines        RepairLine[]
+  extraCostLines     ExtraCostLine[]
 
   // Cards in 1С:Бухгалтерия this product stands for (1С often holds the same
   // article on several cards).
@@ -292,36 +293,72 @@ model Order {
 
 // Services (delivery, forwarding …) -- CRM → Услуги. Not sold in the shop.
 model Service {
-  id          String       @id @default(cuid())
-  name        String
-  code        String?      @unique
-  unit        String?
-  price       Int          @default(0)
-  description String?
-  isActive    Boolean      @default(true)
+  id             String          @id @default(cuid())
+  name           String
+  code           String?         @unique
+  unit           String?
+  price          Int             @default(0)
+  description    String?
+  isActive       Boolean         @default(true)
   // Catalog_Номенклатура Ref_Key of the 1С card (Услуга = true).
-  oneCRef     String?      @unique
-  extraCosts  ExtraCost[]
-  repairLines RepairLine[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  oneCRef        String?         @unique
+  extraCosts     ExtraCost[]
+  extraCostLines ExtraCostLine[]
+  repairLines    RepairLine[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 // Additional costs of an order (delivery etc.) -- CRM → Доп.расходы. Shown
 // in CRM → Заказы as «Доп.расходы», added to «ИТОГО».
 model ExtraCost {
-  id        String   @id @default(cuid())
-  number    String
-  date      DateTime @default(now())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  serviceId String?
-  service   Service? @relation(fields: [serviceId], references: [id])
-  amount    Int
-  note      String?
-  createdAt DateTime @default(now())
+  id         String          @id @default(cuid())
+  // The supplier's document (счёт, акт), as typed.
+  number     String          @default("")
+  date       DateTime        @default(now())
+  // Логистика, Иные затраты, Билеты, Проживание (EXTRA_COST_KINDS).
+  kind       String          @default("Иные затраты")
+  // Not every cost belongs to an order (tickets, a hotel).
+  orderId    String?
+  order      Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId String?
+  supplier   Company?        @relation("ExtraCostSupplier", fields: [supplierId], references: [id])
+  serviceId  String?
+  service    Service?        @relation(fields: [serviceId], references: [id])
+  // Kopecks: the sum of the lines, or typed when there are none.
+  amount     Int
+  // Требуется оплата, Оплачено, Отменено.
+  status     String          @default("Требуется оплата")
+  fileName   String?
+  fileUrl    String?
+  note       String?
+  lines      ExtraCostLine[]
+  createdAt  DateTime        @default(now())
 
   @@index([orderId])
+  @@index([supplierId])
+}
+
+/**
+ * Табличная часть of a cost: «Товары» (catalogue products) or «Услуги» (services of 1С).
+ */
+model ExtraCostLine {
+  id          String    @id @default(cuid())
+  extraCostId String
+  extraCost   ExtraCost @relation(fields: [extraCostId], references: [id], onDelete: Cascade)
+  // GOODS or SERVICE.
+  kind        String
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  serviceId   String?
+  service     Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  name        String
+  quantity    Float
+  // Kopecks.
+  price       Int
+  sum         Int
+
+  @@index([extraCostId])
 }
 
 model OrderDocument {
@@ -476,14 +513,14 @@ model MailSettings {
 // Singleton (id is always 1): 1С:Бухгалтерия (1С:Фреш) reached over the
 // standard OData interface with a dedicated integration user.
 model OneCSettings {
-  id          Int      @id @default(1)
-  baseUrl     String
-  login       String
-  passwordEnc String
-  updatedAt   DateTime @updatedAt
+  id               Int       @id @default(1)
+  baseUrl          String
+  login            String
+  passwordEnc      String
+  updatedAt        DateTime  @updatedAt
   // Daily stock sync (src/lib/onec-stock.ts): when it last ran and its
   // outcome as shown in Настройки → 1С.
-  stockSyncedAt DateTime?
+  stockSyncedAt    DateTime?
   stockSyncSummary String?
 }
 
@@ -532,6 +569,7 @@ model Company {
   suppliedProducts    ProductPricing[]
   supplierOffers      SupplierOffer[]
   supplierOrderLines  SupplierOrderLine[]
+  extraCosts          ExtraCost[]         @relation("ExtraCostSupplier")
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
   oneCRef             String?             @unique

@@ -16,7 +16,8 @@ export default async function CrmOrdersPage({
         orderBy: { id: "asc" },
       },
       extraCosts: {
-        select: { id: true, number: true, date: true, amount: true, service: { select: { name: true } } },
+        select: { id: true, number: true, date: true, amount: true, kind: true, service: { select: { name: true } } },
+        where: { status: { not: "Отменено" } },
         orderBy: { date: "asc" },
       },
       user: {
