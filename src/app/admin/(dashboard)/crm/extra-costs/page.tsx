@@ -27,6 +27,7 @@ export default async function CrmExtraCostsPage({ searchParams }: PageProps<"/ad
           orderNumber: c.order?.orderNumber ?? null,
           supplierId: c.supplierId,
           supplierName: c.supplier?.name ?? null,
+          employeeId: c.employeeId,
           inn: c.supplier?.inn ?? null,
           kpp: c.supplier?.kpp ?? null,
           amount: c.amount,

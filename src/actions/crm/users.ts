@@ -91,6 +91,7 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
         phone: data.phone || null,
         role: data.role,
         companyId,
+        salaryPercent: data.role === "CUSTOMER" ? null : (data.salaryPercent ?? null),
         login,
         passwordHash,
       },
@@ -134,6 +135,7 @@ export async function updateUser(id: string, input: UserInput): Promise<ActionRe
         phone: data.phone || null,
         role: data.role,
         companyId,
+        salaryPercent: data.role === "CUSTOMER" ? null : (data.salaryPercent ?? null),
         ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 12) } : {}),
       },
     });

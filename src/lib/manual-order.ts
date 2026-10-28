@@ -14,7 +14,7 @@ export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false;
  * «Новый заказ» of the staff: the order window and the Claude connector
  * (src/lib/mcp) both end here, after checking who may do it.
  */
-export async function createManualOrderRecord(input: ManualOrderInput): Promise<ManualOrderResult> {
+export async function createManualOrderRecord(input: ManualOrderInput, creatorId: string | null = null): Promise<ManualOrderResult> {
   const parsed = manualOrderSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
@@ -22,17 +22,21 @@ export async function createManualOrderRecord(input: ManualOrderInput): Promise<
   const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, items } = parsed.data;
 
   let deferred = false;
+  // Отчёты → Зарплата: the client company's manager, else whoever makes it.
+  let managerId = creatorId;
   if (customerId) {
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
-      select: { role: true, company: { select: { paymentType: true } } },
+      select: { role: true, company: { select: { paymentType: true, managerId: true } } },
     });
     if (customer?.role !== "CUSTOMER") return { ok: false, error: "Покупатель не найден" };
     deferred = customer.company?.paymentType === "DEFERRED";
+    managerId = customer.company?.managerId ?? managerId;
   } else if (companyId) {
-    const company = await prisma.company.findUnique({ where: { id: companyId }, select: { paymentType: true } });
+    const company = await prisma.company.findUnique({ where: { id: companyId }, select: { paymentType: true, managerId: true } });
     if (!company) return { ok: false, error: "Компания не найдена" };
     deferred = company.paymentType === "DEFERRED";
+    managerId = company.managerId ?? managerId;
   }
 
   const productIds = [...new Set(items.map((i) => i.productId))];
@@ -56,6 +60,7 @@ export async function createManualOrderRecord(input: ManualOrderInput): Promise<
       deliveryNote: deliveryNote || null,
       totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
       userId: customerId || null,
+      managerId,
       deferred,
       status: aggregateOrderStatus(statuses),
       items: {

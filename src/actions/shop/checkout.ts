@@ -94,6 +94,8 @@ export async function createOrder(
 
   let deferred = false;
   let privateCustomer = true;
+  // Отчёты → Зарплата: the sale of the client company's manager.
+  let managerId: string | null = null;
   if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -102,7 +104,7 @@ export async function createOrder(
         email: true,
         phone: true,
         emailVerifiedAt: true,
-        company: { select: { id: true, paymentType: true } },
+        company: { select: { id: true, paymentType: true, managerId: true } },
       },
     });
     if (user && needsEmailVerification(user)) {
@@ -110,6 +112,7 @@ export async function createOrder(
     }
     deferred = user?.company?.paymentType === "DEFERRED";
     privateCustomer = !user?.company;
+    managerId = user?.company?.managerId ?? null;
     // First order of an account without a phone: remember it for next time.
     if (user && !user.phone) {
       await prisma.user.update({ where: { id: userId }, data: { phone: customerPhone } });
@@ -135,6 +138,7 @@ export async function createOrder(
       userId,
       deferred,
       termsAcceptedAt: privateCustomer ? new Date() : null,
+      managerId,
       status: aggregateOrderStatus(statuses),
       items: {
         create: orderItemsData.map((item, i) => ({

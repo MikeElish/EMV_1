@@ -7,6 +7,12 @@ import type { ActionResult } from "@/actions/crm/users";
 
 type Company = { id: string; name: string; isOwn?: boolean };
 
+/** «10,5» → 10.5; empty -- not set. */
+function percentOf(raw: string): number | undefined {
+  const s = raw.trim().replace(",", ".");
+  return s ? Number(s) : undefined;
+}
+
 export function UserForm({
   companies,
   initial,
@@ -33,6 +39,11 @@ export function UserForm({
     setSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
+    if (Number.isNaN(percentOf(String(formData.get("salaryPercent") ?? "")))) {
+      setSubmitting(false);
+      setError("Укажите % от прибыли числом");
+      return;
+    }
     const result = await onSubmit({
       lastName: String(formData.get("lastName") ?? "") || undefined,
       firstName: String(formData.get("firstName") ?? "") || undefined,
@@ -42,6 +53,7 @@ export function UserForm({
       role: (String(formData.get("role") ?? "") || "MANAGER") as UserInput["role"],
       companyId: String(formData.get("companyId") ?? "") || undefined,
       password: String(formData.get("password") ?? "") || undefined,
+      salaryPercent: percentOf(String(formData.get("salaryPercent") ?? "")),
     });
 
     setSubmitting(false);
@@ -178,6 +190,22 @@ export function UserForm({
           )}
         </div>
       </div>
+
+      {isEmployee && !isOwner && (
+        <div>
+          <label htmlFor="salaryPercent" className="text-sm text-foreground/60">
+            % от прибыли (Отчёты → Зарплата)
+          </label>
+          <input
+            id="salaryPercent"
+            name="salaryPercent"
+            inputMode="decimal"
+            placeholder="например, 10"
+            defaultValue={initial?.salaryPercent}
+            className="mt-1 w-40 rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+        </div>
+      )}
 
       <div>
         <label htmlFor="password" className="text-sm text-foreground/60">

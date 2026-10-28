@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
+import { getAdminSession } from "@/lib/session";
 import { createManualOrderRecord, type ManualOrderResult } from "@/lib/manual-order";
 import { COMPANY_PRICE_TYPE, type ManualOrderInput } from "@/lib/validators/manual-order";
 
@@ -90,5 +91,6 @@ export type ManualOrderFormData = Awaited<ReturnType<typeof getManualOrderFormDa
 export async function createManualOrder(input: ManualOrderInput): Promise<ManualOrderResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
-  return createManualOrderRecord(input);
+  const session = await getAdminSession();
+  return createManualOrderRecord(input, session?.userId ?? null);
 }

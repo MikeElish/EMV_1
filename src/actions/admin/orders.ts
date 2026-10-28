@@ -290,3 +290,17 @@ export async function deleteOrderLineAsOwner(itemId: string): Promise<ActionResu
   await removeLines(item.orderId, [itemId]);
   return { ok: true };
 }
+
+/** «Менеджер» of an order -- whose sale it is in Отчёты → Зарплата. */
+export async function updateOrderManager(orderId: string, managerId: string | null): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  if (managerId) {
+    const employee = await prisma.user.findUnique({ where: { id: managerId }, select: { role: true } });
+    if (!employee || employee.role === "CUSTOMER" || employee.role === "DRIVER") return { ok: false, error: "Сотрудник не найден" };
+  }
+  await prisma.order.update({ where: { id: orderId }, data: { managerId } });
+  revalidatePath("/admin/crm/orders");
+  revalidatePath("/admin/reports/salary");
+  return { ok: true };
+}

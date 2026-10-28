@@ -26,6 +26,7 @@ export type ExtraCostListRow = {
   orderNumber: string | null;
   supplierId: string | null;
   supplierName: string | null;
+  employeeId: string | null;
   inn: string | null;
   kpp: string | null;
   amount: number;
@@ -60,6 +61,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
   const [kind, setKind] = useState(cost?.kind ?? EXTRA_COST_KINDS[0]);
   const [supplierId, setSupplierId] = useState(cost?.supplierId ?? "");
   const [orderId, setOrderId] = useState(cost?.orderId ?? "");
+  const [employeeId, setEmployeeId] = useState(cost?.employeeId ?? "");
   const [inn, setInn] = useState("");
   const [innNote, setInnNote] = useState<string | null>(null);
   const [tab, setTab] = useState<"GOODS" | "SERVICE">("GOODS");
@@ -131,6 +133,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
       date: String(form.get("date") ?? ""),
       orderId: orderId || null,
       supplierId: supplierId || null,
+      employeeId: employeeId || null,
       status: String(form.get("status") ?? EXTRA_COST_STATUSES[0]),
       note: String(form.get("note") ?? ""),
       amount: parseRub(String(form.get("amount") ?? "")) || 0,
@@ -238,6 +241,15 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
                 options={data.orders.map((o) => ({ value: o.id, label: o.orderNumber, hint: o.customerName }))}
                 className="mt-1"
               />
+              <label className="mt-3 block text-sm text-foreground/60">Сотрудник</label>
+              <SearchSelect
+                value={employeeId}
+                onChange={setEmployeeId}
+                emptyLabel="— не указан —"
+                options={data.employees.map((e) => ({ value: e.id, label: e.name }))}
+                className="mt-1"
+              />
+              <p className="mt-1 text-xs text-foreground/50">Расход сотрудника идёт в Отчёты → Зарплата</p>
             </div>
           </div>
 

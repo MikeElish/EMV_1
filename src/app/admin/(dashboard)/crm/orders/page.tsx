@@ -34,10 +34,16 @@ export default async function CrmOrdersPage({
   });
 
   const me = await getMyAccess();
+  const staff = await prisma.user.findMany({
+    where: { role: { notIn: ["CUSTOMER", "DRIVER"] } },
+    select: { id: true, lastName: true, firstName: true, login: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  });
+  const employees = staff.map((u) => ({ id: u.id, name: [u.lastName, u.firstName].filter(Boolean).join(" ") || u.login }));
 
   return (
     <CrmPage>
-      <OrdersTable orders={orders} initialOrderNumber={orderNumber} canDelete={me?.role === "OWNER"} />
+      <OrdersTable orders={orders} initialOrderNumber={orderNumber} canDelete={me?.role === "OWNER"} employees={employees} />
     </CrmPage>
   );
 }

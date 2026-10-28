@@ -19,10 +19,10 @@ function revalidate() {
   revalidatePath("/admin/crm/orders");
 }
 
-/** Loaded when the card opens: companies, orders, catalogue products and services. */
+/** Loaded when the card opens: companies, orders, employees, catalogue products and services. */
 export async function getExtraCostFormData() {
   await requireSection("crm.extra-costs", "view");
-  const [companies, orders, products, services] = await Promise.all([
+  const [companies, orders, products, services, staff] = await Promise.all([
     prisma.company.findMany({ where: { isOwn: false }, select: { id: true, name: true, inn: true, kpp: true }, orderBy: { name: "asc" } }),
     prisma.order.findMany({
       select: { id: true, orderNumber: true, customerName: true, status: true },
@@ -31,8 +31,14 @@ export async function getExtraCostFormData() {
     }),
     prisma.product.findMany({ select: { id: true, sku: true, name: true, brand: true }, orderBy: { name: "asc" } }),
     prisma.service.findMany({ where: { isActive: true }, select: { id: true, name: true, unit: true, price: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: { role: { notIn: ["CUSTOMER", "DRIVER"] } },
+      select: { id: true, lastName: true, firstName: true, login: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
   ]);
-  return { companies, orders, products, services };
+  const employees = staff.map((u) => ({ id: u.id, name: [u.lastName, u.firstName].filter(Boolean).join(" ") || u.login }));
+  return { companies, orders, products, services, employees };
 }
 export type ExtraCostFormData = Awaited<ReturnType<typeof getExtraCostFormData>>;
 
@@ -88,6 +94,7 @@ export async function saveExtraCost(formData: FormData): Promise<ActionResult> {
     date,
     orderId: input.orderId || null,
     supplierId: input.supplierId || null,
+    employeeId: input.employeeId || null,
     status: input.status,
     note: String(input.note ?? "").trim().slice(0, 1000) || null,
     amount,

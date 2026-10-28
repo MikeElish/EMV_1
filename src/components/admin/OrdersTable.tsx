@@ -17,6 +17,7 @@ import { DELIVERY_METHOD_LABELS, DELIVERY_METHODS } from "@/lib/delivery";
 import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/client";
 import type { PaymentState } from "@/actions/admin/orders";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
+import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManagerSelect";
 
 type OrderLine = OrderItem & { product: { sku: string; stock: number } | null };
 
@@ -172,9 +173,12 @@ export function OrdersTable({
   orders,
   initialOrderNumber,
   canDelete = false,
+  employees = [],
 }: {
   orders: OrderRow[];
   initialOrderNumber?: string;
+  /** For «Менеджер» of an order. */
+  employees?: Employee[];
   /** Владелец: «Удалить» on every row. */
   canDelete?: boolean;
 }) {
@@ -491,7 +495,12 @@ export function OrdersTable({
                       <td className="whitespace-nowrap py-2 pr-4 font-medium">
                         {g.order.orderNumber}
                       </td>
-                      <td className="py-2 pr-4">{g.customer}</td>
+                      <td className="py-2 pr-4">
+                        {g.customer}
+                        {g.order.managerId && (
+                          <div className="text-xs text-foreground/50">{employees.find((e) => e.id === g.order.managerId)?.name}</div>
+                        )}
+                      </td>
                       <td className="py-2 pr-4">{g.quantity}</td>
                       <td className="whitespace-nowrap py-2 pr-4">
                         {formatRub(g.order.totalAmount)}
@@ -543,7 +552,13 @@ export function OrdersTable({
                         <td className="whitespace-nowrap py-2 pr-4 font-medium">
                           {order.orderNumber}
                         </td>
-                        <td className="py-2 pr-4">{customer}</td>
+                        <td className="py-2 pr-4">
+                          {customer}
+                          {/* Once per order: its first line. */}
+                          {order.items[0]?.id === item.id && (
+                            <OrderManagerSelect orderId={order.id} managerId={order.managerId} employees={employees} />
+                          )}
+                        </td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.nameSnapshot}</td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
                           {item.product?.sku ?? "—"}

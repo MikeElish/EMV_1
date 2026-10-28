@@ -19,6 +19,8 @@ export type ExtraCostInput = {
   date: string;
   orderId: string | null;
   supplierId: string | null;
+  /** The employee it is charged to (Отчёты → Зарплата). */
+  employeeId: string | null;
   status: string;
   note: string;
   /** kopecks; used when there are no lines */

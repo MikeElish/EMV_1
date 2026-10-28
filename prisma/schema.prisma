@@ -290,6 +290,10 @@ model Order {
   handoverNote       String?
   // A private customer ticked «Согласие с условиями поставки» at checkout.
   termsAcceptedAt    DateTime?
+  // The employee whose sale it is (Отчёты → Зарплата): the client company's
+  // manager or whoever made it in CRM; changed in CRM → Заказы.
+  managerId          String?
+  manager            User?              @relation("OrderManager", fields: [managerId], references: [id], onDelete: SetNull)
   userId             String?
   user               User?              @relation(fields: [userId], references: [id])
   items              OrderItem[]
@@ -352,10 +356,14 @@ model ExtraCost {
   note           String?
   lines          ExtraCostLine[]
   paymentRequest PaymentRequest?
+  // The employee it is charged to (Отчёты → Зарплата).
+  employeeId     String?
+  employee       User?           @relation("ExtraCostEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
   createdAt      DateTime        @default(now())
 
   @@index([orderId])
   @@index([supplierId])
+  @@index([employeeId])
 }
 
 /**
@@ -538,6 +546,10 @@ model User {
   company               Company?        @relation("CompanyUsers", fields: [companyId], references: [id])
   managedCompanies      Company[]       @relation("CompanyManager")
   orders                Order[]
+  managedOrders         Order[]         @relation("OrderManager")
+  extraCosts            ExtraCost[]     @relation("ExtraCostEmployee")
+  // Отчёты → Зарплата: «К выплате» = this % of the profit of the period.
+  salaryPercent         Float?
   // Saved from the customer's own "Настройки" card and pre-filled into new
   // checkouts -- independent of the checkout page's own localStorage memory.
   defaultDeliveryMethod DeliveryMethod?
