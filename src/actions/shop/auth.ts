@@ -6,6 +6,7 @@ import { createAdminSession } from "@/lib/session";
 import { issueEmailCode, needsEmailVerification, setEmailUnverifiedFlag } from "@/lib/email-verification";
 import { setConsentPendingFlag } from "@/lib/personal-data-consent";
 import { formatRuPhone } from "@/lib/phone";
+import { recordConsent } from "@/lib/newsletter";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type CustomerAuthResult =
@@ -108,6 +109,8 @@ export async function registerCustomer(input: {
   email: string;
   password: string;
   personalDataConsent: boolean;
+  /** «Получать новости…» -- confirmed once the e-mail code is entered. */
+  newsletter?: boolean;
 }): Promise<CustomerAuthResult> {
   const lastName = input.lastName.trim();
   const firstName = input.firstName.trim();
@@ -148,6 +151,7 @@ export async function registerCustomer(input: {
   await createAdminSession(user.id, user.role, user.login);
   await setConsentPendingFlag(false);
   await setEmailUnverifiedFlag(true);
+  if (input.newsletter) await recordConsent(email, "register", false);
   const issued = await issueEmailCode({ id: user.id, email });
   return { ok: true, emailVerified: false, ...(issued.ok ? {} : { sendError: issued.error }) };
 }

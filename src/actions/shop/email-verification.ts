@@ -11,6 +11,7 @@ import {
   RESEND_COOLDOWN_MS,
 } from "@/lib/email-verification";
 import { EMAIL_CODE_LENGTH } from "@/lib/email-verification-shared";
+import { confirmSubscriberEmail } from "@/lib/newsletter";
 
 export type EmailVerificationState =
   | { required: false }
@@ -97,6 +98,8 @@ export async function verifyEmailCode(code: string): Promise<VerifyResult> {
     },
   });
   await setEmailUnverifiedFlag(false);
+  // A newsletter consent given at registration / checkout now counts: the address is theirs.
+  if (user.email) await confirmSubscriberEmail(user.email);
   return { ok: true };
 }
 

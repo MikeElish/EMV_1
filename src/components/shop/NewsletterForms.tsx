@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition, type FormEvent } from "react";
 import {
   getMyNewsletter,
+  joinByInvite,
   setMyNewsletter,
   subscribeFromForm,
   unsubscribeByToken,
@@ -100,6 +101,30 @@ export function NewsletterToggle() {
         />
         <span>{NEWSLETTER_CONSENT}</span>
       </label>
+      <Note result={result} />
+    </div>
+  );
+}
+
+export function JoinByInvite({ email, signature }: { email: string; signature: string }) {
+  const [consent, setConsent] = useState(false);
+  const [result, setResult] = useState<NewsletterResult | null>(null);
+  const [pending, startTransition] = useTransition();
+  if (result?.ok) return <p className="mt-8 text-center text-green-600">{result.message}</p>;
+  return (
+    <div className="mx-auto mt-8 max-w-md">
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+        <span>{NEWSLETTER_CONSENT}</span>
+      </label>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => startTransition(async () => setResult(await joinByInvite(email, signature, consent)))}
+        className="mt-4 w-full rounded-md bg-foreground px-6 py-2.5 font-medium text-background hover:opacity-90 disabled:opacity-50"
+      >
+        {pending ? "Подписываем..." : "Подписаться"}
+      </button>
       <Note result={result} />
     </div>
   );

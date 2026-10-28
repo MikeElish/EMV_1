@@ -1,5 +1,5 @@
 import "server-only";
-import { randomBytes } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { sendSiteMail } from "@/lib/mailer";
@@ -10,10 +10,12 @@ import { absoluteUrl } from "@/lib/site";
 // subscriber's own: a verified shop account, or the link of the
 // confirmation letter. Every letter carries the unsubscribe link.
 
-export type NewsletterSource = "checkout" | "account" | "form";
+export type NewsletterSource = "register" | "checkout" | "account" | "form" | "invite";
 
 export const NEWSLETTER_SOURCE_LABELS: Record<string, string> = {
+  register: "Регистрация",
   checkout: "Оформление заказа",
+  invite: "Приглашение по e-mail",
   account: "Личный кабинет",
   form: "Форма на сайте",
 };
@@ -60,10 +62,66 @@ export async function recordConsent(email: string, source: NewsletterSource, con
   });
 }
 
+/** The customer verified their e-mail with the code: a pending consent of theirs is confirmed. */
+export async function confirmSubscriberEmail(email: string) {
+  await prisma.newsletterSubscriber.updateMany({
+    where: { email: email.trim().toLowerCase(), confirmedAt: null },
+    data: { confirmedAt: new Date() },
+  });
+}
+
 export async function withdrawConsent(email: string) {
   await prisma.newsletterSubscriber.updateMany({
     where: { email: email.trim().toLowerCase(), unsubscribedAt: null },
     data: { unsubscribedAt: new Date() },
+  });
+}
+
+// ---- Приглашения ----------------------------------------------------------
+
+/** Personal letters from the site's mailbox: few a day keep it out of spam. */
+export const INVITES_PER_DAY = 30;
+
+/** Signs an address so only the invited one can subscribe it by the link. */
+function inviteSignature(email: string) {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET is not set");
+  return createHmac("sha256", `newsletter-invite:${secret}`).update(email.toLowerCase()).digest("base64url").slice(0, 32);
+}
+
+export function checkInviteSignature(email: string, signature: string) {
+  const expected = Buffer.from(inviteSignature(email));
+  const given = Buffer.from(signature);
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
+export const joinUrl = (email: string) =>
+  absoluteUrl(`/shop/newsletter/join?e=${encodeURIComponent(email)}&s=${inviteSignature(email)}`);
+
+/**
+ * A personal letter asking for the consent -- it advertises nothing itself,
+ * so it may go to a client who hasn't agreed yet.
+ */
+export async function sendInviteLetter(email: string, name: string | null) {
+  const link = joinUrl(email);
+  const hello = name ? `Здравствуйте, ${name}!` : "Здравствуйте!";
+  await sendSiteMail({
+    to: email,
+    subject: "EMV Запчасти: наличие на складе и ваши цены на сайте",
+    text: `${hello}
+
+Мы обновили сайт emv.one: теперь там видно, что есть на нашем складе, а после входа — ваши цены и история заказов.
+
+Если хотите узнавать о поступлениях запчастей и специальных предложениях, подпишитесь на новости: ${link}
+
+Если не хотите — ничего делать не нужно, писем с новостями не будет.`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111;line-height:1.5">
+<p>${hello.replace(/</g, "&lt;")}</p>
+<p>Мы обновили сайт <a href="https://emv.one" style="color:#111">emv.one</a>: теперь там видно, что есть на нашем складе, а после входа — ваши цены и история заказов.</p>
+<p>Если хотите узнавать о поступлениях запчастей и специальных предложениях, подпишитесь на новости:</p>
+<p><a href="${link}" style="display:inline-block;background:#111;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Подписаться на новости</a></p>
+<p style="color:#555;font-size:13px">Если не хотите — ничего делать не нужно, писем с новостями не будет.</p>
+</div>`,
   });
 }
 

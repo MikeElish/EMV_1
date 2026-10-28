@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/session";
-import { recordConsent, sendConfirmationLetter, withdrawConsent } from "@/lib/newsletter";
+import { checkInviteSignature, recordConsent, sendConfirmationLetter, withdrawConsent } from "@/lib/newsletter";
 
 export type NewsletterResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -63,14 +63,23 @@ export async function setMyNewsletter(subscribed: boolean, source: "checkout" | 
     await withdrawConsent(me.email);
     return { ok: true, message: "Вы отписались от новостей." };
   }
+  // Not verified yet: the shop asks for the e-mail code anyway, and the code confirms the consent too.
   const record = await recordConsent(me.email, source, me.verified);
-  if (!record.confirmedAt) {
-    await sendConfirmationLetter(me.email, record.token).catch((error) =>
-      console.error("[newsletter] confirmation letter failed", error)
-    );
-    return { ok: true, message: "Подтвердите подписку по ссылке в письме." };
+  return {
+    ok: true,
+    message: record.confirmedAt ? "Вы подписаны на новости." : "Подписка начнёт действовать, когда вы подтвердите e-mail кодом.",
+  };
+}
+
+/** The link of an invitation: the letter reached this mailbox, so the address is confirmed. */
+export async function joinByInvite(email: string, signature: string, consent: boolean): Promise<NewsletterResult> {
+  if (!consent) return { ok: false, error: "Отметьте согласие на получение рассылки" };
+  const parsed = emailSchema.safeParse(email);
+  if (!parsed.success || typeof signature !== "string" || !checkInviteSignature(parsed.data, signature)) {
+    return { ok: false, error: "Ссылка недействительна" };
   }
-  return { ok: true, message: "Вы подписаны на новости." };
+  await recordConsent(parsed.data, "invite", true);
+  return { ok: true, message: `Готово — новости будут приходить на ${parsed.data}.` };
 }
 
 /** The unsubscribe page's button. */

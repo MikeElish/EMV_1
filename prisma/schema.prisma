@@ -124,6 +124,16 @@ model NewsletterSubscriber {
   updatedAt      DateTime  @updatedAt
 }
 
+// Рассылка → Приглашения: a personal letter asking to subscribe (not an
+// advert: it asks for the consent). Addresses typed in CRM; clients of CRM
+// and 1С with an e-mail are offered too.
+model NewsletterInvite {
+  email     String    @id
+  name      String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
 // Склад: where a 1С item lies on a 1С warehouse (cell, shelf), typed by
 // staff. The quantities come from 1С documents (src/lib/onec-warehouse.ts).
 model StoragePlace {

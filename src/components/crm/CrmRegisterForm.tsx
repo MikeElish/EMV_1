@@ -6,6 +6,7 @@ import { registerCustomer } from "@/actions/shop/auth";
 import { reachGoal } from "@/lib/metrika";
 import { digitsFromPhoneInput, formatRuPhone } from "@/lib/phone";
 import { PERSONAL_DATA_CONSENT_URL } from "@/lib/legal-docs";
+import { NEWSLETTER_CONSENT } from "@/components/shop/NewsletterForms";
 
 const fieldClass =
   "w-full rounded-md border border-white/30 bg-white/5 px-4 py-2.5 text-sm text-white outline-none placeholder:text-white/50 focus:border-white/60";
@@ -34,6 +35,7 @@ export function CrmRegisterForm({ customerNext }: { customerNext?: string }) {
       email: value("email"),
       password: value("password"),
       personalDataConsent: form.get("consent") === "on",
+      newsletter: form.get("newsletter") === "on",
     });
     setSubmitting(false);
     if (!result.ok) {
@@ -74,6 +76,11 @@ export function CrmRegisterForm({ customerNext }: { customerNext?: string }) {
             согласие на обработку персональных данных
           </a>
         </span>
+      </label>
+      {/* Not required and not pre-ticked: an advertising consent is separate (38-ФЗ ст. 18). */}
+      <label className="flex items-start gap-2 text-left text-xs leading-relaxed text-white/70">
+        <input name="newsletter" type="checkbox" className="mt-0.5" />
+        <span>{NEWSLETTER_CONSENT}</span>
       </label>
 
       {error && <p className="text-center text-sm text-red-400">{error}</p>}
