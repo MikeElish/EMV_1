@@ -21,5 +21,8 @@ export async function register() {
     // Заказ поставщику: agreed lines go out, invoices come in, every half hour.
     const { startSupplierPurchaseTimer } = await import("@/lib/supplier-purchases");
     startSupplierPurchaseTimer();
+    // Оплата по СБП and чеки АТОЛ: pending ones looked up every 2 minutes.
+    const { startSbpTimer } = await import("@/lib/sbp");
+    startSbpTimer();
   }
 }

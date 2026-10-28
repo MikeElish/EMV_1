@@ -9,6 +9,7 @@ const TABS = [
   { href: "/admin/settings/1c", label: "1С" },
   { href: "/admin/settings/warehouses", label: "Склады" },
   { href: "/admin/settings/banks", label: "Банки" },
+  { href: "/admin/settings/cashbox", label: "Касса и СБП" },
   { href: "/admin/settings/access", label: "Доступ" },
 ];
 

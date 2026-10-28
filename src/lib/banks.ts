@@ -17,7 +17,7 @@ import { matchOutgoing } from "@/lib/payment-requests";
 // the amount is that of the company's only unpaid order. A full payment
 // marks the order paid as «Оплачено» in CRM does.
 
-const TOCHKA = "https://enter.tochka.com/uapi/open-banking/v1.0";
+const TOCHKA = "https://enter.tochka.com/uapi";
 const DAY = 24 * 60 * 60 * 1000;
 
 export const BANK_KINDS = { TOCHKA_API: "Точка — по API", STATEMENT_FILE: "Выписка 1С (файл)" } as const;
@@ -60,10 +60,11 @@ function caList() {
   return bankCa;
 }
 
-async function tochka<T>(token: string, url: string, init?: { method?: string; body?: string }): Promise<T> {
+/** A call of Точка's API: `path` after /uapi (/open-banking/v1.0/…, /acquiring/v1.0/…). */
+export async function tochkaApi<T>(token: string, path: string, init?: { method?: string; body?: string }): Promise<T> {
   const { status, text } = await new Promise<{ status: number; text: string }>((resolve, reject) => {
     const request = https.request(
-      `${TOCHKA}${url}`,
+      `${TOCHKA}${path}`,
       {
         method: init?.method ?? "GET",
         ca: caList(),
@@ -81,10 +82,12 @@ async function tochka<T>(token: string, url: string, init?: { method?: string; b
     if (init?.body) request.write(init.body);
     request.end();
   });
-  if (status === 401 || status === 403) throw new Error("Точка не приняла токен — выпустите новый в «Интеграции и API» (с правом на выписки)");
+  if (status === 401 || status === 403) throw new Error("Точка не приняла токен — выпустите новый в «Интеграции и API» (с нужными правами: выписки, эквайринг)");
   if (status < 200 || status >= 300) throw new Error(`Точка ответила ${status}: ${text.slice(0, 300)}`);
   return JSON.parse(text) as T;
 }
+
+const tochka = <T,>(token: string, url: string, init?: { method?: string; body?: string }) => tochkaApi<T>(token, `/open-banking/v1.0${url}`, init);
 
 /** The statement of the account for the period, waited for (the bank builds it in the background). */
 async function tochkaStatement(account: BankAccount, from: Date, to: Date): Promise<StatementLine[]> {

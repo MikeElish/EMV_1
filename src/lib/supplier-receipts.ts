@@ -8,6 +8,7 @@ import { createOneCReceipt } from "@/lib/onec-purchase";
 import { afterWrite } from "@/lib/onec-stock-docs";
 import { setLineStatuses } from "@/lib/order-status";
 import { uploadOrderDocumentFile } from "@/lib/order-document-storage";
+import { settleHandedOver } from "@/lib/cash-receipts";
 import type { HandoverKind } from "@/lib/validators/receipts";
 
 // Склад → Поступление and Выдача.
@@ -126,5 +127,7 @@ export async function handOverOrder(input: {
     const fileUrl = await uploadOrderDocumentFile(input.orderId, "WAYBILL", input.file.content, input.file.name);
     await prisma.orderDocument.create({ data: { orderId: input.orderId, category: "WAYBILL", fileName: input.file.name, fileUrl } });
   }
+  // Paid in advance online: the receipt «Полный расчёт».
+  await settleHandedOver(input.orderId, items.map((i) => i.id)).catch((e) => console.error("[receipts] handover", e));
   return items.length;
 }

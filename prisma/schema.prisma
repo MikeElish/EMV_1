@@ -300,7 +300,8 @@ model Order {
   bankTransactions   BankTransaction[]
   supplierPurchases  SupplierPurchase[]
   paymentRequests    PaymentRequest[]
-  payment            Payment?
+  payments           Payment[]
+  cashReceipts       CashReceipt[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -437,16 +438,76 @@ model OrderItem {
   @@index([statusNotifyPending])
 }
 
+// Оплата по СБП (Точка, платёжная ссылка) of the order's lines «Требуется
+// оплата» -- src/lib/sbp.ts. SUCCEEDED marks those lines paid.
 model Payment {
   id              String        @id @default(cuid())
-  orderId         String        @unique
+  orderId         String
   order           Order         @relation(fields: [orderId], references: [id])
-  yookassaId      String        @unique
+  // Точка's operationId.
+  operationId     String?       @unique
+  // Kopecks.
+  amount          Int
+  lineIds         String[]
   status          PaymentStatus @default(PENDING)
+  // The payment link.
   confirmationUrl String?
+  paidAt          DateTime?
   rawPayload      Json?
+  receipts        CashReceipt[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// A receipt of the online cash register (АТОЛ Онлайн) -- src/lib/cash-receipts.ts.
+model CashReceipt {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  // PREPAYMENT -- «Предоплата 100%» when paid; FULL_PAYMENT -- «Полный
+  // расчёт» (the advance offset) when handed over.
+  kind      String
+  lineIds   String[]
+  // Kopecks.
+  amount    Int
+  // АТОЛ's uuid of the document; status new / wait / done / fail.
+  atolUuid  String?
+  status    String   @default("new")
+  error     String?
+  // The fiscal data of a done one (ФН, ФД, ФП, time).
+  fiscal    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// Настройки → Касса и СБП (one row).
+model CashboxSettings {
+  id              Int      @id @default(1)
+  // АТОЛ Онлайн: login, password (secret-box), group code.
+  atolLogin       String   @default("")
+  atolPasswordEnc String?
+  atolGroupCode   String   @default("")
+  // Система налогообложения (osn, usn_income …) and the VAT type of goods (vat22 …).
+  sno             String   @default("osn")
+  vat             String   @default("vat22")
+  inn             String   @default("")
+  email           String   @default("")
+  paymentAddress  String   @default("https://emv.one")
+  receiptsEnabled Boolean  @default(false)
+  // СБП: the Точка account whose token takes payments; its customerCode and merchantId.
+  sbpEnabled      Boolean  @default(false)
+  bankAccountId   String?
+  customerCode    String?
+  merchantId      String?
+  updatedAt       DateTime @updatedAt
 }
 
 enum Role {

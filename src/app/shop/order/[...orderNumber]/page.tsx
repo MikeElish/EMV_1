@@ -3,10 +3,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatRub, formatShopPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
+import { payableLines, sbpAvailable } from "@/lib/sbp";
+import { SbpPayButton } from "@/components/shop/SbpPayButton";
 
 export default async function OrderConfirmationPage({
   params,
+  searchParams,
 }: PageProps<"/shop/order/[...orderNumber]">) {
+  const { payment } = await searchParams;
   // Order numbers contain a literal "/" (ДДММГГ/N), so this route is a
   // catch-all: the segments are rejoined into the exact orderNumber string.
   const { orderNumber: segments } = await params;
@@ -18,6 +22,9 @@ export default async function OrderConfirmationPage({
   });
 
   if (!order) notFound();
+  // A private customer pays the lines «Требуется оплата» by СБП.
+  const due = (await sbpAvailable()) ? await payableLines(order.id) : null;
+  const returnedPaymentId = typeof payment === "string" ? payment : undefined;
 
   return (
     <section className="mx-auto max-w-2xl px-4 sm:px-6 py-16">
@@ -48,6 +55,10 @@ export default async function OrderConfirmationPage({
           </p>
         )}
       </div>
+
+      {(due || returnedPaymentId) && (
+        <SbpPayButton orderNumber={order.orderNumber} amount={due?.amount ?? null} returnedPaymentId={returnedPaymentId} />
+      )}
 
       <Link
         href="/shop"

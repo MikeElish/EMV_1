@@ -82,6 +82,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "settings.1c", label: "1С", path: "/admin/settings/1c" },
       { key: "settings.warehouses", label: "Склады", path: "/admin/settings/warehouses" },
       { key: "settings.banks", label: "Банки", path: "/admin/settings/banks" },
+      { key: "settings.cashbox", label: "Касса и СБП", path: "/admin/settings/cashbox" },
       { key: "settings.access", label: "Доступ", path: "/admin/settings/access" },
     ],
   },
