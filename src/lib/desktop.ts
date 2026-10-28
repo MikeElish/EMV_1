@@ -17,6 +17,13 @@ export type EmvDesktop = {
   isDesktop: true;
   /** Prints a file of the site (PDF or image) on the printer chosen in the program, without a dialog. */
   printFile(url: string, name: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  /** The window's Масштаб, percent (50–200); since program 1.1.2. */
+  zoom?: {
+    get(): Promise<number>;
+    set(percent: number): Promise<number>;
+    /** Changed elsewhere (the program's settings, Ctrl + wheel); returns the unsubscribe. */
+    onChange(callback: (percent: number) => void): () => void;
+  };
   prices: {
     /** The next price list from the watched folder, null when none is waiting. */
     next(): Promise<DesktopPriceFile | null>;

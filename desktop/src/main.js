@@ -97,7 +97,15 @@ function start() {
   });
 
   setupIpc();
-  settings.onChange(applyZoom);
+  // One Масштаб, two sliders (the settings window and «Настройки → Сайт» on the site): both follow.
+  let zoom = settings.get().zoom;
+  settings.onChange((s) => {
+    if (s.zoom === zoom) return;
+    zoom = s.zoom;
+    applyZoom();
+    if (win && !win.isDestroyed()) win.webContents.send("desktop:zoom", zoom);
+    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("settings:zoom", zoom);
+  });
   createMenu();
   createWindow();
   createTray();
@@ -184,6 +192,9 @@ function setupIpc() {
       return { ok: false, error: String(err?.message || err) };
     }
   });
+
+  ipcMain.handle("desktop:zoom-get", (e) => (fromSite(e) ? settings.get().zoom : null));
+  ipcMain.handle("desktop:zoom-set", (e, value) => (fromSite(e) ? settings.set({ zoom: Number(value) }).zoom : null));
 
   ipcMain.handle("prices:next", (e) => (fromSite(e) ? prices.next() : null));
   ipcMain.handle("prices:finish", (e, id, imported) => (fromSite(e) ? prices.finish(id, imported) : undefined));
@@ -327,7 +338,6 @@ function applyZoom() {
 /** ±10% (Ctrl+= / Ctrl+- / Ctrl + wheel); the settings slider follows. */
 function stepZoom(direction) {
   settings.set({ zoom: settings.get().zoom + direction * 10 });
-  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("settings:zoom", settings.get().zoom);
 }
 
 function buildContextMenu(params) {

@@ -2,6 +2,7 @@ import os from "os";
 import { headers } from "next/headers";
 import nextPkg from "next/package.json";
 import { getDesktopRelease } from "@/lib/desktop-release";
+import { DesktopZoomSlider } from "@/components/admin/DesktopZoomSlider";
 
 function formatDuration(seconds: number) {
   const days = Math.floor(seconds / 86400);
@@ -81,6 +82,7 @@ export default async function SiteSettingsPage() {
           При первой установке Windows может показать «Неизвестный издатель» — нажмите «Подробнее» → «Выполнить в любом
           случае».
         </p>
+        <DesktopZoomSlider />
       </section>
 
       <dl className="mt-4max-w-2xl divide-y divide-foreground/10 text-sm">
