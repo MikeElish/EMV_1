@@ -202,6 +202,7 @@ const IMPORT_COLUMNS: RegExp[] = [
   /^бренд|^производител/,
   /^наименование/,
   /^артикул/,
+  /^кол/,
   /^цена/,
   /^итого|^всего|^сумма/,
   /^срок/,
@@ -221,19 +222,19 @@ function parseQuality(raw: unknown): string | null {
 }
 
 /**
- * Where Бренд, Наименование, Артикул, Цена, Итого, Срок поставки, Качество are: found
- * by the header row (so a file from «Выгрузка», with «Количество», loads
- * too), or in this order when the headers aren't recognised.
+ * Where Бренд, Наименование, Артикул, Количество, Цена, Итого, Срок поставки,
+ * Качество are: found by the header row, or in this order when the headers
+ * aren't recognised.
  */
 function columnPositions(header: unknown[]): number[] {
   const names = header.map((h) => String(h ?? "").trim().toLowerCase());
   const found = IMPORT_COLUMNS.map((re) => names.findIndex((n) => re.test(n)));
-  return found[2] >= 0 && (found[3] >= 0 || found[4] >= 0) ? found : IMPORT_COLUMNS.map((_, i) => i);
+  return found[2] >= 0 && (found[4] >= 0 || found[5] >= 0) ? found : IMPORT_COLUMNS.map((_, i) => i);
 }
 
 /**
- * Reads a supplier price file -- columns Бренд, Наименование, Артикул, Цена,
- * Итого, Срок поставки, Качество (first row = headers) -- and matches it with the
+ * Reads a supplier price file -- columns Бренд, Наименование, Артикул, Количество,
+ * Цена, Итого, Срок поставки, Качество (first row = headers) -- and matches it with the
  * catalogue. Writes nothing.
  */
 export async function analyzeOfferImport(formData: FormData): Promise<OfferImportAnalysis> {
@@ -257,12 +258,13 @@ export async function analyzeOfferImport(formData: FormData): Promise<OfferImpor
   raw.slice(1).forEach((cells, i) => {
     const row = i + 2;
     if (cells.every((c) => c === "" || c == null)) return;
-    const [brandRaw, nameRaw, skuRaw, priceRaw, totalRaw, daysRaw, qualityRaw] = at.map((p) => (p < 0 ? "" : cells[p]));
+    const [brandRaw, nameRaw, skuRaw, qtyRaw, priceRaw, totalRaw, daysRaw, qualityRaw] = at.map((p) => (p < 0 ? "" : cells[p]));
     const sku = String(skuRaw ?? "").trim();
     const name = String(nameRaw ?? "").trim();
     const brand = String(brandRaw ?? "").trim();
-    // «Цена»; when the file has only «Итого», that one.
-    const price = String(priceRaw ?? "").trim() ? num(priceRaw) : num(totalRaw);
+    // «Цена»; when the file has only «Итого», that one -- per piece when «Количество» is given.
+    const qty = num(qtyRaw);
+    const price = String(priceRaw ?? "").trim() ? num(priceRaw) : qty > 0 ? num(totalRaw) / qty : num(totalRaw);
     if (!sku) return errors.push({ row, message: "Нет артикула" });
     if (!(price > 0)) return errors.push({ row, message: `Артикул ${sku}: нет цены` });
     parsed.push({ row, brand: findCanonicalBrand(brand) ?? brand, name, sku, price: kopecks(price), deliveryDays: parseDays(daysRaw), quality: parseQuality(qualityRaw) });
