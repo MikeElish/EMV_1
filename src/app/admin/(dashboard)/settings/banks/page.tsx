@@ -22,6 +22,7 @@ export default async function BanksSettingsPage() {
         bik: a.bik ?? "",
         hasToken: !!a.tokenEnc,
         isActive: a.isActive,
+        syncHours: a.syncHours,
         lastSyncAt: a.lastSyncAt?.toISOString() ?? null,
         lastSyncNote: a.lastSyncNote,
       }))}

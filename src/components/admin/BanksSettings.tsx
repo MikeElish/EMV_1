@@ -14,6 +14,7 @@ type Account = {
   bik: string;
   hasToken: boolean;
   isActive: boolean;
+  syncHours: string;
   lastSyncAt: string | null;
   lastSyncNote: string | null;
 };
@@ -51,6 +52,7 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
         bik: String(f.get("bik") ?? ""),
         token: String(f.get("token") ?? ""),
         isActive: f.get("isActive") === "on",
+        syncHours: String(f.get("syncHours") ?? ""),
       });
       if (!r.ok) setError(r.error);
       else onClose();
@@ -85,6 +87,17 @@ function AccountForm({ account, onClose }: { account: Account | null; onClose: (
             <input name="bik" inputMode="numeric" defaultValue={account?.bik} className={inputClass} />
           </div>
         </div>
+        {kind === "TOCHKA_API" && (
+          <div>
+            <label className="text-sm text-foreground/60">График выгрузки — часы по Москве</label>
+            <input
+              name="syncHours"
+              defaultValue={(account?.syncHours ?? "10,14,20").split(",").join(", ")}
+              placeholder="10, 14, 20 — пусто: только кнопкой"
+              className={inputClass}
+            />
+          </div>
+        )}
         {kind === "TOCHKA_API" && (
           <div>
             <label className="text-sm text-foreground/60">Токен Точки (JWT)</label>
@@ -145,6 +158,7 @@ function AccountCard({ account, onEdit }: { account: Account; onEdit: () => void
           <p className="text-xs text-foreground/50">
             {account.accountNumber}
             {account.bik && ` · БИК ${account.bik}`} · {KINDS[account.kind]}
+            {account.kind === "TOCHKA_API" && (account.syncHours ? ` · по графику ${account.syncHours.split(",").map((h) => `${h}:00`).join(", ")}` : " · только кнопкой")}
             {account.kind === "TOCHKA_API" && !account.hasToken && <span className="text-red-600"> · токен не задан</span>}
           </p>
         </div>
@@ -163,7 +177,7 @@ function AccountCard({ account, onEdit }: { account: Account; onEdit: () => void
             disabled={pending || !account.hasToken}
             className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background disabled:opacity-50"
           >
-            {pending ? "Загружаем..." : "Загрузить выписку сейчас"}
+            {pending ? "Выгружаем..." : "Выгрузить сейчас"}
           </button>
         )}
         <button
@@ -217,7 +231,7 @@ export function BanksSettings({ accounts, transactions }: { accounts: Account[];
           <h1 className="text-lg font-semibold">Банки</h1>
         </div>
         <p className="mt-2 text-sm text-foreground/60">
-          Точка загружается сама в 10:00, 14:00 и 20:00 (Москва), остальные банки — файлом выписки в формате 1С (kl_to_1c.txt). Входящий
+          Точка выгружается сама по графику счёта (часы по Москве) и кнопкой «Выгрузить сейчас», остальные банки — файлом выписки в формате 1С (kl_to_1c.txt). Выписки на сайте нужны только для оплаты заказов — в 1С сайт их не записывает. Входящий
           платёж ищет свой заказ: ИНН плательщика — компании заказа, в назначении — номер счёта или заказа, иначе единственный
           неоплаченный заказ на эту сумму. Полная оплата отмечает заказ оплаченным.
         </p>

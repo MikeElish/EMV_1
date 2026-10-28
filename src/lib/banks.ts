@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/secret-box";
 import { applyPaymentTerms, refreshOrder } from "@/lib/order-status";
 
-// Банки: the shop's statements come in -- Точка by its Open API (at 10, 14
-// and 20 o'clock and by the button), others as a 1С «Клиент-банк» file -- and an
+// Банки: the shop's statements come in -- Точка by its Open API (on the
+// account's schedule and by «Выгрузить сейчас»), others as a 1С «Клиент-банк» file -- and an
 // incoming payment is matched with the order it pays: the payer's ИНН is
 // the order company's, and the purpose names the invoice (or the order), or
 // the amount is that of the company's only unpaid order. A full payment
@@ -235,33 +235,33 @@ export async function syncBankAccount(id: string) {
 
 const timerState = globalThis as unknown as { __emvBankTimer?: NodeJS.Timeout };
 
-/** Pull hours, Moscow time. */
-export const BANK_SYNC_HOURS = [10, 14, 20];
-
-/** Until the next of BANK_SYNC_HOURS. */
-function untilNextRun() {
-  const msk = new Date(Date.now() + 3 * 60 * 60 * 1000);
-  const hour = BANK_SYNC_HOURS.find((h) => h > msk.getUTCHours());
-  const next = new Date(msk);
-  next.setUTCHours(hour ?? BANK_SYNC_HOURS[0] + 24, 0, 0, 0);
-  return next.getTime() - msk.getTime();
+/** «10, 14,20» → [10, 14, 20]: whole Moscow hours, sorted, once each. */
+export function parseSyncHours(text: string): number[] {
+  const hours = (text.match(/\d+/g) ?? []).map(Number).filter((h) => h >= 0 && h <= 23);
+  return [...new Set(hours)].sort((a, b) => a - b);
 }
 
-/** Точка, at BANK_SYNC_HOURS. */
+/**
+ * Точка on each account's schedule (Настройки → Банки → «График выгрузки»):
+ * checked every minute, an account is pulled in the first minutes of each
+ * of its hours, unless it was pulled within the last half hour.
+ */
 export function startBankTimer() {
   if (timerState.__emvBankTimer) return;
-  const schedule = () => {
-    timerState.__emvBankTimer = setTimeout(async () => {
-      const accounts = await prisma.bankAccount.findMany({ where: { kind: "TOCHKA_API", isActive: true }, select: { id: true } }).catch(() => []);
-      for (const a of accounts) {
-        try {
-          console.log("[banks]", await syncBankAccount(a.id));
-        } catch (error) {
-          console.error("[banks] sync failed", error);
-        }
+  timerState.__emvBankTimer = setInterval(async () => {
+    const msk = new Date(Date.now() + 3 * 60 * 60 * 1000);
+    if (msk.getUTCMinutes() > 5) return;
+    const accounts = await prisma.bankAccount
+      .findMany({ where: { kind: "TOCHKA_API", isActive: true }, select: { id: true, syncHours: true, lastSyncAt: true } })
+      .catch(() => []);
+    for (const a of accounts) {
+      if (!parseSyncHours(a.syncHours).includes(msk.getUTCHours())) continue;
+      if (a.lastSyncAt && Date.now() - a.lastSyncAt.getTime() < 30 * 60 * 1000) continue;
+      try {
+        console.log("[banks]", await syncBankAccount(a.id));
+      } catch (error) {
+        console.error("[banks] sync failed", error);
       }
-      schedule();
-    }, untilNextRun());
-  };
-  schedule();
+    }
+  }, 60 * 1000);
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "BankAccount" ADD COLUMN "syncHours" TEXT NOT NULL DEFAULT '10,14,20';

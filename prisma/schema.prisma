@@ -943,6 +943,8 @@ model BankAccount {
   // Точка: the JWT of «Интеграции и API», encrypted (secret-box).
   tokenEnc      String?
   isActive      Boolean           @default(true)
+  // Точка: Moscow hours of the automatic statement, «10,14,20».
+  syncHours     String            @default("10,14,20")
   lastSyncAt    DateTime?
   lastSyncNote  String?
   transactions  BankTransaction[]

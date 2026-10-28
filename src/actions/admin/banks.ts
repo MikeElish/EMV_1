@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied } from "@/lib/access-server";
 import { encryptSecret } from "@/lib/secret-box";
-import { BANK_KINDS, parseClientBankStatement, saveStatement, syncBankAccount } from "@/lib/banks";
+import { BANK_KINDS, parseClientBankStatement, parseSyncHours, saveStatement, syncBankAccount } from "@/lib/banks";
 
 export type BankResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -12,7 +12,7 @@ const PATH = "/admin/settings/banks";
 
 export async function saveBankAccount(
   id: string | null,
-  input: { name: string; kind: string; accountNumber: string; bik: string; token: string; isActive: boolean }
+  input: { name: string; kind: string; accountNumber: string; bik: string; token: string; isActive: boolean; syncHours: string }
 ): Promise<BankResult> {
   const denied = await accessDenied("settings.banks");
   if (denied) return denied;
@@ -23,8 +23,11 @@ export async function saveBankAccount(
   if (accountNumber.length !== 20) return { ok: false, error: "Номер счёта — 20 цифр" };
   const bik = input.bik.replace(/\D/g, "");
   if (bik && bik.length !== 9) return { ok: false, error: "БИК — 9 цифр" };
+  const hours = parseSyncHours(input.syncHours);
+  if (input.kind === "TOCHKA_API" && input.syncHours.trim() && !hours.length) return { ok: false, error: "График — часы от 0 до 23 через запятую, например 10, 14, 20" };
   const data = {
     name,
+    syncHours: hours.join(","),
     kind: input.kind,
     accountNumber,
     bik: bik || null,
@@ -46,7 +49,7 @@ export async function deleteBankAccount(id: string): Promise<BankResult> {
   return { ok: true, message: "Удалено" };
 }
 
-/** «Загрузить выписку сейчас» (Точка). */
+/** «Выгрузить сейчас» (Точка). */
 export async function syncBankNow(id: string): Promise<BankResult> {
   const denied = await accessDenied("settings.banks");
   if (denied) return denied;
