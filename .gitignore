@@ -50,3 +50,6 @@ next-env.d.ts
 # Claude Code local tooling (skills, agent config) -- not part of the app
 /.claude/
 /.agents/
+
+# Invoice stamp and signature (src/lib/invoice-pdf.ts) -- copied to the server by hand
+/private/

@@ -10,6 +10,7 @@ import {
 } from "@/lib/order-document-storage";
 import { applyPaymentTerms, refreshOrder, releaseAwaitingSupply, setLineStatuses, targetLines } from "@/lib/order-status";
 import { sendDeliveryChangeLetter } from "@/lib/order-notifications";
+import { issueOrderInvoice } from "@/lib/order-invoice";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -197,6 +198,19 @@ export async function uploadOrderDocument(formData: FormData): Promise<ActionRes
 
   revalidatePath("/admin/crm/orders");
   return { ok: true };
+}
+
+/** «Сформировать счёт»: the invoice is written to 1С and its PDF goes into «Счета». */
+export async function issueInvoice(orderId: string): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  try {
+    const issued = await issueOrderInvoice(String(orderId));
+    return { ok: true, message: `Счёт № ${issued.number} записан в 1С и вложен в заказ` };
+  } catch (error) {
+    console.error("[invoice]", error);
+    return { ok: false, error: error instanceof Error ? error.message : "Не удалось сформировать счёт" };
+  }
 }
 
 export async function deleteOrderDocument(id: string): Promise<ActionResult> {

@@ -272,6 +272,11 @@ model Order {
   // DEFERRED. Null for prepayment/no-company orders (plain paid/unpaid).
   plannedPaymentDate DateTime?
   totalAmount        Int
+  // «Счет на оплату» made from the order in 1С (src/lib/order-invoice.ts): its
+  // number comes from 1С; a new one replaces the same 1С document.
+  invoiceRef         String?
+  invoiceNumber      String?
+  invoiceDate        DateTime?
   userId             String?
   user               User?           @relation(fields: [userId], references: [id])
   items              OrderItem[]

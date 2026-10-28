@@ -10,6 +10,7 @@ import {
   listOrderDocuments,
   uploadOrderDocument,
   deleteOrderDocument,
+  issueInvoice,
 } from "@/actions/admin/orders";
 
 export function OrderDocumentsModal({
@@ -28,6 +29,19 @@ export function OrderDocumentsModal({
   // In the Windows program: «Печать» sends the file straight to the printer.
   const desktop = useDesktop();
   const [printing, setPrinting] = useState<string | null>(null);
+  const [issuing, setIssuing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function issue() {
+    setIssuing(true);
+    setError(null);
+    setNotice(null);
+    const result = await issueInvoice(orderId);
+    setIssuing(false);
+    if (!result.ok) return setError(result.error);
+    setNotice(result.message);
+    refresh();
+  }
 
   async function print(doc: OrderDocument) {
     if (!desktop) return;
@@ -82,6 +96,17 @@ export function OrderDocumentsModal({
         <h2 className="text-lg font-semibold">
           {ORDER_DOCUMENT_CATEGORY_LABELS[category]}
         </h2>
+        {category === "INVOICE" && (
+          <button
+            type="button"
+            onClick={issue}
+            disabled={issuing}
+            title="Записать счёт в 1С (номер даёт 1С) и вложить PDF; повторно — тот же счёт с новыми строками"
+            className="ml-auto rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5 disabled:opacity-50"
+          >
+            {issuing ? "Формируем..." : "Сформировать счёт"}
+          </button>
+        )}
       </div>
       <input
         ref={fileInputRef}
@@ -91,6 +116,7 @@ export function OrderDocumentsModal({
       />
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {notice && <p className="mt-2 text-sm text-green-600">{notice}</p>}
       {uploading && <p className="mt-2 text-sm text-foreground/50">Загрузка...</p>}
 
       <div className="mt-4 space-y-2">
