@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { MobileMenu, MOBILE_MENU_ITEM } from "@/components/MobileMenu";
 import { CustomerSettingsModal } from "@/components/shop/CustomerSettingsModal";
 import { getCrmBadge, type CrmBadgeInfo } from "@/actions/crm/session-badge";
+import { BalanceBadge } from "@/components/shop/BalanceBadge";
 import { logoutCustomer } from "@/actions/shop/settings";
 
 const LOGGED_OUT: CrmBadgeInfo = { loggedIn: false, label: null, role: null };
@@ -47,6 +48,9 @@ export function ShopMobileMenu({ light }: { light: boolean }) {
                 <Link href="/shop/orders" className={MOBILE_MENU_ITEM}>
                   Мои заказы
                 </Link>
+                <div className="px-4 py-2">
+                  <BalanceBadge />
+                </div>
                 <button
                   type="button"
                   onClick={() => {

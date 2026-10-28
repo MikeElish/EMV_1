@@ -11,6 +11,7 @@ import { HeaderSearchBar } from "@/components/shop/HeaderSearchBar";
 import { ShopLink } from "@/components/shop/ShopLink";
 import { getCrmBadge } from "@/actions/crm/session-badge";
 import { ShopMobileMenu } from "@/components/shop/ShopMobileMenu";
+import { BalanceBadge } from "@/components/shop/BalanceBadge";
 
 export function ShopHeader() {
   // На главной странице фон — видео в баннере, поэтому шапка там
@@ -54,6 +55,7 @@ export function ShopHeader() {
 
         <CartIcon light={isHome} />
         <ThemeToggle light={isHome} />
+        {isCustomer && <BalanceBadge light={isHome} className="hidden sm:inline-block" />}
         {isCustomer && (
           <ShopLink
             eager
