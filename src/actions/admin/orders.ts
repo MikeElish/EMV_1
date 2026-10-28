@@ -82,7 +82,8 @@ export async function updateLinePrice(itemId: string, price: number): Promise<Ac
   if (!Number.isInteger(price) || price <= 0 || price > 1_000_000_000) return { ok: false, error: "Укажите цену больше нуля" };
   const item = await prisma.orderItem.findUnique({ where: { id: itemId }, select: { orderId: true, paid: true } });
   if (!item) return { ok: false, error: "Позиция не найдена" };
-  if (item.paid) return { ok: false, error: "Позиция уже оплачена — цену не меняем" };
+  // The owner corrects any line («Ручное редактирование»); others only unpaid ones.
+  if (item.paid && (await ownerOnly())) return { ok: false, error: "Позиция уже оплачена — цену не меняем" };
   await prisma.orderItem.update({ where: { id: itemId }, data: { priceSnapshot: price } });
   await refreshOrder(prisma, item.orderId);
   revalidateOrders();

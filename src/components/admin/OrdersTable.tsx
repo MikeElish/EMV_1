@@ -185,6 +185,8 @@ export function OrdersTable({
   const [creating, setCreating] = useState(false);
   const [grouped, setGrouped] = useState(false);
   const [unfinished, setUnfinished] = useState(false);
+  // «Ручное редактирование» (owner): every line's price becomes a field.
+  const [manual, setManual] = useState(false);
 
   // Remembered per browser.
   useEffect(() => {
@@ -355,10 +357,26 @@ export function OrdersTable({
           <button
             type="button"
             onClick={() => setFilters(EMPTY_FILTERS)}
-            className="text-sm text-foreground/50 hover:text-foreground"
+            className="ml-auto text-sm text-foreground/50 hover:text-foreground"
           >
             Сбросить фильтры
           </button>
+        )}
+        {canDelete && (
+          <label className="ml-4 flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <span>Ручное редактирование</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={manual}
+              onClick={() => setManual((m) => !m)}
+              className={`relative h-5 w-9 rounded-full transition-colors ${manual ? "bg-green-600" : "bg-foreground/20"}`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${manual ? "left-[18px]" : "left-0.5"}`}
+              />
+            </button>
+          </label>
         )}
       </div>
 
@@ -536,7 +554,13 @@ export function OrdersTable({
                           {item.product?.stock ?? "—"}
                         </td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
-                          {item.priceSnapshot <= 0 && !item.cancelled ? <LinePriceCell itemId={item.id} /> : formatRub(item.priceSnapshot)}
+                          {manual && !item.cancelled ? (
+                            <LinePriceCell itemId={item.id} current={item.priceSnapshot} />
+                          ) : item.priceSnapshot <= 0 && !item.cancelled ? (
+                            <LinePriceCell itemId={item.id} />
+                          ) : (
+                            formatRub(item.priceSnapshot)
+                          )}
                         </td>
                         <td className={`whitespace-nowrap py-2 pr-4 ${cancelledCellClass}`}>
                           {/* Всего = Количество × Цена */}
