@@ -37,6 +37,13 @@ async function answer(req: RpcRequest) {
     }
     case "ping":
       return result({});
+    // Asked by clients that probe every list; the site offers tools only.
+    case "resources/list":
+      return result({ resources: [] });
+    case "resources/templates/list":
+      return result({ resourceTemplates: [] });
+    case "prompts/list":
+      return result({ prompts: [] });
     case "tools/list":
       return result({
         tools: TOOLS.map((t) => ({
