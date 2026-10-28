@@ -249,7 +249,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
                 options={data.employees.map((e) => ({ value: e.id, label: e.name }))}
                 className="mt-1"
               />
-              <p className="mt-1 text-xs text-foreground/50">Расход сотрудника идёт в Отчёты → Зарплата</p>
+              <p className="mt-1 text-xs text-foreground/50">Расход сотрудника идёт в Отчёты → Бонусы</p>
             </div>
           </div>
 

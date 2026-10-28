@@ -19,7 +19,7 @@ export type ExtraCostInput = {
   date: string;
   orderId: string | null;
   supplierId: string | null;
-  /** The employee it is charged to (Отчёты → Зарплата). */
+  /** The employee it is charged to (Отчёты → Бонусы). */
   employeeId: string | null;
   status: string;
   note: string;

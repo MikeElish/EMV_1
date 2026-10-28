@@ -22,7 +22,7 @@ export async function createManualOrderRecord(input: ManualOrderInput, creatorId
   const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, items } = parsed.data;
 
   let deferred = false;
-  // Отчёты → Зарплата: the client company's manager, else whoever makes it.
+  // Отчёты → Бонусы: the client company's manager, else whoever makes it.
   let managerId = creatorId;
   if (customerId) {
     const customer = await prisma.user.findUnique({

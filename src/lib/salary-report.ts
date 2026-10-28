@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 
-// Отчёты → Зарплата of an employee for a period:
+// Отчёты → Бонусы of an employee for a period:
 //  - income: the lines of the orders they manage (Order.managerId) that are
 //    paid and shipped (handed over / passed to a transport company), by the
 //    order's handover date;

@@ -63,7 +63,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
     path: "/admin/reports",
     sections: [
       { key: "reports.funds", label: "Фонды", path: "/admin/reports/funds" },
-      { key: "reports.salary", label: "Зарплата", path: "/admin/reports/salary" },
+      { key: "reports.salary", label: "Бонусы", path: "/admin/reports/bonuses" },
       { key: "reports.execution", label: "Выполнение", path: "/admin/reports/execution" },
       { key: "reports.analytics", label: "Аналитика", path: "/admin/reports/analytics" },
       { key: "reports.movements", label: "Движение товаров", path: "/admin/reports/movements" },

@@ -36,7 +36,7 @@ export function SalaryReportView({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const params = new URLSearchParams({ e: String(form.get("e") ?? ""), from: String(form.get("from")), to: String(form.get("to")) });
-    router.push(`/admin/reports/salary?${params}`);
+    router.push(`/admin/reports/bonuses?${params}`);
   }
 
   return (

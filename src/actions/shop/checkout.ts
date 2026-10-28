@@ -94,7 +94,7 @@ export async function createOrder(
 
   let deferred = false;
   let privateCustomer = true;
-  // Отчёты → Зарплата: the sale of the client company's manager.
+  // Отчёты → Бонусы: the sale of the client company's manager.
   let managerId: string | null = null;
   if (userId) {
     const user = await prisma.user.findUnique({

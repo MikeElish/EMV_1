@@ -194,7 +194,7 @@ export function UserForm({
       {isEmployee && !isOwner && (
         <div>
           <label htmlFor="salaryPercent" className="text-sm text-foreground/60">
-            % от прибыли (Отчёты → Зарплата)
+            % от прибыли (Отчёты → Бонусы)
           </label>
           <input
             id="salaryPercent"

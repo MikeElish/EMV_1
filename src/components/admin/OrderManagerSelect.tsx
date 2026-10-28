@@ -5,7 +5,7 @@ import { updateOrderManager } from "@/actions/admin/orders";
 
 export type Employee = { id: string; name: string };
 
-/** «Менеджер» under the order's customer: whose sale it is (Отчёты → Зарплата). */
+/** «Менеджер» under the order's customer: whose sale it is (Отчёты → Бонусы). */
 export function OrderManagerSelect({ orderId, managerId, employees }: { orderId: string; managerId: string | null; employees: Employee[] }) {
   const [value, setValue] = useState(managerId ?? "");
   const [error, setError] = useState<string | null>(null);

@@ -291,7 +291,7 @@ export async function deleteOrderLineAsOwner(itemId: string): Promise<ActionResu
   return { ok: true };
 }
 
-/** «Менеджер» of an order -- whose sale it is in Отчёты → Зарплата. */
+/** «Менеджер» of an order -- whose sale it is in Отчёты → Бонусы. */
 export async function updateOrderManager(orderId: string, managerId: string | null): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
@@ -301,6 +301,6 @@ export async function updateOrderManager(orderId: string, managerId: string | nu
   }
   await prisma.order.update({ where: { id: orderId }, data: { managerId } });
   revalidatePath("/admin/crm/orders");
-  revalidatePath("/admin/reports/salary");
+  revalidatePath("/admin/reports/bonuses");
   return { ok: true };
 }

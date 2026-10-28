@@ -36,7 +36,7 @@ export const userSchema = z.object({
   role: z.enum(ASSIGNABLE_ROLES),
   companyId: z.string().trim().optional(),
   password: z.union([z.string().min(6, "Минимум 6 символов"), z.literal("")]).optional(),
-  // Отчёты → Зарплата: «К выплате» = this % of the profit.
+  // Отчёты → Бонусы: «К выплате» = this % of the profit.
   salaryPercent: z.number().min(0, "Процент не может быть отрицательным").max(100, "Не больше 100%").optional(),
 });
 export type UserInput = z.infer<typeof userSchema>;
