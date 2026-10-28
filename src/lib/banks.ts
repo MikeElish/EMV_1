@@ -1,5 +1,9 @@
 import "server-only";
 import { createHash } from "crypto";
+import { readFileSync } from "fs";
+import https from "https";
+import path from "path";
+import tls from "tls";
 import type { BankAccount } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/secret-box";
@@ -44,16 +48,41 @@ type TochkaTx = {
   CreditorParty?: { inn?: string; name?: string };
 };
 
-async function tochka<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${TOCHKA}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-    cache: "no-store",
+// Точка's certificate is issued by the Минцифры CA (Russian Trusted Root CA,
+// gu-st.ru), which isn't among Node's roots: it is trusted for these calls only.
+let bankCa: string[] | null = null;
+function caList() {
+  bankCa ??= [
+    ...tls.rootCertificates,
+    ...["russian_trusted_root_ca.pem", "russian_trusted_sub_ca.pem"].map((f) => readFileSync(path.join(process.cwd(), "assets", "certs", f), "utf8")),
+  ];
+  return bankCa;
+}
+
+async function tochka<T>(token: string, url: string, init?: { method?: string; body?: string }): Promise<T> {
+  const { status, text } = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const request = https.request(
+      `${TOCHKA}${url}`,
+      {
+        method: init?.method ?? "GET",
+        ca: caList(),
+        timeout: 30_000,
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (c: Buffer) => chunks.push(c));
+        response.on("end", () => resolve({ status: response.statusCode ?? 0, text: Buffer.concat(chunks).toString("utf8") }));
+      }
+    );
+    request.on("timeout", () => request.destroy(new Error("Точка не ответила за 30 секунд")));
+    request.on("error", reject);
+    if (init?.body) request.write(init.body);
+    request.end();
   });
-  if (response.status === 401 || response.status === 403) throw new Error("Точка не приняла токен — выпустите новый в «Интеграции и API» (с правом на выписки)");
-  if (!response.ok) throw new Error(`Точка ответила ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  return response.json() as Promise<T>;
+  if (status === 401 || status === 403) throw new Error("Точка не приняла токен — выпустите новый в «Интеграции и API» (с правом на выписки)");
+  if (status < 200 || status >= 300) throw new Error(`Точка ответила ${status}: ${text.slice(0, 300)}`);
+  return JSON.parse(text) as T;
 }
 
 /** The statement of the account for the period, waited for (the bank builds it in the background). */
