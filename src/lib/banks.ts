@@ -8,6 +8,7 @@ import type { BankAccount } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/secret-box";
 import { applyPaymentTerms, refreshOrder } from "@/lib/order-status";
+import { matchOutgoing } from "@/lib/payment-requests";
 
 // Банки: the shop's statements come in -- Точка by its Open API (on the
 // account's schedule and by «Выгрузить сейчас»), others as a 1С «Клиент-банк» file -- and an
@@ -243,7 +244,7 @@ async function matchPayment(tx: { id: string; amount: number; date: Date; counte
   return `Заказ ${order.orderNumber} оплачен ${how}`;
 }
 
-/** Stores the statement's lines (once each) and matches the new incoming ones. */
+/** Stores the statement's lines (once each): new incoming ones pay orders, outgoing ones close payment requests. */
 export async function saveStatement(accountId: string, lines: StatementLine[]) {
   let added = 0;
   let paid = 0;
@@ -252,7 +253,11 @@ export async function saveStatement(accountId: string, lines: StatementLine[]) {
     if (exists) continue;
     const tx = await prisma.bankTransaction.create({ data: { ...line, bankAccountId: accountId } });
     added++;
-    if (!line.incoming) continue;
+    if (!line.incoming) {
+      const note = await matchOutgoing(tx).catch((e) => `Ошибка сопоставления: ${(e as Error).message}`);
+      if (note) await prisma.bankTransaction.update({ where: { id: tx.id }, data: { matchNote: note } });
+      continue;
+    }
     const note = await matchPayment(tx).catch((e) => `Ошибка сопоставления: ${(e as Error).message}`);
     if (/ оплачен /.test(note)) paid++;
     await prisma.bankTransaction.update({ where: { id: tx.id }, data: { matchNote: note } });

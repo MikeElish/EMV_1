@@ -5,7 +5,8 @@ import { mkdir, unlink, writeFile } from "fs/promises";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
-import { DadataError, findPartyByInn } from "@/lib/dadata";
+import { companyByInn, type SupplierLookup } from "@/lib/company-by-inn";
+import { syncExtraCostRequest } from "@/lib/payment-requests";
 import { EXTRA_COST_KINDS, EXTRA_COST_STATUSES, type ExtraCostInput } from "@/lib/validators/extra-costs";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -35,30 +36,13 @@ export async function getExtraCostFormData() {
 }
 export type ExtraCostFormData = Awaited<ReturnType<typeof getExtraCostFormData>>;
 
-export type SupplierLookup = { ok: true; company: { id: string; name: string; inn: string | null; kpp: string | null }; created: boolean } | { ok: false; error: string };
+export type { SupplierLookup };
 
 /** «Контрагент по ИНН»: a company of the site with it, else from ЕГРЮЛ/ЕГРИП as a new Поставщик. */
 export async function supplierByInn(inn: string): Promise<SupplierLookup> {
   const denied = await accessDenied("crm.extra-costs");
   if (denied) return denied;
-  const digits = String(inn).replace(/\D/g, "");
-  if (digits.length !== 10 && digits.length !== 12) return { ok: false, error: "ИНН — 10 цифр у организации или 12 у ИП" };
-  const select = { id: true, name: true, inn: true, kpp: true } as const;
-  const known = await prisma.company.findFirst({ where: { inn: digits, isOwn: false }, select });
-  if (known) return { ok: true, company: known, created: false };
-  try {
-    const party = await findPartyByInn(digits);
-    if (!party) return { ok: false, error: "В ЕГРЮЛ/ЕГРИП нет организации с таким ИНН" };
-    const company = await prisma.company.create({
-      data: { name: party.name, inn: digits, kpp: party.kpp, ogrn: party.ogrn, address: party.address, type: "Поставщик" },
-      select,
-    });
-    revalidatePath("/admin/crm/companies");
-    return { ok: true, company, created: true };
-  } catch (error) {
-    if (error instanceof DadataError) return { ok: false, error: error.message };
-    throw error;
-  }
+  return companyByInn(inn);
 }
 
 /** The card's «Сохранить»: the cost with its lines (JSON in `data`) and, optionally, a file. */
@@ -126,6 +110,7 @@ export async function saveExtraCost(formData: FormData): Promise<ActionResult> {
       data: { fileName: file.name, fileUrl: `/uploads/extra-costs/${saved.id}/${stored}` },
     });
   }
+  await syncExtraCostRequest(saved.id);
   revalidate();
   return { ok: true };
 }
@@ -135,6 +120,7 @@ export async function setExtraCostStatus(id: string, status: string): Promise<Ac
   if (denied) return denied;
   if (!(EXTRA_COST_STATUSES as readonly string[]).includes(status)) return { ok: false, error: "Некорректный статус" };
   await prisma.extraCost.update({ where: { id: String(id) }, data: { status } });
+  await syncExtraCostRequest(String(id));
   revalidate();
   return { ok: true };
 }

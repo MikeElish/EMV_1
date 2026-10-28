@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendSiteMail } from "@/lib/mailer";
 import { mailboxes, requestSheet, SHOP_MAILBOX } from "@/lib/price-requests";
+import { requestForPurchase } from "@/lib/payment-requests";
 
 // Заказ поставщику. Lines in «Заказать» (the purchase is agreed: the
 // customer paid or is on deferral) go to their supplier -- one letter per
@@ -99,10 +100,12 @@ export async function addPurchaseFile(purchaseId: string, kind: "INVOICE" | "PAY
   await mkdir(dir, { recursive: true });
   const stored = `${Date.now()}-${crypto.randomUUID()}${path.extname(name)}`;
   await writeFile(path.join(dir, stored), content);
-  await prisma.supplierPurchaseFile.create({ data: { purchaseId, kind, fileName: name, fileUrl: `/uploads/supplier-purchases/${purchaseId}/${stored}` } });
+  const file = await prisma.supplierPurchaseFile.create({ data: { purchaseId, kind, fileName: name, fileUrl: `/uploads/supplier-purchases/${purchaseId}/${stored}` } });
   if (kind === "INVOICE") {
     await prisma.supplierPurchase.update({ where: { id: purchaseId }, data: { invoiceAt: new Date() } });
     await prisma.supplierOrderLine.updateMany({ where: { purchaseId, status: { in: ["TO_ORDER"] } }, data: { status: "AWAITING_PAYMENT" } });
+    // Финансы → Заявки на оплату.
+    await requestForPurchase(purchaseId, { fileName: file.fileName, fileUrl: file.fileUrl });
   }
 }
 

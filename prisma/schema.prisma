@@ -289,6 +289,7 @@ model Order {
   claims             Claim[]
   bankTransactions   BankTransaction[]
   supplierPurchases  SupplierPurchase[]
+  paymentRequests    PaymentRequest[]
   payment            Payment?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -318,28 +319,29 @@ model Service {
 // Additional costs of an order (delivery etc.) -- CRM → Доп.расходы. Shown
 // in CRM → Заказы as «Доп.расходы», added to «ИТОГО».
 model ExtraCost {
-  id         String          @id @default(cuid())
+  id             String          @id @default(cuid())
   // The supplier's document (счёт, акт), as typed.
-  number     String          @default("")
-  date       DateTime        @default(now())
+  number         String          @default("")
+  date           DateTime        @default(now())
   // Логистика, Иные затраты, Билеты, Проживание (EXTRA_COST_KINDS).
-  kind       String          @default("Иные затраты")
+  kind           String          @default("Иные затраты")
   // Not every cost belongs to an order (tickets, a hotel).
-  orderId    String?
-  order      Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  supplierId String?
-  supplier   Company?        @relation("ExtraCostSupplier", fields: [supplierId], references: [id])
-  serviceId  String?
-  service    Service?        @relation(fields: [serviceId], references: [id])
+  orderId        String?
+  order          Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId     String?
+  supplier       Company?        @relation("ExtraCostSupplier", fields: [supplierId], references: [id])
+  serviceId      String?
+  service        Service?        @relation(fields: [serviceId], references: [id])
   // Kopecks: the sum of the lines, or typed when there are none.
-  amount     Int
+  amount         Int
   // Требуется оплата, Оплачено, Отменено.
-  status     String          @default("Требуется оплата")
-  fileName   String?
-  fileUrl    String?
-  note       String?
-  lines      ExtraCostLine[]
-  createdAt  DateTime        @default(now())
+  status         String          @default("Требуется оплата")
+  fileName       String?
+  fileUrl        String?
+  note           String?
+  lines          ExtraCostLine[]
+  paymentRequest PaymentRequest?
+  createdAt      DateTime        @default(now())
 
   @@index([orderId])
   @@index([supplierId])
@@ -582,6 +584,7 @@ model Company {
   extraCosts          ExtraCost[]         @relation("ExtraCostSupplier")
   priceRequests       PriceRequest[]      @relation("PriceRequestSupplier")
   supplierPurchases   SupplierPurchase[]  @relation("SupplierPurchaseSupplier")
+  paymentRequests     PaymentRequest[]    @relation("PaymentRequestCompany")
   kpp                 String?
   // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
   oneCRef             String?             @unique
@@ -959,9 +962,9 @@ model BankAccount {
  * A payment of a statement; an incoming one is matched with an order and marks it paid.
  */
 model BankTransaction {
-  id               String      @id @default(cuid())
+  id               String          @id @default(cuid())
   bankAccountId    String
-  bankAccount      BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  bankAccount      BankAccount     @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   // The bank's transaction id, or date|number|amount|ИНН for a statement file.
   externalId       String
   date             DateTime
@@ -973,10 +976,12 @@ model BankTransaction {
   purpose          String?
   documentNumber   String?
   orderId          String?
-  order            Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  order            Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
   // How it was matched, or why not.
   matchNote        String?
-  createdAt        DateTime    @default(now())
+  // An outgoing one: the payment request it closed.
+  paymentRequest   PaymentRequest?
+  createdAt        DateTime        @default(now())
 
   @@unique([bankAccountId, externalId])
   @@index([date])
@@ -989,20 +994,21 @@ model BankTransaction {
  * reply makes them «Требуется оплата» (src/lib/supplier-purchases.ts).
  */
 model SupplierPurchase {
-  id          String                 @id @default(cuid())
-  number      Int                    @unique @default(autoincrement())
-  supplierId  String
-  supplier    Company                @relation("SupplierPurchaseSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
-  orderId     String?
-  order       Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  email       String?
-  contactName String?
-  messageId   String?
-  sentAt      DateTime?
-  invoiceAt   DateTime?
-  lines       SupplierOrderLine[]
-  files       SupplierPurchaseFile[]
-  createdAt   DateTime               @default(now())
+  id             String                 @id @default(cuid())
+  number         Int                    @unique @default(autoincrement())
+  supplierId     String
+  supplier       Company                @relation("SupplierPurchaseSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+  orderId        String?
+  order          Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  email          String?
+  contactName    String?
+  messageId      String?
+  sentAt         DateTime?
+  invoiceAt      DateTime?
+  lines          SupplierOrderLine[]
+  files          SupplierPurchaseFile[]
+  paymentRequest PaymentRequest?
+  createdAt      DateTime               @default(now())
 
   @@index([supplierId])
   @@index([orderId])
@@ -1022,4 +1028,54 @@ model SupplierPurchaseFile {
   createdAt  DateTime         @default(now())
 
   @@index([purchaseId])
+}
+
+/**
+ * Финансы → Заявки на оплату: what the shop has to pay -- a supplier's
+ * invoice of a supplier order, an extra cost, or one added by hand. An
+ * outgoing payment of a statement to the same ИНН for the same sum closes it
+ * (src/lib/payment-requests.ts).
+ */
+model PaymentRequest {
+  id                String               @id @default(cuid())
+  number            Int                  @unique @default(autoincrement())
+  companyId         String?
+  company           Company?             @relation("PaymentRequestCompany", fields: [companyId], references: [id], onDelete: SetNull)
+  // The payee's ИНН as typed, when there is no company.
+  inn               String?
+  orderId           String?
+  order             Order?               @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  purchaseId        String?              @unique
+  purchase          SupplierPurchase?    @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  extraCostId       String?              @unique
+  extraCost         ExtraCost?           @relation(fields: [extraCostId], references: [id], onDelete: Cascade)
+  // Kopecks.
+  amount            Int
+  purpose           String?
+  // Требуется оплата, Оплачено, Отменено.
+  status            String               @default("Требуется оплата")
+  paidAt            DateTime?
+  bankTransactionId String?              @unique
+  bankTransaction   BankTransaction?     @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  files             PaymentRequestFile[]
+  createdAt         DateTime             @default(now())
+
+  @@index([status])
+  @@index([companyId])
+}
+
+/**
+ * A file of a payment request: the invoice, the payment order, others.
+ */
+model PaymentRequestFile {
+  id        String         @id @default(cuid())
+  requestId String
+  request   PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  // INVOICE, PAYMENT or OTHER.
+  kind      String
+  fileName  String
+  fileUrl   String
+  createdAt DateTime       @default(now())
+
+  @@index([requestId])
 }
