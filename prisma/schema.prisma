@@ -800,6 +800,22 @@ model MailRuleState {
   updatedAt   DateTime @updatedAt
 }
 
+/**
+ * Почта: a letter's line in the list (from, to, subject, date, attachments)
+ * -- never changes for its uid, and Yandex is slow to give it, so it is read
+ * once (src/lib/mail/messages.ts). Flags are always asked fresh.
+ */
+model MailSummary {
+  userId      String
+  folder      String
+  uidValidity String
+  uid         Int
+  data        Json
+  createdAt   DateTime @default(now())
+
+  @@id([userId, folder, uidValidity, uid])
+}
+
 // Настройки → Доступ: the access template of a role ({ "<section key>":
 // "edit" | "view" | "hide" }, src/lib/access.ts). Users of the role follow it
 // unless their own card sets them apart (User.access); saving the template

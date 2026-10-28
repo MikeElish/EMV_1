@@ -4,12 +4,9 @@ import { processMailRules } from "@/lib/mail/rules";
 
 export default async function Page({ searchParams }: PageProps<"/admin/mail/inbox">) {
   const { page } = await searchParams;
-  // Rules first, so a letter that a rule moves away isn't shown here -- but
-  // never keep the inbox waiting on a slow server.
+  // Rules run every minute anyway; opening Входящие starts a run without
+  // waiting for it (a letter a rule moves may show here until the next visit).
   const { userId } = await verifyStaffSession();
-  await Promise.race([
-    processMailRules(userId).catch((error) => console.error("[mail-rules]", error)),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
+  processMailRules(userId).catch((error) => console.error("[mail-rules]", error));
   return <MailFolderPage role="inbox" basePath="/admin/mail/inbox" page={pageFromSearch(page)} />;
 }

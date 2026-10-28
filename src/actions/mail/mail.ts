@@ -5,7 +5,7 @@ import { getStaffSession } from "@/lib/staff-dal";
 import type { AccessLevel } from "@/lib/access";
 import { getMailAccount, type MailAccount } from "@/lib/mail/account";
 import { withFolder, withImap, folderByRole, MailError, type FolderRole } from "@/lib/mail/imap";
-import { getFoldersWithCounts, invalidateUnread, type UnreadCounts } from "@/lib/mail/unread";
+import { forgetFolders, getFoldersWithCounts, invalidateUnread, type UnreadCounts } from "@/lib/mail/unread";
 import { sendOutgoing, saveDraftMessage, deleteDraft, type OutgoingMail } from "@/lib/mail/compose";
 import { parseRecipients, folderNameSchema, MAX_ATTACHMENTS_BYTES } from "@/lib/validators/mail";
 
@@ -46,7 +46,7 @@ export async function getMailUnread(): Promise<MailUnreadResult> {
   const account = await getMailAccount(session.userId);
   if (!account) return { configured: false };
   try {
-    const { counts } = await getFoldersWithCounts(account);
+    const { counts } = await getFoldersWithCounts(account, { wait: true });
     return { configured: true, ok: true, counts };
   } catch {
     return { configured: true, ok: false };
@@ -195,6 +195,7 @@ export async function createFolder(name: string): Promise<MailActionResult> {
       return { ok: false, error: "Папка с таким названием уже есть" };
     }
     await withImap(r.account, (client) => client.mailboxCreate(parsedName.data));
+    forgetFolders(r.account.userId);
     return done(r.account.userId);
   } catch (error) {
     return fail(error);
@@ -211,6 +212,7 @@ export async function renameFolder(path: string, name: string): Promise<MailActi
     const folder = folders.find((f) => f.path === path);
     if (!folder || folder.role !== "custom") return { ok: false, error: "Системные папки переименовать нельзя" };
     await withImap(r.account, (client) => client.mailboxRename(path, parsedName.data));
+    forgetFolders(r.account.userId);
     return done(r.account.userId);
   } catch (error) {
     return fail(error);
@@ -225,6 +227,7 @@ export async function deleteFolder(path: string): Promise<MailActionResult> {
     const folder = folders.find((f) => f.path === path);
     if (!folder || folder.role !== "custom") return { ok: false, error: "Системные папки удалить нельзя" };
     await withImap(r.account, (client) => client.mailboxDelete(path));
+    forgetFolders(r.account.userId);
     return done(r.account.userId);
   } catch (error) {
     return fail(error);

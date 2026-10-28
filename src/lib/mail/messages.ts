@@ -4,6 +4,7 @@ import sanitizeHtml from "sanitize-html";
 import type { MessageStructureObject } from "imapflow";
 import type { MailAccount } from "@/lib/mail/account";
 import { withFolder, MailError } from "@/lib/mail/imap";
+import { prisma } from "@/lib/prisma";
 
 export type MailAddress = { name: string; address: string };
 
@@ -35,7 +36,14 @@ function hasAttachment(node: MessageStructureObject | undefined): boolean {
 const toAddresses = (list?: { name?: string; address?: string }[]): MailAddress[] =>
   (list ?? []).map((a) => ({ name: a.name ?? "", address: a.address ?? "" }));
 
-/** Newest first, `pageSize` per page (sequence numbers, so no full scan). */
+type Summary = Omit<MessageSummary, "uid" | "seen" | "flagged">;
+
+/**
+ * Newest first, `pageSize` per page (sequence numbers, so no full scan).
+ * Yandex gives flags at once but envelopes slowly (seconds per page): the
+ * envelope part of each letter is kept in MailSummary after the first read,
+ * so a page asks only the flags and the letters it hasn't seen.
+ */
 export async function listMessages(
   account: MailAccount,
   path: string,
@@ -43,6 +51,7 @@ export async function listMessages(
 ): Promise<MessagePage> {
   return withFolder(account, path, async (client) => {
     const total = client.mailbox ? client.mailbox.exists : 0;
+    const validity = String(client.mailbox ? client.mailbox.uidValidity : "");
     const size = account.pageSize;
     const pages = Math.max(1, Math.ceil(total / size));
     const current = Math.min(Math.max(1, page), pages);
@@ -50,27 +59,36 @@ export async function listMessages(
 
     const end = total - (current - 1) * size;
     const start = Math.max(1, end - size + 1);
-    const items: MessageSummary[] = [];
-    for await (const msg of client.fetch(`${start}:${end}`, {
-      uid: true,
-      flags: true,
-      envelope: true,
-      bodyStructure: true,
-      internalDate: true,
-    })) {
-      items.push({
-        uid: msg.uid,
-        seen: msg.flags?.has("\\Seen") ?? false,
-        flagged: msg.flags?.has("\\Flagged") ?? false,
-        from: toAddresses(msg.envelope?.from),
-        to: toAddresses(msg.envelope?.to),
-        subject: msg.envelope?.subject || "(без темы)",
-        date: (msg.envelope?.date ?? msg.internalDate)
-          ? new Date((msg.envelope?.date ?? msg.internalDate) as Date | string).toISOString()
-          : null,
-        hasAttachments: hasAttachment(msg.bodyStructure),
-      });
+    const flags = new Map<number, Set<string>>();
+    for await (const msg of client.fetch(`${start}:${end}`, { uid: true, flags: true })) flags.set(msg.uid, msg.flags ?? new Set());
+
+    const key = { userId: account.userId, folder: path, uidValidity: validity };
+    const stored = await prisma.mailSummary.findMany({ where: { ...key, uid: { in: [...flags.keys()] } } });
+    const summaries = new Map(stored.map((s) => [s.uid, s.data as Summary]));
+    const missing = [...flags.keys()].filter((uid) => !summaries.has(uid));
+    if (missing.length) {
+      const fresh: { uid: number; data: Summary }[] = [];
+      for await (const msg of client.fetch(missing.join(","), { uid: true, envelope: true, bodyStructure: true, internalDate: true }, { uid: true })) {
+        const date = msg.envelope?.date ?? msg.internalDate;
+        fresh.push({
+          uid: msg.uid,
+          data: {
+            from: toAddresses(msg.envelope?.from),
+            to: toAddresses(msg.envelope?.to),
+            subject: msg.envelope?.subject || "(без темы)",
+            date: date ? new Date(date as Date | string).toISOString() : null,
+            hasAttachments: hasAttachment(msg.bodyStructure),
+          },
+        });
+      }
+      for (const f of fresh) summaries.set(f.uid, f.data);
+      await prisma.mailSummary.createMany({ data: fresh.map((f) => ({ ...key, uid: f.uid, data: f.data })), skipDuplicates: true });
     }
+
+    const items: MessageSummary[] = [...flags].flatMap(([uid, f]) => {
+      const s = summaries.get(uid);
+      return s ? [{ uid, seen: f.has("\\Seen"), flagged: f.has("\\Flagged"), ...s }] : [];
+    });
     items.sort((a, b) => b.uid - a.uid);
     return { total, page: current, pages, items };
   });

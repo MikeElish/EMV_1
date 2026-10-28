@@ -79,15 +79,28 @@ async function getClient(account: MailAccount): Promise<ImapFlow> {
   return client;
 }
 
-/** Runs `fn` on the employee's pooled connection; IMAP failures become MailError. */
+// Yandex drops idle connections now and then: the pooled one is dead.
+const isDropped = (error: unknown) =>
+  /Connection not available|ECONNRESET|EPIPE|Connection closed|socket|NoConnection/i.test(
+    `${(error as { code?: string })?.code ?? ""} ${(error as Error)?.message ?? ""}`
+  );
+
+/** Runs `fn` on the employee's pooled connection (a fresh one once if it was dropped); IMAP failures become MailError. */
 export async function withImap<T>(account: MailAccount, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
-  const client = await getClient(account);
-  try {
-    return await fn(client);
-  } catch (error) {
-    if (error instanceof MailError) throw error;
-    console.error("[mail] imap operation failed:", error);
-    throw new MailError(describeError(error));
+  for (let attempt = 0; ; attempt++) {
+    const client = await getClient(account);
+    try {
+      return await fn(client);
+    } catch (error) {
+      if (error instanceof MailError) throw error;
+      if (attempt === 0 && isDropped(error)) {
+        const entry = pool.get(account.userId);
+        if (entry) drop(account.userId, entry);
+        continue;
+      }
+      console.error("[mail] imap operation failed:", error);
+      throw new MailError(describeError(error));
+    }
   }
 }
 

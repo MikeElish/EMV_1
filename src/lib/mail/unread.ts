@@ -13,7 +13,9 @@ export type UnreadCounts = {
 };
 
 const TTL_MS = 20 * 1000;
-type Entry = { at: number; data: Promise<{ folders: MailFolder[]; counts: UnreadCounts }> };
+type Data = { folders: MailFolder[]; counts: UnreadCounts };
+// `data` -- the last good result; `refresh` -- a new reading under way.
+type Entry = { at: number; data: Promise<Data>; refresh?: Promise<Data> };
 const globalCache = globalThis as unknown as { __emvMailUnread?: Map<string, Entry> };
 const cache: Map<string, Entry> = (globalCache.__emvMailUnread ??= new Map<string, Entry>());
 
@@ -37,18 +39,50 @@ function countsOf(folders: MailFolder[]): UnreadCounts {
   };
 }
 
-/** Folders with counters, shared by every page/poll for a few seconds. */
-export function getFoldersWithCounts(account: MailAccount) {
+/**
+ * Folders with counters. Asking the server takes seconds (a STATUS per
+ * folder), so pages get the last reading at once and a new one is made in the
+ * background when it is older than a few seconds. `wait` (the counters'
+ * poll) waits for a reading under way instead.
+ */
+export function getFoldersWithCounts(account: MailAccount, { wait = false }: { wait?: boolean } = {}): Promise<Data> {
   const hit = cache.get(account.userId);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
-  const data = listFolders(account).then((folders) => ({ folders, counts: countsOf(folders) }));
-  cache.set(account.userId, { at: Date.now(), data });
-  data.catch(() => {
-    if (cache.get(account.userId)?.data === data) cache.delete(account.userId);
+  if (hit && Date.now() - hit.at < TTL_MS) return wait && hit.refresh ? hit.refresh : hit.data;
+  if (hit) {
+    const refresh = hit.refresh ?? readFolders(account, hit);
+    return wait ? refresh : hit.data;
+  }
+  const entry: Entry = { at: Date.now(), data: Promise.resolve() as unknown as Promise<Data> };
+  entry.data = readFolders(account, entry);
+  cache.set(account.userId, entry);
+  entry.data.catch(() => {
+    if (cache.get(account.userId) === entry) cache.delete(account.userId);
   });
-  return data;
+  return entry.data;
 }
 
+function readFolders(account: MailAccount, entry: Entry): Promise<Data> {
+  const reading = listFolders(account).then((folders) => ({ folders, counts: countsOf(folders) }));
+  entry.refresh = reading;
+  reading
+    .then(() => {
+      entry.data = reading;
+      entry.at = Date.now();
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (entry.refresh === reading) entry.refresh = undefined;
+    });
+  return reading;
+}
+
+/** Letters were read, moved, sent: the counters are re-read now (pages keep the last ones meanwhile). */
 export function invalidateUnread(userId: string) {
+  const hit = cache.get(userId);
+  if (hit) hit.at = 0;
+}
+
+/** Folders were created, renamed or deleted: the next page waits for the new list. */
+export function forgetFolders(userId: string) {
   cache.delete(userId);
 }

@@ -42,7 +42,7 @@ function parseCursor(raw: string | null): MailCursor | null {
 async function pollMail(userId: string, since: MailCursor | null): Promise<MailPart | null> {
   const account = await getMailAccount(userId);
   if (!account) return null;
-  const { folders, counts } = await getFoldersWithCounts(account);
+  const { folders, counts } = await getFoldersWithCounts(account, { wait: true });
   const cursor: MailCursor = {};
   const found: (MailPart["letters"][number] & { date: number })[] = [];
 

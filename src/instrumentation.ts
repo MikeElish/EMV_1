@@ -6,6 +6,9 @@ export async function register() {
     // Почта: «Правила обработки писем» for new letters, every minute.
     const { startMailRulesTimer } = await import("@/lib/mail/rules");
     startMailRulesTimer();
+    // Почта: counters and the first pages kept ready, every 3 minutes.
+    const { startMailWarmTimer } = await import("@/lib/mail/warm");
+    startMailWarmTimer();
     // Наличие товаров из остатков 1С, at 06:00 and 18:00 Moscow time.
     const { startOneCStockTimer } = await import("@/lib/onec-stock");
     startOneCStockTimer();

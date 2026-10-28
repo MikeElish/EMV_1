@@ -6,7 +6,7 @@ import { getStaffSession } from "@/lib/staff-dal";
 import { encryptSecret } from "@/lib/secret-box";
 import { getMailAccount } from "@/lib/mail/account";
 import { listFolders, MailError } from "@/lib/mail/imap";
-import { invalidateUnread } from "@/lib/mail/unread";
+import { forgetFolders } from "@/lib/mail/unread";
 import { MAX_SIGNATURE_LOGO_BYTES, sniffImageType } from "@/lib/mail/signature-logo";
 import { userMailboxSchema } from "@/lib/validators/mail-settings";
 import { mailPreferencesSchema, type MailPreferencesInput } from "@/lib/validators/mail";
@@ -14,7 +14,8 @@ import { mailPreferencesSchema, type MailPreferencesInput } from "@/lib/validato
 export type SettingsResult = { ok: true; message: string } | { ok: false; error: string };
 
 function refresh(userId: string) {
-  invalidateUnread(userId);
+  // Another mailbox may be connected now: its folders are read anew.
+  forgetFolders(userId);
   revalidatePath("/admin/mail", "layout");
   revalidatePath("/admin/settings/mail");
 }
