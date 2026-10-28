@@ -1,12 +1,12 @@
 import "server-only";
-import { absoluteUrl } from "@/lib/site";
+import { SITE_URL, absoluteUrl } from "@/lib/site";
 import { MCP_RESOURCE } from "@/lib/mcp/auth";
 
 /** RFC 9728: where the connector's tokens come from. */
 export function protectedResourceMetadata() {
   return {
     resource: MCP_RESOURCE(),
-    authorization_servers: [absoluteUrl("/")],
+    authorization_servers: [SITE_URL],
     bearer_methods_supported: ["header"],
     resource_name: "EMV",
   };
@@ -15,7 +15,7 @@ export function protectedResourceMetadata() {
 /** RFC 8414: the OAuth endpoints of the site. */
 export function authorizationServerMetadata() {
   return {
-    issuer: absoluteUrl("/"),
+    issuer: SITE_URL,
     authorization_endpoint: absoluteUrl("/admin/connect"),
     token_endpoint: absoluteUrl("/api/mcp/oauth/token"),
     registration_endpoint: absoluteUrl("/api/mcp/oauth/register"),
