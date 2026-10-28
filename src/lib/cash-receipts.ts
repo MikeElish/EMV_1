@@ -40,9 +40,7 @@ export async function sendReceipt(receiptId: string) {
     price: rub(l.priceSnapshot),
     quantity: l.quantity,
     sum: rub(l.priceSnapshot * l.quantity),
-    measure: 0,
     payment_method: prepayment ? "full_prepayment" : "full_payment",
-    payment_object: 1,
     vat: { type: vat },
   }));
   const total = rub(receipt.amount);

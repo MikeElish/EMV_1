@@ -60,8 +60,8 @@ export async function testAtol(): Promise<ActionResult> {
   const settings = await prisma.cashboxSettings.findUnique({ where: { id: 1 } });
   if (!settings) return { ok: false, error: "Сначала сохраните настройки" };
   try {
-    await atolToken(settings);
-    return { ok: true, message: "АТОЛ Онлайн: вход выполнен" };
+    const { version } = await atolToken(settings);
+    return { ok: true, message: `АТОЛ Онлайн: вход выполнен (протокол ${version})` };
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
