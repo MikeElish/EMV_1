@@ -74,7 +74,10 @@ export async function oneCHasCustomerReturn(): Promise<boolean> {
   return r.value.length > 0;
 }
 
-type Sale = { Ref_Key: string; Number: string; Date: string; Склад_Key: string; ДоговорКонтрагента_Key: string; Товары?: { Номенклатура: string; Количество: number; Цена: number }[] };
+type Sale = { Ref_Key: string; Number: string; Date: string; Склад_Key: string; ДоговорКонтрагента_Key: string; Товары?: SaleLine[] };
+// Реализация names the item Номенклатура_Key (a счёт -- Номенклатура).
+type SaleLine = { Номенклатура_Key?: string; Номенклатура?: string; Количество: number; Цена: number };
+const lineItem = (t: SaleLine) => t.Номенклатура_Key ?? t.Номенклатура ?? "";
 
 /** The 1С shipment of the claimed line: the one made on the order's invoice, else the buyer's latest with that item. */
 async function shipmentOf(invoiceRef: string | null, buyerRef: string | null, itemRefs: string[]): Promise<Sale | null> {
@@ -87,7 +90,7 @@ async function shipmentOf(invoiceRef: string | null, buyerRef: string | null, it
     const r = await oneCGet<{ value: Sale[] }>(
       `/${q("Document_РеализацияТоваровУслуг")}?$filter=${q(filter)}&$orderby=${q("Date desc")}&${select}`
     );
-    const sale = r.value.find((s) => !itemRefs.length || s.Товары?.some((t) => itemRefs.includes(t.Номенклатура)));
+    const sale = r.value.find((s) => !itemRefs.length || s.Товары?.some((t) => itemRefs.includes(lineItem(t))));
     if (sale) return sale;
   }
   return null;
@@ -125,7 +128,7 @@ export async function sendManualReturnLetter(id: string): Promise<boolean> {
     description("Catalog_ДоговорыКонтрагентов", sale?.ДоговорКонтрагента_Key),
     description("Catalog_Номенклатура", itemRefs[0]),
   ]);
-  const saleLine = sale?.Товары?.find((t) => itemRefs.includes(t.Номенклатура));
+  const saleLine = sale?.Товары?.find((t) => itemRefs.includes(lineItem(t)));
   const price = saleLine ? saleLine.Цена : c.orderItem.priceSnapshot / 100;
   const day = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("ru-RU");
   const rub = (n: number) => n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -146,7 +149,7 @@ export async function sendManualReturnLetter(id: string): Promise<boolean> {
     "Товар:",
     `  ${item ?? c.orderItem.nameSnapshot}${c.orderItem.product?.sku ? ` (арт. ${c.orderItem.product.sku})` : ""}`,
     `  Количество: ${c.quantity} шт.`,
-    `  Цена: ${rub(price)} руб. (как в реализации)`,
+    `  Цена: ${rub(price)} руб. ${saleLine ? "(как в реализации)" : "(как в заказе на сайте — сверьте с реализацией)"}`,
     `  Сумма: ${rub(price * c.quantity)} руб.`,
     "",
     `Причина возврата: ${c.reason}. ${c.description}`,
