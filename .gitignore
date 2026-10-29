@@ -53,3 +53,4 @@ next-env.d.ts
 
 # Invoice stamp and signature (src/lib/invoice-pdf.ts) -- copied to the server by hand
 /private/
+tsc2.log`ntsc2`ndecode.txt`ntsc2-clean.txt`nstatus-after-commit.log`ncommit.log`nclean-log*.log`ntmp/`n
