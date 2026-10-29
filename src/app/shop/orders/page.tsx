@@ -20,8 +20,19 @@ export default async function MyOrdersPage({ searchParams }: PageProps<"/shop/or
     redirect(`/crm?next=${encodeURIComponent(back)}`);
   }
 
+  // A customer pinned to a company sees every order of that company, not only
+  // the ones created under their own account.
+  const me = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { companyId: true },
+  });
+  const where = me?.companyId
+    ? { user: { companyId: me.companyId } }
+    : { userId: session.userId };
+
+
   const orders = await prisma.order.findMany({
-    where: { userId: session.userId },
+    where,
     include: {
       items: {
         include: {

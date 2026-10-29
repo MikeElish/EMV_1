@@ -94,6 +94,78 @@ export async function updateLinePrice(itemId: string, price: number): Promise<Ac
   revalidateOrders();
   return { ok: true };
 }
+/** «Ручное редактирование» (owner): change the quantity of one line. */
+export async function updateLineQuantity(itemId: string, quantity: number): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return { ok: false, error: "Укажите количество" };
+
+  const item = await prisma.orderItem.findUnique({
+    where: { id: itemId },
+    select: { orderId: true, productId: true, quantity: true, stockWrittenOff: true, paid: true },
+  });
+  if (!item) return { ok: false, error: "Позиция не найдена" };
+  if (item.paid && (await ownerOnly())) return { ok: false, error: "Позиция уже оплачена — количество не меняем" };
+
+  const delta = quantity - item.quantity;
+  await prisma.$transaction(async (tx) => {
+    if (item.stockWrittenOff && delta !== 0) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: delta > 0 ? { stock: { decrement: delta } } : { stock: { increment: -delta } },
+      });
+    }
+    await tx.orderItem.update({ where: { id: itemId }, data: { quantity } });
+    await refreshOrder(tx, item.orderId);
+  });
+  await applyOrderSurcharges(item.orderId);
+  revalidateOrders();
+  return { ok: true };
+}
+
+/** «Ручное редактирование» (owner): add an extra product to an existing order. */
+export async function addOrderItem(
+  orderId: string,
+  productId: string,
+  quantity: number,
+  price: number
+): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  if (await ownerOnly()) return { ok: false, error: "Добавлять товар в заказ может только владелец" };
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return { ok: false, error: "Укажите количество" };
+  if (!Number.isInteger(price) || price <= 0 || price > 1_000_000_000) return { ok: false, error: "Укажите цену" };
+
+  const [order, product] = await Promise.all([
+    prisma.order.findUnique({ where: { id: orderId }, select: { deferred: true, items: { select: { deliveryMethod: true }, take: 1 } } }),
+    prisma.product.findUnique({ where: { id: productId }, select: { name: true } }),
+  ]);
+  if (!order) return { ok: false, error: "Заказ не найден" };
+  if (!product) return { ok: false, error: "Товар не найден" };
+
+  const { initialLineStatuses } = await import("@/lib/order-status");
+  const [status] = await initialLineStatuses([{ productId, quantity }], order.deferred);
+  const deliveryMethod = order.items[0]?.deliveryMethod ?? null;
+
+  await prisma.orderItem.create({
+    data: {
+      orderId,
+      productId,
+      nameSnapshot: product.name,
+      priceSnapshot: price,
+      quantity,
+      status,
+      deferred: order.deferred,
+      deliveryMethod,
+    },
+  });
+  await refreshOrder(prisma, orderId);
+  await applyOrderSurcharges(orderId);
+  revalidateOrders();
+  return { ok: true };
+}
+
+
 
 export async function updateLineDeliveryDate(
   itemId: string,

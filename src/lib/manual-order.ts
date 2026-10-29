@@ -24,6 +24,7 @@ export async function createManualOrderRecord(input: ManualOrderInput, creatorId
   let deferred = false;
   // Отчёты → Бонусы: the client company's manager, else whoever makes it.
   let managerId = creatorId;
+  let customerUserId: string | null = null;
   if (customerId) {
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
@@ -32,11 +33,20 @@ export async function createManualOrderRecord(input: ManualOrderInput, creatorId
     if (customer?.role !== "CUSTOMER") return { ok: false, error: "Покупатель не найден" };
     deferred = customer.company?.paymentType === "DEFERRED";
     managerId = customer.company?.managerId ?? managerId;
+    customerUserId = customerId;
   } else if (companyId) {
     const company = await prisma.company.findUnique({ where: { id: companyId }, select: { paymentType: true, managerId: true } });
     if (!company) return { ok: false, error: "Компания не найдена" };
     deferred = company.paymentType === "DEFERRED";
     managerId = company.managerId ?? managerId;
+    // Tie the order to the company's pinned customer (if any) so it shows
+    // up under «Мои заказы» and in the company's balance.
+    const pinned = await prisma.user.findFirst({
+      where: { companyId, role: "CUSTOMER" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    customerUserId = pinned?.id ?? null;
   }
 
   const productIds = [...new Set(items.map((i) => i.productId))];
@@ -59,7 +69,7 @@ export async function createManualOrderRecord(input: ManualOrderInput, creatorId
       customerEmail,
       deliveryNote: deliveryNote || null,
       totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
-      userId: customerId || null,
+      userId: customerUserId || null,
       managerId,
       deferred,
       status: aggregateOrderStatus(statuses),

@@ -10,6 +10,8 @@ import { OrderFilesMenu } from "@/components/admin/OrderFilesMenu";
 import { OrderDeleteButton } from "@/components/admin/OrderDeleteButton";
 import { NewOrderModal } from "@/components/admin/NewOrderModal";
 import { LinePriceCell } from "@/components/admin/LinePriceCell";
+import { AddOrderItemModal } from "@/components/admin/AddOrderItemModal";
+import { LineQuantityCell } from "@/components/admin/LineQuantityCell";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DeliveryMethodCell } from "@/components/admin/DeliveryMethodCell";
 import { ExtraCostsButton, type ExtraCostRow } from "@/components/admin/ExtraCostsButton";
@@ -193,6 +195,7 @@ export function OrdersTable({
   const [unfinished, setUnfinished] = useState(false);
   // «Ручное редактирование» (owner): every line's price becomes a field.
   const [manual, setManual] = useState(false);
+const [addingProduct, setAddingProduct] = useState(false);
 
   // Remembered per browser.
   useEffect(() => {
@@ -369,6 +372,7 @@ export function OrdersTable({
           </button>
         )}
         {canDelete && (
+          <>
           <label className="ml-4 flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
             <span>Ручное редактирование</span>
             <button
@@ -383,10 +387,26 @@ export function OrdersTable({
               />
             </button>
           </label>
+          {manual && (
+            <button
+              type="button"
+              onClick={() => setAddingProduct(true)}
+              className="ml-2 rounded-md border border-foreground/20 px-2 py-1 text-sm hover:bg-foreground/5"
+            >
+              + Товар в заказ
+            </button>
+          )}
+          </>
         )}
       </div>
 
       {creating && <NewOrderModal onClose={() => setCreating(false)} />}
+{addingProduct && (
+  <AddOrderItemModal
+    orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber }))}
+    onClose={() => setAddingProduct(false)}
+  />
+)}
 
       {orders.length === 0 ? (
         <p className="mt-4 text-sm text-foreground/40">Заказов пока нет.</p>
@@ -563,7 +583,9 @@ export function OrdersTable({
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
                           {item.product?.sku ?? "—"}
                         </td>
-                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.quantity}</td>
+                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>
+  {manual && !item.cancelled ? <LineQuantityCell itemId={item.id} current={item.quantity} /> : item.quantity}
+</td>
                         <td
                           className={`py-2 pr-4 ${short ? "text-red-600 dark:text-red-500" : ""}`}
                           title={short ? "Меньше, чем заказано" : undefined}
