@@ -1,13 +1,10 @@
 "use client";
 
-import { useEscape } from "@/lib/use-escape";
-import { useEffect, useState } from "react";
 import type { Product } from "@prisma/client";
 import { AddToCartButton } from "@/components/shop/AddToCartButton";
 import { OfferPrice, ProductOffersBlock } from "@/components/shop/ShopOffers";
 import { ProductGallery } from "@/components/shop/ProductGallery";
-
-const TRANSITION_MS = 200;
+import { Modal } from "@/components/Modal";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
@@ -18,105 +15,76 @@ export function ProductQuickViewModal({
   product: Product;
   onRequestClose: () => void;
 }) {
-  const [visible, setVisible] = useState(false);
   const attributes = product.attributes as Attributes;
 
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  function close() {
-    setVisible(false);
-    setTimeout(onRequestClose, TRANSITION_MS);
-  }
-
-  // Esc closes the window on top (see useEscape).
-  useEscape(close);
-
   return (
-    <div
-      onClick={close}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 transition-opacity duration-200 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
+    <Modal
+      onClose={onRequestClose}
+      title={`Товар: ${product.name}`}
+      widthClassName="w-[90vw] max-sm:w-[95vw]"
+      maxWidthClassName="max-w-[60vw] max-sm:max-w-[95vw]"
+      maxHeightClassName="max-h-[60vh]"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[60vh] w-[90vw] max-w-[60vw] flex-col overflow-y-auto rounded-lg bg-background p-6 shadow-xl transition-all duration-200 max-sm:w-[95vw] max-sm:max-w-[95vw] ${
-          visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={close}
-          aria-label="Закрыть"
-          className="ml-auto text-foreground/40 hover:text-foreground"
-        >
-          ✕
-        </button>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <ProductGallery images={product.images} alt={product.name} />
 
-        <div className="grid gap-6 sm:grid-cols-2">
-          <ProductGallery images={product.images} alt={product.name} />
+        <div>
+          {product.brand && (
+            <span className="text-sm text-foreground/50">
+              {product.brand}
+              {attributes?.machineType ? ` · ${attributes.machineType}` : ""}
+            </span>
+          )}
+          <h2 className="mt-1 text-xl font-bold">{product.name}</h2>
+          <p className="mt-1 text-sm text-foreground/40">
+            Артикул: {product.sku}
+          </p>
 
-          <div>
-            {product.brand && (
-              <span className="text-sm text-foreground/50">
-                {product.brand}
-                {attributes?.machineType ? ` · ${attributes.machineType}` : ""}
+          <p className="mt-4 text-2xl font-semibold">
+            <OfferPrice product={product} />
+          </p>
+          <p className="mt-1 text-sm">
+            {product.stock > 0 ? (
+              <span className="text-green-700 dark:text-green-500">
+                В наличии ({product.stock} шт.)
               </span>
+            ) : (
+              <span className="text-foreground/50">Под заказ</span>
             )}
-            <h2 className="mt-1 text-xl font-bold">{product.name}</h2>
-            <p className="mt-1 text-sm text-foreground/40">
-              Артикул: {product.sku}
+          </p>
+
+          <AddToCartButton
+            product={{
+              id: product.id,
+              slug: product.slug,
+              sku: product.sku,
+              name: product.name,
+              price: product.price,
+              stock: product.stock,
+            }}
+          />
+          <ProductOffersBlock product={product} />
+
+          {product.description && (
+            <p className="mt-4 text-sm text-foreground/80">
+              {product.description}
             </p>
+          )}
 
-            <p className="mt-4 text-2xl font-semibold">
-              <OfferPrice product={product} />
-            </p>
-            <p className="mt-1 text-sm">
-              {product.stock > 0 ? (
-                <span className="text-green-700 dark:text-green-500">
-                  В наличии ({product.stock} шт.)
-                </span>
-              ) : (
-                <span className="text-foreground/50">Под заказ</span>
-              )}
-            </p>
-
-            <AddToCartButton
-              product={{
-                id: product.id,
-                slug: product.slug,
-                sku: product.sku,
-                name: product.name,
-                price: product.price,
-                stock: product.stock,
-              }}
-            />
-            <ProductOffersBlock product={product} />
-
-            {product.description && (
-              <p className="mt-4 text-sm text-foreground/80">
-                {product.description}
-              </p>
-            )}
-
-            {attributes?.compatibleWith && attributes.compatibleWith.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-foreground/50">
-                  Совместимо с
-                </h3>
-                <ul className="mt-1 text-sm">
-                  {attributes.compatibleWith.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          {attributes?.compatibleWith && attributes.compatibleWith.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-foreground/50">
+                Совместимо с
+              </h3>
+              <ul className="mt-1 text-sm">
+                {attributes.compatibleWith.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

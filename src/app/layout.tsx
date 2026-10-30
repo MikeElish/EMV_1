@@ -6,6 +6,7 @@ import { MetrikaPageViews } from "@/components/MetrikaPageViews";
 import { METRIKA_ID, SITE_URL } from "@/lib/site";
 import { EmailVerificationGate } from "@/components/EmailVerificationGate";
 import { PersonalDataConsentGate } from "@/components/PersonalDataConsentGate";
+import { WindowMinimizationProvider } from "@/components/WindowMinimizationProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -45,18 +46,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             if (a) ym(${METRIKA_ID}, 'reachGoal', a.getAttribute('href').indexOf('tel:') === 0 ? 'phone' : 'email');
           }, true);`}
         </Script>
-        <Suspense>
-          <MetrikaPageViews />
-        </Suspense>
-        <noscript>
-          <div>
-            <img src="https://mc.yandex.ru/watch/105596920" style={{ position: "absolute", left: "-9999px" }} alt="" />
-          </div>
-        </noscript>
-        {children}
-        <EmailVerificationGate />
-        {/* After the e-mail one, so it opens on top: consent comes first. */}
-        <PersonalDataConsentGate />
+        <WindowMinimizationProvider>
+          <Suspense>
+            <MetrikaPageViews />
+          </Suspense>
+          <noscript>
+            <div>
+              <img src="https://mc.yandex.ru/watch/105596920" style={{ position: "absolute", left: "-9999px" }} alt="" />
+            </div>
+          </noscript>
+          {children}
+          <EmailVerificationGate />
+          {/* After the e-mail one, so it opens on top: consent comes first. */}
+          <PersonalDataConsentGate />
+        </WindowMinimizationProvider>
       </body>
     </html>
   );
