@@ -16,6 +16,7 @@ type MinimizedWindow = {
 };
 
 type WindowMinimizationContextValue = {
+  hasMinimizedWindows: boolean;
   registerWindow: (window: MinimizedWindow) => void;
   unregisterWindow: (id: string) => void;
 };
@@ -41,8 +42,12 @@ export function WindowMinimizationProvider({
     setWindows((current) => current.filter((window) => window.id !== id));
   }, []);
   const contextValue = useMemo(
-    () => ({ registerWindow, unregisterWindow }),
-    [registerWindow, unregisterWindow],
+    () => ({
+      hasMinimizedWindows: windows.length > 0,
+      registerWindow,
+      unregisterWindow,
+    }),
+    [registerWindow, unregisterWindow, windows.length],
   );
 
   return (

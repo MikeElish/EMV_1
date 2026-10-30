@@ -3,6 +3,7 @@
 import { useEscape } from "@/lib/use-escape";
 import { useEffect, useState } from "react";
 import { USER_AGREEMENT_URL } from "@/lib/legal-docs";
+import { useWindowMinimization } from "@/components/WindowMinimizationProvider";
 
 // Accepted once -> never shown again in this browser. Closed with ✕ -> hidden
 // until the next visit (session), as on most Russian sites.
@@ -28,6 +29,7 @@ function write(storage: () => Storage, key: string, value: string) {
 /** Cookie notice in the bottom-right corner of the taxi and shop pages. */
 export function CookieNotice() {
   const [visible, setVisible] = useState(false);
+  const { hasMinimizedWindows } = useWindowMinimization();
 
   useEffect(() => {
     if (read(() => localStorage, ACCEPTED_KEY) || read(() => sessionStorage, CLOSED_KEY)) return;
@@ -55,7 +57,9 @@ export function CookieNotice() {
     <div
       role="dialog"
       aria-label="Уведомление об использовании cookie"
-      className="fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-sm rounded-xl border border-foreground/15 bg-background p-5 text-foreground shadow-2xl"
+      className={`fixed bottom-4 z-[60] w-[calc(100vw-2rem)] max-w-sm rounded-xl border border-foreground/15 bg-background p-5 text-foreground shadow-2xl ${
+        hasMinimizedWindows ? "left-4 right-auto" : "right-4"
+      }`}
     >
       <button
         type="button"
