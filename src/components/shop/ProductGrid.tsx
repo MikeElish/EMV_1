@@ -41,6 +41,8 @@ export function ProductGrid({
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
+      // Restore the browser preference after hydration to avoid SSR mismatches.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (stored === "grid" || stored === "list") setLayout(stored);
     } catch {
       // ignore unavailable storage

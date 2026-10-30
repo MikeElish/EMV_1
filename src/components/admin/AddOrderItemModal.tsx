@@ -34,12 +34,6 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
 
   const selected = products.find((p) => p.id === productId);
 
-  useEffect(() => {
-    if (selected && !priceRub) {
-      setPriceRub((selected.prices.wholesale / 100).toFixed(2).replace(/\.00$/, ""));
-    }
-  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
-
   async function save() {
     if (!orderId || !productId) return setError("Выберите заказ и товар");
     const qty = parseInt(quantity, 10);

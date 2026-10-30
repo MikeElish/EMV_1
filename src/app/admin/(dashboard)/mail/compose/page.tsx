@@ -42,24 +42,28 @@ export default async function ComposePage({ searchParams }: PageProps<"/admin/ma
   const signature = signatureBlock(account.signature, !!logo);
 
   let initial: ComposeInitial = { to: "", cc: "", subject: "", body: signature };
+  let failure: string | null = null;
 
   try {
     if (draftUid > 0) {
       const drafts = folderByRole((await getFoldersWithCounts(account)).folders, "drafts");
-      if (!drafts) return <MailErrorBox message="В ящике нет папки «Черновики»" />;
-      const draft = await getMessage(account, drafts.path, draftUid, false);
-      initial = {
-        to: join(draft.to),
-        cc: join(draft.cc),
-        subject: draft.subject === "(без темы)" ? "" : draft.subject,
-        body: draft.text,
-        draftUid,
-        inReplyTo: undefined,
-        references: draft.references,
-        carried: draft.attachments.length
-          ? { path: drafts.path, uid: draftUid, names: draft.attachments.map((a) => a.filename) }
-          : undefined,
-      };
+      if (!drafts) {
+        failure = "В ящике нет папки «Черновики»";
+      } else {
+        const draft = await getMessage(account, drafts.path, draftUid, false);
+        initial = {
+          to: join(draft.to),
+          cc: join(draft.cc),
+          subject: draft.subject === "(без темы)" ? "" : draft.subject,
+          body: draft.text,
+          draftUid,
+          inReplyTo: undefined,
+          references: draft.references,
+          carried: draft.attachments.length
+            ? { path: drafts.path, uid: draftUid, names: draft.attachments.map((a) => a.filename) }
+            : undefined,
+        };
+      }
     } else if (mode === "reply" || mode === "replyAll" || mode === "forward") {
       const path = one(params.path);
       const uid = Number(one(params.uid));
@@ -106,8 +110,10 @@ export default async function ComposePage({ searchParams }: PageProps<"/admin/ma
       }
     }
   } catch (error) {
-    return <MailErrorBox message={error instanceof MailError ? error.message : "Не удалось открыть письмо"} />;
+    failure = error instanceof MailError ? error.message : "Не удалось открыть письмо";
   }
+
+  if (failure) return <MailErrorBox message={failure} />;
 
   return (
     <ComposeForm

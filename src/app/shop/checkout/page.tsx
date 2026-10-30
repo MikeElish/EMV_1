@@ -125,12 +125,15 @@ export default function CheckoutPage() {
       // ignore malformed/unavailable storage
     }
 
+    // Restore browser-only data after hydration to avoid server/client mismatches.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (saved.customerName) setCustomerName(saved.customerName);
     if (saved.phoneDigits) {
       setPhoneDigits(saved.phoneDigits);
       setPhoneTouched(true);
     }
     if (saved.customerEmail) setCustomerEmail(saved.customerEmail);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // A signed-in customer's saved delivery defaults (from "Настройки") take
     // priority over this browser's last-order memory; fall back to the

@@ -32,7 +32,7 @@ export function noteAddress(note: string | null) {
 
 export type IssuedInvoice = { number: string; fileName: string; fileUrl: string };
 
-export async function issueOrderInvoice(orderId: string): Promise<IssuedInvoice> {
+export async function issueOrderInvoice(orderId: string, number?: string): Promise<IssuedInvoice> {
   await applyOrderSurcharges(orderId);
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -72,6 +72,7 @@ export async function issueOrderInvoice(orderId: string): Promise<IssuedInvoice>
   const contractNumber = company.hasContract && company.contract ? company.contract.replace(/^№\s*/, "").trim() : null;
   const saved = await saveOneCInvoice({
     ref: order.invoiceRef,
+    number,
     buyer: await counterpartyRef(company),
     contractNumber,
     lines: order.items.map((i) => ({ product: i.product, quantity: i.quantity, price: i.priceSnapshot })),
@@ -112,7 +113,7 @@ export async function issueOrderInvoice(orderId: string): Promise<IssuedInvoice>
 
   // The previous file of this invoice goes.
   const old = await prisma.orderDocument.findMany({
-    where: { orderId, category: "INVOICE", fileName: { startsWith: `Счет на оплату № ${saved.number} от` } },
+    where: { orderId, category: "INVOICE", fileName: { startsWith: "Счет на оплату № " } },
   });
   for (const d of old) {
     await deleteOrderDocumentFile(d.fileUrl);

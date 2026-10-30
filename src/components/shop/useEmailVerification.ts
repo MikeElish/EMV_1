@@ -22,6 +22,8 @@ export function useEmailVerification(recheckKey?: unknown) {
 
   useEffect(() => {
     if (!hasUnverifiedFlag()) {
+      // Resolve the browser-only cookie state after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ required: false });
       return;
     }

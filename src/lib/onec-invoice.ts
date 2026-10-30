@@ -14,7 +14,7 @@ const INVOICE = "Document_СчетНаОплатуПокупателю";
 const ITEM_TYPE = "StandardODATA.Catalog_Номенклатура";
 
 type TemplateLine = { Номенклатура: string; СтавкаНДС: string };
-type Template = Record<string, unknown> & { Товары: TemplateLine[] };
+type Template = Record<string, unknown> & { Number: string; Товары: TemplateLine[] };
 
 const HEADER_FIELDS = [
   "Организация_Key",
@@ -107,12 +107,22 @@ export async function itemRef(product: { id: string; sku: string; name: string }
 export type OneCInvoiceLine = { product: { id: string; sku: string; name: string }; quantity: number; /** kopecks */ price: number };
 export type OneCInvoice = { ref: string; number: string; date: Date; vatRate: number | null; vat: number };
 
+function nextInvoiceNumber(number: string): string {
+  const match = /^(.*?)(\d+)$/.exec(number);
+  if (!match) throw new OneCError(`Не удалось определить следующий номер по счёту 1С «${number}»`);
+  const serial = Number(match[2]);
+  if (!Number.isSafeInteger(serial)) throw new OneCError(`Номер счёта 1С «${number}» слишком велик для продолжения`);
+  return `${match[1]}${String(serial + 1).padStart(match[2].length, "0")}`;
+}
+
 /**
- * Writes the invoice (a new one, or `ref` again with the new lines) and posts
- * it. Returns 1С's number without the prefix («НФНФ-000590» → «590»).
+ * Writes and posts the invoice. New documents continue the latest posted 1С
+ * invoice's number sequence; `number` is only for an explicitly requested
+ * correction of an existing document.
  */
 export async function saveOneCInvoice(input: {
   ref: string | null;
+  number?: string;
   buyer: string;
   contractNumber: string | null;
   lines: OneCInvoiceLine[];
@@ -150,15 +160,29 @@ export async function saveOneCInvoice(input: {
     Товары: lines,
   };
 
+  const expectedNumber = input.number ?? (input.ref ? undefined : nextInvoiceNumber(t.Number));
   // Rewriting an invoice keeps its date and the accountant's comment.
   let ref = input.ref;
-  if (ref) await oneCSend("PATCH", `/${q(INVOICE)}(guid'${ref}')`, body);
+  if (ref) {
+    await oneCSend("PATCH", `/${q(INVOICE)}(guid'${ref}')`, {
+      ...body,
+      ...(expectedNumber ? { Number: expectedNumber } : {}),
+    });
+  }
   else
     ref = (
-      await oneCSend<{ Ref_Key: string }>("POST", `/${q(INVOICE)}`, { ...body, Комментарий: input.comment, Date: oneCDateTime(new Date()) })
+      await oneCSend<{ Ref_Key: string }>("POST", `/${q(INVOICE)}`, {
+        ...body,
+        Number: expectedNumber,
+        Комментарий: input.comment,
+        Date: oneCDateTime(new Date()),
+      })
     ).Ref_Key;
   await oneCSend("POST", `/${q(INVOICE)}(guid'${ref}')/Post?PostingModeOperational=false`);
   const saved = await oneCGet<{ Number: string; Date: string }>(`/${q(INVOICE)}(guid'${ref}')?$select=Number,Date`);
+  if (expectedNumber && saved.Number !== expectedNumber) {
+    throw new OneCError(`1С не сохранила номер счёта ${expectedNumber}; документ остался под номером ${saved.Number}`);
+  }
   return {
     ref,
     number: String(Number(saved.Number.replace(/\D/g, "")) || saved.Number.trim()),

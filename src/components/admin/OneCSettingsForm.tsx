@@ -105,7 +105,7 @@ export function OneCSettingsForm({ saved, stockSync }: { saved: Saved; stockSync
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState<string | null>(null);
   const [check, setCheck] = useState<OneCCheck | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState(Boolean(saved));
 
   const runCheck = useCallback(async () => {
     setChecking(true);
@@ -115,8 +115,18 @@ export function OneCSettingsForm({ saved, stockSync }: { saved: Saved; stockSync
 
   // A saved connection is checked as soon as the tab opens.
   useEffect(() => {
-    if (saved) runCheck();
-  }, [saved, runCheck]);
+    if (!saved) return;
+    let cancelled = false;
+    checkOneCConnection().then((result) => {
+      if (!cancelled) {
+        setCheck(result);
+        setChecking(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [saved]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

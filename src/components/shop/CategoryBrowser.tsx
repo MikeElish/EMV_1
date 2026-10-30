@@ -117,7 +117,12 @@ export function CategoryBrowser({
   const maxScrollIndex = Math.max(0, categories.length - visibleCount);
 
   function scrollBy(delta: number) {
-    setScrollIndex((i) => Math.min(maxScrollIndex, Math.max(0, i + delta)));
+    const nextIndex = Math.min(maxScrollIndex, Math.max(0, scrollIndex + delta));
+    const selectedIndex = categories.findIndex((category) => category.id === selectedId);
+    if (selectedId && (selectedIndex < nextIndex || selectedIndex >= nextIndex + visibleCount)) {
+      setSelectedId(null);
+    }
+    setScrollIndex(nextIndex);
   }
 
   function handleWheel(e: WheelEvent<HTMLDivElement>) {
@@ -125,17 +130,6 @@ export function CategoryBrowser({
     e.preventDefault();
     scrollBy(e.deltaY > 0 ? 1 : -1);
   }
-
-  // A selected card that scrolls out of the visible window loses its
-  // selection -- matches how the drum only "knows about" what's on screen.
-  useEffect(() => {
-    if (!selectedId) return;
-    const index = categories.findIndex((c) => c.id === selectedId);
-    if (index === -1 || index < scrollIndex || index >= scrollIndex + visibleCount) {
-      setSelectedId(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollIndex]);
 
   function toggleSelect(id: string) {
     setSelectedId((prev) => (prev === id ? null : id));

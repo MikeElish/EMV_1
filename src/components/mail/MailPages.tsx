@@ -57,25 +57,34 @@ export async function MailFolderPage({
   const account = await loadAccount();
   if (!account) return null; // MailShell shows «Почта не настроена»
 
+  let result: {
+    folders: MailFolder[];
+    folder: MailFolder;
+    data: Awaited<ReturnType<typeof listMessages>>;
+  } | null = null;
+  let failure: string | null = null;
+
   try {
     const { folders } = await getFoldersWithCounts(account);
     const folder = role ? folderByRole(folders, role) : folders.find((f) => f.path === path && isMyFolder(f));
-    if (!folder) return <MailErrorBox message="Такой папки нет в почтовом ящике" />;
-    const data = await listMessages(account, folder.path, page);
-    return (
-      <>
-        {heading}
-        <MessageList
-          folder={{ path: folder.path, role: folder.role, name: folder.name }}
-          basePath={basePath}
-          data={data}
-          moveTargets={moveTargets(folders, folder.path)}
-        />
-      </>
-    );
+    if (folder) result = { folders, folder, data: await listMessages(account, folder.path, page) };
   } catch (error) {
-    return <MailErrorBox message={errorText(error)} />;
+    failure = errorText(error);
   }
+
+  if (!result) return <MailErrorBox message={failure ?? "Такой папки нет в почтовом ящике"} />;
+
+  return (
+    <>
+      {heading}
+      <MessageList
+        folder={{ path: result.folder.path, role: result.folder.role, name: result.folder.name }}
+        basePath={basePath}
+        data={result.data}
+        moveTargets={moveTargets(result.folders, result.folder.path)}
+      />
+    </>
+  );
 }
 
 export async function MailMessagePage({
@@ -94,24 +103,36 @@ export async function MailMessagePage({
   const uidNumber = Number(uid);
   if (!Number.isInteger(uidNumber) || uidNumber <= 0) notFound();
 
+  let result: {
+    folders: MailFolder[];
+    folder: MailFolder;
+    message: Awaited<ReturnType<typeof getMessage>>;
+  } | null = null;
+  let failure: string | null = null;
+
   try {
     const { folders } = await getFoldersWithCounts(account);
     const folder = role ? folderByRole(folders, role) : folders.find((f) => f.path === path);
-    if (!folder) return <MailErrorBox message="Такой папки нет в почтовом ящике" />;
-    const message = await getMessage(account, folder.path, uidNumber, folder.role !== "drafts");
-    // Opening a letter marks it read -- the counters must not lag behind.
-    invalidateUnread(account.userId);
-    return (
-      <MessageReader
-        folder={{ path: folder.path, role: folder.role, name: folder.name }}
-        basePath={basePath}
-        message={message}
-        moveTargets={moveTargets(folders, folder.path)}
-      />
-    );
+    if (folder) {
+      const message = await getMessage(account, folder.path, uidNumber, folder.role !== "drafts");
+      // Opening a letter marks it read -- the counters must not lag behind.
+      invalidateUnread(account.userId);
+      result = { folders, folder, message };
+    }
   } catch (error) {
-    return <MailErrorBox message={errorText(error)} />;
+    failure = errorText(error);
   }
+
+  if (!result) return <MailErrorBox message={failure ?? "Такой папки нет в почтовом ящике"} />;
+
+  return (
+    <MessageReader
+      folder={{ path: result.folder.path, role: result.folder.role, name: result.folder.name }}
+      basePath={basePath}
+      message={result.message}
+      moveTargets={moveTargets(result.folders, result.folder.path)}
+    />
+  );
 }
 
 export function pageFromSearch(value: string | string[] | undefined) {

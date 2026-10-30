@@ -34,6 +34,13 @@ function subscribe(listener: () => void) {
 function savePlace(url: string) {
   const path = url.split("?")[0];
   if (path.startsWith("/admin/mail")) return;
+  let placeUrl = url;
+  const [pathname, query] = url.split("?", 2);
+  if (pathname === "/admin/crm/orders" && query) {
+    const params = new URLSearchParams(query);
+    params.delete("orderNumber");
+    placeUrl = params.toString() ? `${pathname}?${params}` : pathname;
+  }
   const parts = path.split("/").filter(Boolean);
   if (parts.length < 2) return;
   let places: Record<string, string>;
@@ -43,7 +50,7 @@ function savePlace(url: string) {
     places = {};
   }
   // /admin/crm/orders/x → kept for /admin/crm, /admin/crm/orders, /admin/crm/orders/x.
-  for (let i = 2; i <= parts.length; i++) places["/" + parts.slice(0, i).join("/")] = url;
+  for (let i = 2; i <= parts.length; i++) places["/" + parts.slice(0, i).join("/")] = placeUrl;
   try {
     localStorage.setItem(PLACES_KEY, JSON.stringify(places));
   } catch {

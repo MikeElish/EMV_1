@@ -33,6 +33,8 @@ export function ThemeToggle({ light = false, scope = "shop" }: { light?: boolean
   useLayoutEffect(() => {
     const resolved = readStoredTheme(scope);
     applyTheme(scope, resolved);
+    // Resolve the browser-only preference after hydration to preserve SSR markup.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(resolved);
   }, [scope]);
 

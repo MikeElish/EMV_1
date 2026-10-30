@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Electron program: separate npm project with its own dependencies.
     "desktop/**",
+    // Local agent tooling is not part of the application source.
+    ".agents/**",
+    ".claude/**",
   ]),
 ]);
 
