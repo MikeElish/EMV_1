@@ -57,8 +57,10 @@ export function CookieNotice() {
     <div
       role="dialog"
       aria-label="Уведомление об использовании cookie"
-      className={`fixed bottom-4 z-[60] w-[calc(100vw-2rem)] max-w-sm rounded-xl border border-foreground/15 bg-background p-5 text-foreground shadow-2xl ${
-        hasMinimizedWindows ? "left-4 right-auto" : "right-4"
+      className={`fixed z-[60] w-[calc(100vw-2rem)] max-w-sm rounded-xl border border-foreground/15 bg-background p-5 text-foreground shadow-2xl ${
+        hasMinimizedWindows
+          ? "left-4 right-auto top-4 bottom-auto"
+          : "bottom-4 right-4"
       }`}
     >
       <button
