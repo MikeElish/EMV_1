@@ -6,7 +6,12 @@ import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } 
 import { deliveryMethodFromNote } from "@/lib/delivery";
 import { sendPriceRequests } from "@/lib/price-requests";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
-import { manualOrderSchema, type ManualOrderInput } from "@/lib/validators/manual-order";
+import {
+  manualOrderSchema,
+  ownCompanyManualOrderSchema,
+  type ManualOrderInput,
+  type ManualOrderRecordInput,
+} from "@/lib/validators/manual-order";
 
 export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false; error: string };
 
@@ -14,39 +19,61 @@ export type ManualOrderResult = { ok: true; orderNumber: string } | { ok: false;
  * «Новый заказ» of the staff: the order window and the Claude connector
  * (src/lib/mcp) both end here, after checking who may do it.
  */
-export async function createManualOrderRecord(input: ManualOrderInput, creatorId: string | null = null): Promise<ManualOrderResult> {
+export async function createManualOrderRecord(input: ManualOrderRecordInput, creatorId: string | null = null): Promise<ManualOrderResult> {
   const parsed = manualOrderSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
+  let orderInput: ManualOrderInput;
+  if (parsed.success) {
+    orderInput = parsed.data;
+  } else {
+    const companyId = input.companyId;
+    const company = companyId
+      ? await prisma.company.findUnique({ where: { id: companyId }, select: { isOwn: true } })
+      : null;
+    if (!company?.isOwn) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
+    }
+    const ownParsed = ownCompanyManualOrderSchema.safeParse(input);
+    if (!ownParsed.success) {
+      return { ok: false, error: ownParsed.error.issues[0]?.message ?? "Некорректные данные" };
+    }
+    orderInput = ownParsed.data;
   }
-  const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, items } = parsed.data;
+  const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, items } = orderInput;
 
   let deferred = false;
   // Отчёты → Бонусы: the client company's manager, else whoever makes it.
   let managerId = creatorId;
   let customerUserId: string | null = null;
+  let buyerCompanyId: string | null = null;
   if (customerId) {
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
-      select: { role: true, company: { select: { paymentType: true, managerId: true } } },
+      select: { role: true, company: { select: { id: true, paymentType: true, managerId: true } } },
     });
     if (customer?.role !== "CUSTOMER") return { ok: false, error: "Покупатель не найден" };
     deferred = customer.company?.paymentType === "DEFERRED";
     managerId = customer.company?.managerId ?? managerId;
     customerUserId = customerId;
+    buyerCompanyId = customer.company?.id ?? null;
   } else if (companyId) {
-    const company = await prisma.company.findUnique({ where: { id: companyId }, select: { paymentType: true, managerId: true } });
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, isOwn: true, paymentType: true, managerId: true },
+    });
     if (!company) return { ok: false, error: "Компания не найдена" };
+    buyerCompanyId = company.id;
     deferred = company.paymentType === "DEFERRED";
     managerId = company.managerId ?? managerId;
     // Tie the order to the company's pinned customer (if any) so it shows
     // up under «Мои заказы» and in the company's balance.
-    const pinned = await prisma.user.findFirst({
-      where: { companyId, role: "CUSTOMER" },
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    });
-    customerUserId = pinned?.id ?? null;
+    if (!company.isOwn) {
+      const pinned = await prisma.user.findFirst({
+        where: { companyId, role: "CUSTOMER" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      customerUserId = pinned?.id ?? null;
+    }
   }
 
   const productIds = [...new Set(items.map((i) => i.productId))];
@@ -66,10 +93,11 @@ export async function createManualOrderRecord(input: ManualOrderInput, creatorId
       orderNumber,
       customerName,
       customerPhone,
-      customerEmail,
+      customerEmail: customerEmail || null,
       deliveryNote: deliveryNote || null,
       totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
       userId: customerUserId || null,
+      buyerCompanyId,
       managerId,
       deferred,
       status: aggregateOrderStatus(statuses),
@@ -91,6 +119,7 @@ export async function createManualOrderRecord(input: ManualOrderInput, creatorId
   await applyOrderSurcharges(created.id);
   void sendPriceRequests(created.id).catch((error) => console.error("[price-requests] order", orderNumber, error));
   revalidatePath("/admin/crm/orders");
+  revalidatePath("/admin/warehouse/replenishment");
   revalidatePath("/admin/crm/supplier-orders");
   revalidatePath("/shop/orders");
   return { ok: true, orderNumber };

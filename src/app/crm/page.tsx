@@ -6,7 +6,8 @@ import { CrmLoginForm } from "@/components/crm/CrmLoginForm";
 import { customerNextPath } from "@/lib/customer-next";
 
 export default async function CrmLoginPage({ searchParams }: PageProps<"/crm">) {
-  const customerNext = customerNextPath((await searchParams).next);
+  const params = await searchParams;
+  const customerNext = customerNextPath(params.next);
   const session = await getAdminSession();
   if (session?.userId) {
     redirect(
@@ -25,6 +26,11 @@ export default async function CrmLoginPage({ searchParams }: PageProps<"/crm">) 
           <Logo className="h-14 w-14" />
           <span className="text-lg leading-none text-white/80">crm</span>
         </Link>
+        {params.invite === "accepted" && (
+          <p className="max-w-xs text-center text-sm text-green-300">
+            Пароль задан. Теперь войдите, используя логин из приглашения.
+          </p>
+        )}
         <CrmLoginForm customerNext={customerNext} />
         <p className="-mt-2 text-sm text-white/60">
           Нет учётной записи?{" "}

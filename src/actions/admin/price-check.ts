@@ -4,9 +4,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
 import { uploadOfferFile, deleteOfferFile } from "@/lib/offer-file-storage";
-import { selectOffer, syncSelectedOffer } from "@/lib/supplier-offers";
+import { selectOffer, syncSelectedOffer, upsertSupplierOffer } from "@/lib/supplier-offers";
 import { sendPriceRequests } from "@/lib/price-requests";
 import { analyzeOfferRows, sheetRows, writeOfferRows, type OfferImportRow, type OfferRowsAnalysis, type OfferWriteResult } from "@/lib/offer-import";
+import {
+  analyzePriceReplyText,
+  requestedPriceProductIds,
+  type PriceReplyCandidate,
+} from "@/lib/price-reply-text";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -222,6 +227,9 @@ export type PriceRequestView = {
   remindedAt: string | null;
   answeredAt: string | null;
   answerNote: string | null;
+  answerBody: string | null;
+  answerReviewedAt: string | null;
+  replyCandidates: PriceReplyCandidate[];
   summarySentAt: string | null;
   lines: number;
 };
@@ -234,19 +242,112 @@ export async function listPriceRequests(): Promise<PriceRequestView[]> {
     take: 300,
     include: { order: { select: { orderNumber: true } }, supplier: { select: { name: true } } },
   });
+  const productIds = [...new Set(rows.flatMap((row) => requestedPriceProductIds(row.items)))];
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, sku: true, name: true },
+  });
+  const productsById = new Map(products.map((product) => [product.id, product]));
   const iso = (d: Date | null) => d?.toISOString() ?? null;
-  return rows.map((r) => ({
-    id: r.id,
-    orderNumber: r.order.orderNumber,
-    supplier: r.supplier.name,
-    email: r.email,
-    sentAt: r.sentAt.toISOString(),
-    remindedAt: iso(r.remindedAt),
-    answeredAt: iso(r.answeredAt),
-    answerNote: r.answerNote,
-    summarySentAt: iso(r.summarySentAt),
-    lines: Array.isArray(r.items) ? r.items.length : 0,
-  }));
+  return rows.map((r) => {
+    const answerBody = r.answerReviewedAt ? null : r.answerBody;
+    const requestedProducts = requestedPriceProductIds(r.items)
+      .map((id) => productsById.get(id))
+      .filter((product): product is (typeof products)[number] => !!product);
+    return {
+      id: r.id,
+      orderNumber: r.order.orderNumber,
+      supplier: r.supplier.name,
+      email: r.email,
+      sentAt: r.sentAt.toISOString(),
+      remindedAt: iso(r.remindedAt),
+      answeredAt: iso(r.answeredAt),
+      answerNote: r.answerNote,
+      answerBody,
+      answerReviewedAt: iso(r.answerReviewedAt),
+      replyCandidates: answerBody
+        ? analyzePriceReplyText(answerBody, requestedProducts)
+        : [],
+      summarySentAt: iso(r.summarySentAt),
+      lines: Array.isArray(r.items) ? r.items.length : 0,
+    };
+  });
+}
+
+/** Applies text-reply price suggestions only after an administrator reviews them. */
+export async function applyPriceReplyReview(
+  requestId: string,
+  lines: { productId: string; priceRub: string; deliveryDays: string }[],
+): Promise<ActionResult> {
+  const denied = await accessDenied("crm.price-check");
+  if (denied) return denied;
+  if (!Array.isArray(lines) || lines.length > 200) {
+    return { ok: false, error: "Некорректный список предложений" };
+  }
+
+  const request = await prisma.priceRequest.findUnique({
+    where: { id: requestId },
+    select: { id: true, supplierId: true, items: true, answerBody: true, answerReviewedAt: true },
+  });
+  if (!request?.answerBody) return { ok: false, error: "Текст ответа не найден" };
+  if (request.answerReviewedAt) return { ok: false, error: "Этот ответ уже проверен" };
+
+  const productIds = requestedPriceProductIds(request.items);
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, sku: true, name: true },
+  });
+  const candidateIds = new Set(
+    analyzePriceReplyText(request.answerBody, products).map((candidate) => candidate.productId),
+  );
+  const seen = new Set<string>();
+  const validated: { productId: string; price: number; deliveryDays: number | null }[] = [];
+
+  for (const line of lines) {
+    if (
+      !line ||
+      typeof line.productId !== "string" ||
+      !candidateIds.has(line.productId) ||
+      seen.has(line.productId)
+    ) {
+      return { ok: false, error: "В ответе есть неподтверждённая или повторная позиция" };
+    }
+    const priceRub = num(line.priceRub);
+    if (!(priceRub > 0) || priceRub > 100_000_000) {
+      return { ok: false, error: "Проверьте цену: она должна быть больше нуля" };
+    }
+    const daysRaw = String(line.deliveryDays ?? "").trim();
+    const deliveryDays = daysRaw ? Number(daysRaw) : null;
+    if (deliveryDays !== null && (!Number.isInteger(deliveryDays) || deliveryDays < 0 || deliveryDays > 365)) {
+      return { ok: false, error: "Срок поставки — целое число дней от 0 до 365" };
+    }
+    seen.add(line.productId);
+    validated.push({
+      productId: line.productId,
+      price: kopecks(priceRub),
+      deliveryDays,
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const line of validated) {
+      await upsertSupplierOffer(tx, line.productId, {
+        supplierId: request.supplierId,
+        price: line.price,
+        deliveryDays: line.deliveryDays,
+      });
+      await syncSelectedOffer(tx, line.productId);
+    }
+    await tx.priceRequest.update({
+      where: { id: request.id },
+      data: {
+        answerReviewedAt: new Date(),
+        answerNote: `${validated.length ? `Внесено предложений: ${validated.length}` : "Текст ответа проверен; цены не внесены"}.`,
+      },
+    });
+  });
+  revalidate();
+  return { ok: true };
 }
 
 /** «Запросить КП» by an order number: suppliers not asked yet for its lines in «Проверка заказа». */

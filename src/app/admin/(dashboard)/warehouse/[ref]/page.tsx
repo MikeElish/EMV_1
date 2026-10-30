@@ -1,12 +1,24 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { OneCError } from "@/lib/onec";
 import { balances, getWarehouseData } from "@/lib/onec-warehouse";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { WarehouseTable } from "@/components/admin/WarehouseTable";
 
 export default async function WarehousePage({ params }: PageProps<"/admin/warehouse/[ref]">) {
   const { ref } = await params;
-  const data = await getWarehouseData();
+  let data: Awaited<ReturnType<typeof getWarehouseData>>;
+  try {
+    data = await getWarehouseData();
+  } catch (error) {
+    return (
+      <CrmPage>
+        <p className="text-sm text-red-600">
+          {error instanceof OneCError ? error.message : "1С не ответила — остатки по складам недоступны, попробуйте позже."}
+        </p>
+      </CrmPage>
+    );
+  }
   const warehouse = data.warehouses.find((w) => w.ref === ref);
   if (!warehouse) notFound();
 

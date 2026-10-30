@@ -296,6 +296,8 @@ model Order {
   manager            User?              @relation("OrderManager", fields: [managerId], references: [id], onDelete: SetNull)
   userId             String?
   user               User?              @relation(fields: [userId], references: [id])
+  buyerCompanyId     String?
+  buyerCompany       Company?            @relation("OrderBuyerCompany", fields: [buyerCompanyId], references: [id], onDelete: SetNull)
   items              OrderItem[]
   documents          OrderDocument[]
   extraCosts         ExtraCost[]
@@ -311,6 +313,7 @@ model Order {
 
   @@index([status])
   @@index([userId])
+  @@index([buyerCompanyId])
 }
 
 // Services (delivery, forwarding …) -- CRM → Услуги. Not sold in the shop.
@@ -590,11 +593,24 @@ model User {
   personalDataConsentAt DateTime?
   mailRules             MailRule[]
   mailRuleState         MailRuleState?
+  invitation            UserInvitation?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
   @@index([role])
   @@index([companyId])
+}
+
+model UserInvitation {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([expiresAt])
 }
 
 // Singleton (id is always 1): the site's own mailbox, used to send
@@ -655,6 +671,7 @@ model Company {
   contract            String?
   type                String?
   users               User[]              @relation("CompanyUsers")
+  buyerOrders         Order[]             @relation("OrderBuyerCompany")
   managerId           String?
   manager             User?               @relation("CompanyManager", fields: [managerId], references: [id])
   // "Договор" checkbox -- the contract number field is only editable while
@@ -1009,6 +1026,9 @@ model PriceRequest {
   answeredAt    DateTime?
   // What the reply gave: «3 позиции загружено» or why nothing was.
   answerNote    String?
+  // Plain-text body of a reply that needs manual review.
+  answerBody    String?
+  answerReviewedAt DateTime?
   summarySentAt DateTime?
 
   @@index([orderId])

@@ -6,17 +6,16 @@ import { getWarehouseData } from "@/lib/onec-warehouse";
 // Склад: one tab per warehouse of 1С.
 export default async function WarehouseLayout({ children }: { children: React.ReactNode }) {
   await requireSection("warehouse");
-  let warehouses;
+  let warehouses: Awaited<ReturnType<typeof getWarehouseData>>["warehouses"] = [];
   try {
     ({ warehouses } = await getWarehouseData());
   } catch (error) {
-    return (
-      <p className="text-sm text-red-600">
-        {error instanceof OneCError ? error.message : "1С не ответила — остатки по складам недоступны, попробуйте позже."}
-      </p>
+    // The site-side journals below remain available when 1С is offline.
+    console.error(
+      "[warehouse-layout] failed to load 1С warehouses",
+      error instanceof OneCError ? error.message : error
     );
   }
-  if (!warehouses.length) return <p className="text-sm text-foreground/50">В 1С нет ни одного склада.</p>;
   return (
     <NavTabs
       fill
@@ -25,6 +24,7 @@ export default async function WarehouseLayout({ children }: { children: React.Re
         { href: "/admin/warehouse/receipts", label: "Поступление" },
         { href: "/admin/warehouse/handover", label: "Выдача" },
         { href: "/admin/warehouse/adjustments", label: "Списание/Оприходование" },
+        { href: "/admin/warehouse/replenishment", label: "Пополнение остатков" },
       ]}
     >
       {children}

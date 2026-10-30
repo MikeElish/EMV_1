@@ -8,7 +8,11 @@ export default async function NewUserPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Новый пользователь</h1>
-      <UserForm companies={companies} onSubmit={createUser} />
+      <UserForm
+        companies={companies}
+        onSubmit={createUser}
+        cancelHref="/admin/crm/users"
+      />
     </div>
   );
 }

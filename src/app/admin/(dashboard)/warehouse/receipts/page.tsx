@@ -1,22 +1,37 @@
 import { prisma } from "@/lib/prisma";
 import { requireSection } from "@/lib/access-server";
+import { OneCError } from "@/lib/onec";
 import { getWarehouseData } from "@/lib/onec-warehouse";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { ReceiptsTable } from "@/components/admin/ReceiptsTable";
 
+async function loadReceipts() {
+  try {
+    const [data, receiptRows] = await Promise.all([
+      getWarehouseData(),
+      prisma.supplierReceipt.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 500,
+        include: {
+          supplier: { select: { name: true, inn: true } },
+          lines: { select: { purchase: { select: { number: true } }, orderItem: { select: { order: { select: { orderNumber: true } } } } } },
+        },
+      }),
+    ]);
+    return { ok: true as const, warehouses: data.warehouses, receipts: receiptRows };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof OneCError ? error.message : "1С не ответила — поступления недоступны, попробуйте позже.",
+    };
+  }
+}
+
 export default async function ReceiptsPage() {
   await requireSection("warehouse", "view");
-  const [{ warehouses }, receipts] = await Promise.all([
-    getWarehouseData(),
-    prisma.supplierReceipt.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 500,
-      include: {
-        supplier: { select: { name: true, inn: true } },
-        lines: { select: { purchase: { select: { number: true } }, orderItem: { select: { order: { select: { orderNumber: true } } } } } },
-      },
-    }),
-  ]);
+  const loaded = await loadReceipts();
+  if (!loaded.ok) return <p className="text-sm text-red-600">{loaded.error}</p>;
+  const { warehouses, receipts } = loaded;
   const warehouseName = new Map(warehouses.map((w) => [w.ref, w.name]));
   return (
     <CrmPage>

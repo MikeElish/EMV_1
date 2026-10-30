@@ -16,7 +16,7 @@ export const COMPANY_PRICE_TYPE: Record<"RETAIL" | "WHOLESALE" | "DEALER" | "IND
   INDIVIDUAL: "individual",
 };
 
-export const manualOrderSchema = z.object({
+const manualOrderFieldsSchema = z.object({
   // Set when an existing Покупатель was picked -- the order then shows up
   // in their "Мои заказы". Empty for a new buyer (stored like a guest order).
   customerId: z.string().trim().optional(),
@@ -37,4 +37,22 @@ export const manualOrderSchema = z.object({
     )
     .min(1, "Добавьте хотя бы одну позицию"),
 });
+
+const oneBuyer = (input: { customerId?: string; companyId?: string }) =>
+  !(input.customerId && input.companyId);
+
+export const manualOrderSchema = manualOrderFieldsSchema.refine(oneBuyer, {
+  message: "Выберите одного покупателя",
+});
+
+export const ownCompanyManualOrderSchema = manualOrderFieldsSchema
+  .extend({
+    customerPhone: z.string().trim().max(30).optional().default(""),
+    customerEmail: z.string().trim().email("Укажите корректный e-mail покупателя").or(z.literal("")).optional().default(""),
+  })
+  .refine(oneBuyer, { message: "Выберите одного покупателя" });
+
 export type ManualOrderInput = z.infer<typeof manualOrderSchema>;
+export type ManualOrderRecordInput =
+  | z.input<typeof manualOrderSchema>
+  | z.input<typeof ownCompanyManualOrderSchema>;

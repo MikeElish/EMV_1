@@ -1,9 +1,11 @@
 "use server";
 
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { sendUserInvitation } from "@/lib/user-invitations";
 import { getOwnCompanyId } from "@/lib/own-company";
 import { accessDenied, getMyAccess } from "@/lib/access-server";
 import { parseAccessMap, resolveAccess, sameAccess } from "@/lib/access";
@@ -73,21 +75,21 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
   }
   const data = parsed.data;
 
-  if (!data.password) {
-    return { ok: false, error: "Задайте пароль для нового пользователя" };
-  }
+  const email = data.email?.trim().toLowerCase();
+  if (!email) return { ok: false, error: "Укажите электронную почту для отправки приглашения" };
 
+  let createdUser: { id: string; login: string } | null = null;
   try {
     const companyId = await companyFor(data.role, data.companyId);
-    const login = await generateLogin(data.role, data.email || undefined);
-    const passwordHash = await bcrypt.hash(data.password, 12);
+    const login = await generateLogin(data.role, email);
+    const passwordHash = await bcrypt.hash(randomBytes(32).toString("base64url"), 12);
 
-    await prisma.user.create({
+    createdUser = await prisma.user.create({
       data: {
         lastName: data.lastName || null,
         firstName: data.firstName || null,
         patronymic: data.patronymic || null,
-        email: data.email || null,
+        email,
         phone: data.phone || null,
         role: data.role,
         companyId,
@@ -97,13 +99,83 @@ export async function createUser(input: UserInput): Promise<ActionResult> {
         login,
         passwordHash,
       },
+      select: { id: true, login: true },
     });
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
 
+  try {
+    await sendUserInvitation({
+      id: createdUser.id,
+      login: createdUser.login,
+      email,
+      firstName: data.firstName || null,
+      lastName: data.lastName || null,
+    });
+  } catch (error) {
+    console.error("[user-invitation] could not send invitation", error);
+    try {
+      await prisma.user.delete({ where: { id: createdUser.id } });
+    } catch (rollbackError) {
+      console.error("[user-invitation] could not remove account after mail failure", rollbackError);
+      return {
+        ok: false,
+        error: "Пользователь создан, но письмо не отправлено. Не создавайте его повторно; проверьте почту сайта и отправку приглашения.",
+      };
+    }
+    return {
+      ok: false,
+      error: "Не удалось отправить приглашение. Пользователь не создан; проверьте настройки почты и повторите попытку.",
+    };
+  }
+
   revalidatePath("/admin/crm/users");
   redirect("/admin/crm/users");
+}
+
+export async function resendUserInvitation(userId: string): Promise<ActionResult> {
+  const denied = await accessDenied("crm.users");
+  if (denied) return denied;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, login: true, email: true, firstName: true, lastName: true, role: true },
+  });
+  if (!user || user.role === "OWNER") return { ok: false, error: "Пользователь не найден" };
+  if (!user.email) return { ok: false, error: "У пользователя не указан e-mail" };
+
+  const invitation = await prisma.userInvitation.findUnique({ where: { userId: user.id } });
+  if (!invitation || invitation.usedAt) {
+    return { ok: false, error: "Для этого пользователя приглашение не ожидает подтверждения" };
+  }
+
+  try {
+    await sendUserInvitation({ ...user, email: user.email });
+  } catch (error) {
+    console.error("[user-invitation] resend failed", error);
+    try {
+      await prisma.userInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          tokenHash: invitation.tokenHash,
+          expiresAt: invitation.expiresAt,
+          usedAt: invitation.usedAt,
+          createdAt: invitation.createdAt,
+        },
+      });
+    } catch (restoreError) {
+      console.error("[user-invitation] could not restore previous link", restoreError);
+      return {
+        ok: false,
+        error: "Письмо не отправлено, а прежнюю ссылку не удалось восстановить. Проверьте почту сайта и повторите отправку.",
+      };
+    }
+    return { ok: false, error: "Не удалось отправить письмо. Прежняя ссылка сохранена; проверьте настройки почты и повторите." };
+  }
+
+  revalidatePath("/admin/crm/users");
+  return { ok: true };
 }
 
 export async function updateUser(id: string, input: UserInput): Promise<ActionResult> {

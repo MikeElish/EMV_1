@@ -15,7 +15,9 @@ import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
 import {
   getManualOrderFormData,
   createManualOrder,
+  createReplenishmentOrder,
   type ManualOrderFormData,
+  type ManualOrderFormMode,
 } from "@/actions/admin/manual-order";
 import { PRICE_TYPES, PRICE_TYPE_LABELS, type PriceType } from "@/lib/validators/manual-order";
 import { applyMarkup } from "@/lib/pricing";
@@ -115,7 +117,13 @@ function priceOf(p: Product, type: PriceType, markup: number | null): number {
 let nextKey = 1;
 const emptyLine = (): Line => ({ key: nextKey++, productId: "", quantity: "1", priceRub: "" });
 
-export function NewOrderModal({ onClose }: { onClose: () => void }) {
+export function NewOrderModal({
+  onClose,
+  mode = "crm",
+}: {
+  onClose: () => void;
+  mode?: ManualOrderFormMode;
+}) {
   const router = useRouter();
   const [data, setData] = useState<ManualOrderFormData | null>(null);
   const [tab, setTab] = useState<Tab>("items");
@@ -141,8 +149,32 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
   const [terminal, setTerminal] = useState("");
 
   useEffect(() => {
-    getManualOrderFormData().then(setData);
-  }, []);
+    let active = true;
+    getManualOrderFormData(mode)
+      .then((formData) => {
+        if (!active) return;
+        setData(formData);
+        if (mode === "replenishment") {
+          const ownCompany = formData.companies.find((item) => item.isOwn);
+          if (!ownCompany) {
+            setError("Не найдена компания EMV для заказа пополнения");
+            return;
+          }
+          setCompany(ownCompany);
+          setCustomerName(ownCompany.name);
+          setCustomerPhone(ownCompany.contactPhone);
+          setCustomerEmail(ownCompany.contactEmail);
+          setMarkup(ownCompany.markup);
+          setPriceType(ownCompany.priceType === "individual" && ownCompany.markup === null ? "wholesale" : ownCompany.priceType);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить данные заказа");
+      });
+    return () => {
+      active = false;
+    };
+  }, [mode]);
 
   const productById = useMemo(() => new Map((data?.products ?? []).map((p) => [p.id, p])), [data]);
   const buyers = useMemo<Buyer[]>(
@@ -159,15 +191,17 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
     setMarkup(terms.markup);
     changePriceType(terms.priceType === "individual" && terms.markup === null ? "wholesale" : terms.priceType, terms.markup);
     if (b.customer) {
+      setCompany(null);
       setCustomer(b.customer);
       setCustomerName(b.customer.name);
       setCustomerPhone(b.customer.phone);
       setCustomerEmail(b.customer.email);
     } else {
-      // A company without an account: its name goes into the order, the
-      // phone and e-mail of the contact are typed below.
+      setCustomer(null);
       setCompany(b.company);
-      setCustomerName(b.company.name);
+      setCustomerName(b.company.contactName || b.company.name);
+      setCustomerPhone(b.company.contactPhone);
+      setCustomerEmail(b.company.contactEmail);
     }
   }
 
@@ -215,7 +249,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
       }
     }
     setSubmitting(true);
-    const result = await createManualOrder({
+    const input = {
       customerId: customer?.id,
       companyId: company?.id,
       customerName,
@@ -227,23 +261,29 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
         quantity: parseInt(l.quantity, 10) || 0,
         price: parseRub(l.priceRub) ?? 0,
       })),
-    });
+    };
+    const result =
+      mode === "replenishment"
+        ? await createReplenishmentOrder(input)
+        : await createManualOrder(input);
     setSubmitting(false);
     if (!result.ok) {
       if (/позиц|товар|Количество|Цена/.test(result.error)) setTab("items");
       return setError(result.error);
     }
     onClose();
-    router.push(`/admin/crm/orders?orderNumber=${encodeURIComponent(result.orderNumber)}`);
+    if (mode === "crm") {
+      router.push(`/admin/crm/orders?orderNumber=${encodeURIComponent(result.orderNumber)}`);
+    }
     router.refresh();
   }
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-4xl">
-      <h2 className="text-xl font-bold">Новый заказ</h2>
+      <h2 className="text-xl font-bold">{mode === "replenishment" ? "Новое пополнение остатков" : "Новый заказ"}</h2>
 
       {!data ? (
-        <p className="mt-6 text-sm text-foreground/40">Загрузка...</p>
+        <p className={`mt-6 text-sm ${error ? "text-red-600" : "text-foreground/40"}`}>{error ?? "Загрузка..."}</p>
       ) : (
         <>
           <div className="mt-4 space-y-3">
@@ -260,21 +300,23 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                     <span>
                       {company!.name}
                       <span className="text-foreground/50">
-                        {company!.inn && ` · ИНН ${company!.inn}`} · компания, укажите телефон и e-mail контакта
+                        {company!.inn && ` · ИНН ${company!.inn}`} · контактные данные подставлены из карточки компании или аккаунта клиента
                       </span>
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomer(null);
-                      setCompany(null);
-                    }}
-                    className="text-foreground/40 hover:text-foreground"
-                    aria-label="Сбросить покупателя"
-                  >
-                    ✕
-                  </button>
+                  {mode === "crm" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomer(null);
+                        setCompany(null);
+                      }}
+                      className="text-foreground/40 hover:text-foreground"
+                      aria-label="Сбросить покупателя"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="mt-1">
@@ -303,11 +345,13 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <input aria-label="ФИО покупателя" placeholder="ФИО *" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClassName} />
-              <input aria-label="Телефон покупателя" placeholder="Телефон *" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className={inputClassName} />
-              <input aria-label="E-mail покупателя" placeholder="E-mail *" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className={inputClassName} />
-            </div>
+            {mode === "crm" && (
+              <div className="grid grid-cols-3 gap-3">
+                <input aria-label="ФИО покупателя" placeholder="ФИО *" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClassName} />
+                <input aria-label="Телефон покупателя" placeholder="Телефон *" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className={inputClassName} />
+                <input aria-label="E-mail покупателя" placeholder="E-mail *" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className={inputClassName} />
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-3">
               <div>

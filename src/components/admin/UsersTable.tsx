@@ -1,13 +1,13 @@
 "use client";
 
 import { CrmPage, CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Role } from "@prisma/client";
 import { ROLE_LABELS } from "@/lib/validators/crm";
 import type { UserInput } from "@/lib/validators/crm";
-import { updateUser, deleteUser } from "@/actions/crm/users";
+import { updateUser, deleteUser, resendUserInvitation } from "@/actions/crm/users";
 import { UserForm } from "@/components/admin/UserForm";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
@@ -30,6 +30,7 @@ type Row = {
   role: Role;
   companyId: string | null;
   company: { name: string } | null;
+  invitation: { expiresAt: string; usedAt: string | null } | null;
   /** Every section's level (Доступ). */
   access: AccessMap;
   /** The role template (Настройки → Доступ). */
@@ -55,6 +56,8 @@ export function UsersTable({
   const [selected, setSelected] = useState<Row | null>(null);
   const [tab, setTab] = useState<Tab>("info");
   const [search, setSearch] = useRememberedState("search", "");
+  const [invitationPending, startInvitationTransition] = useTransition();
+  const [invitationError, setInvitationError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -180,6 +183,34 @@ export function UsersTable({
             />
           ) : (
           <>
+          {selected.invitation && !selected.invitation.usedAt && (
+            <div className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+              <p className="text-sm text-foreground/70">
+                Пользователь ещё не задал пароль по приглашению
+                {new Date(selected.invitation.expiresAt) <= new Date() ? " (ссылка истекла)." : "."}
+              </p>
+              <button
+                type="button"
+                disabled={invitationPending || !selected.email}
+                onClick={() => {
+                  setInvitationError(null);
+                  startInvitationTransition(async () => {
+                    const result = await resendUserInvitation(selected.id);
+                    if (!result.ok) {
+                      setInvitationError(result.error);
+                      return;
+                    }
+                    setSelected(null);
+                    router.refresh();
+                  });
+                }}
+                className="mt-2 rounded-md border border-foreground/20 px-3 py-1.5 text-sm font-medium hover:bg-foreground/5 disabled:opacity-50"
+              >
+                {invitationPending ? "Отправляем..." : "Отправить приглашение повторно"}
+              </button>
+              {invitationError && <p className="mt-2 text-sm text-red-600">{invitationError}</p>}
+            </div>
+          )}
           <UserForm
             companies={companies}
             initial={{

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import type { UserInput } from "@/lib/validators/crm";
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from "@/lib/validators/crm";
 import type { ActionResult } from "@/actions/crm/users";
@@ -23,12 +24,14 @@ export function UserForm({
   companies,
   initial,
   isOwner,
+  cancelHref,
   onSubmit,
   onSuccess,
 }: {
   companies: Company[];
   initial?: Partial<UserInput>;
   isOwner?: boolean;
+  cancelHref?: string;
   onSubmit: (input: UserInput) => Promise<ActionResult>;
   onSuccess?: () => void;
 }) {
@@ -124,9 +127,15 @@ export function UserForm({
             id="email"
             name="email"
             type="email"
+            required={!initial}
             defaultValue={initial?.email}
             className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
           />
+          {!initial && (
+            <p className="mt-1 text-xs text-foreground/50">
+              На этот адрес отправим приглашение со ссылкой для задания пароля.
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="phone" className="text-sm text-foreground/60">
@@ -254,28 +263,43 @@ export function UserForm({
         </fieldset>
       )}
 
-      <div>
-        <label htmlFor="password" className="text-sm text-foreground/60">
-          {initial ? "Новый пароль (оставьте пустым, чтобы не менять)" : "Пароль"}
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required={!initial}
-          className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-        />
-      </div>
+      {initial ? (
+        <div>
+          <label htmlFor="password" className="text-sm text-foreground/60">
+            Новый пароль (оставьте пустым, чтобы не менять)
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+        </div>
+      ) : (
+        <p className="text-sm text-foreground/60">
+          Пользователь задаст пароль по ссылке из письма. Ссылка действует 24 часа.
+        </p>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {submitting ? "Сохраняем..." : "Сохранить"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {submitting ? "Сохраняем..." : "Сохранить"}
+        </button>
+        {cancelHref && (
+          <Link
+            href={cancelHref}
+            className="rounded-md border border-foreground/20 px-6 py-2 font-medium transition-colors hover:bg-foreground/5"
+          >
+            Отмена
+          </Link>
+        )}
+      </div>
     </form>
   );
 }

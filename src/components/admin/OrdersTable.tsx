@@ -33,6 +33,7 @@ export type OrderRow = Order & {
     login: string;
     company: { name: string } | null;
   } | null;
+  buyerCompany: { name: string } | null;
 };
 
 type Row = {
@@ -45,6 +46,7 @@ type Row = {
 
 /** The company, or the person when not tied to one (guests: the name from checkout). */
 function customerOf(order: OrderRow): string {
+  if (order.buyerCompany) return order.buyerCompany.name;
   if (order.user?.company) return order.user.company.name;
   if (order.user) {
     const name = [order.user.lastName, order.user.firstName, order.user.patronymic]

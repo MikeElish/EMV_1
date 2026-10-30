@@ -1,11 +1,14 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
+import sanitizeHtml from "sanitize-html";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendSiteMail } from "@/lib/mailer";
 import { decryptSecret } from "@/lib/secret-box";
 import { analyzeOfferRows, sheetRows, writeOfferRows } from "@/lib/offer-import";
+import { analyzePriceReplyText, findFreeDeliveryTerm, requestedPriceProductIds } from "@/lib/price-reply-text";
 
 // Проценка по почте. Lines of an order that aren't in stock (Проверка
 // заказа) go to the suppliers known for those products -- to the contact of
@@ -200,25 +203,72 @@ export async function readPriceReplies(): Promise<number> {
           if (!request || (m.envelope?.date && m.envelope.date < request.sentAt)) continue;
 
           let note = "Ответ без таблицы — посмотрите письмо";
+          let answerBody: string | null = null;
+          let importedAttachment = false;
           for (const t of tables(m.bodyStructure as Part)) {
             const download = await client.download(String(m.uid), t.part, { uid: true });
             if (!download?.content) continue;
             const chunks: Buffer[] = [];
             for await (const c of download.content) chunks.push(c as Buffer);
-            const analysis = await analyzeOfferRows(sheetRows(Buffer.concat(chunks), t.name), request.supplierId, true);
-            const written = await writeOfferRows(request.supplierId, analysis.rows, false);
-            const priced = written.added + written.updated;
-            const analogs = analysis.rows.filter((r) => r.analog).map((r) => `${r.sku} → ${r.analog}`);
-            note = [
-              `Цен получено: ${priced}`,
-              written.skipped && `нет в каталоге: ${analysis.rows.filter((r) => !r.productId).map((r) => r.sku).join(", ")}`,
-              analogs.length && `аналоги: ${analogs.join("; ")}`,
-            ]
-              .filter(Boolean)
-              .join("; ");
-            break;
+            const content = Buffer.concat(chunks);
+            if (!content.length) continue;
+            try {
+              const analysis = await analyzeOfferRows(sheetRows(content, t.name), request.supplierId, true);
+              if (!analysis.rows.length) continue;
+              const written = await writeOfferRows(request.supplierId, analysis.rows, false);
+              const priced = written.added + written.updated;
+              const analogs = analysis.rows.filter((r) => r.analog).map((r) => `${r.sku} → ${r.analog}`);
+              note = [
+                `Цен получено: ${priced}`,
+                written.skipped && `нет в каталоге: ${analysis.rows.filter((r) => !r.productId).map((r) => r.sku).join(", ")}`,
+                analogs.length && `аналоги: ${analogs.join("; ")}`,
+              ]
+                .filter(Boolean)
+                .join("; ");
+              importedAttachment = true;
+              break;
+            } catch (error) {
+              console.error("[price-requests] could not analyze reply attachment", t.name, error);
+            }
           }
-          await prisma.priceRequest.update({ where: { id: request.id }, data: { answeredAt: new Date(), answerNote: note.slice(0, 1000) } });
+          if (!importedAttachment) {
+            const source = await client.fetchOne(String(m.uid), { source: true }, { uid: true });
+            const rawSource = source && source.source;
+            if (typeof rawSource === "string") {
+              const parsed = await simpleParser(rawSource);
+              answerBody = (
+                parsed.text ||
+                sanitizeHtml(parsed.html || "", { allowedTags: [], allowedAttributes: {} })
+              )
+                .trim()
+                .slice(0, 20_000);
+              if (answerBody) {
+                const productIds = requestedPriceProductIds(request.items);
+                const products = await prisma.product.findMany({
+                  where: { id: { in: productIds } },
+                  select: { id: true, sku: true, name: true },
+                });
+                const candidates = analyzePriceReplyText(answerBody, products);
+                const deliveryTerm = findFreeDeliveryTerm(answerBody);
+                note = [
+                  "Ответ в теле письма — требуется проверка",
+                  candidates.length ? `найдены цены по артикулам: ${candidates.map((c) => c.sku).join(", ")}` : null,
+                  deliveryTerm,
+                ]
+                  .filter(Boolean)
+                  .join("; ");
+              }
+            }
+          }
+          await prisma.priceRequest.update({
+            where: { id: request.id },
+            data: {
+              answeredAt: new Date(),
+              answerNote: note.slice(0, 1000),
+              answerBody,
+              answerReviewedAt: null,
+            },
+          });
           request.answeredAt = new Date();
           answered++;
         }

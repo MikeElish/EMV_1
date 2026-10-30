@@ -25,6 +25,7 @@ export default async function CrmUsersPage() {
         companyId: true,
         company: { select: { name: true } },
         access: true,
+        invitation: { select: { expiresAt: true, usedAt: true } },
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -39,6 +40,12 @@ export default async function CrmUsersPage() {
       <UsersTable
         users={users.map(({ access, ...u }) => ({
           ...u,
+          invitation: u.invitation
+            ? {
+                expiresAt: u.invitation.expiresAt.toISOString(),
+                usedAt: u.invitation.usedAt?.toISOString() ?? null,
+              }
+            : null,
           access: resolveAccess(u.role, access, templateOf.get(u.role)),
           template: resolveAccess(u.role, null, templateOf.get(u.role)),
           personalAccess: access !== null,
