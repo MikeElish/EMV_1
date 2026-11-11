@@ -12,13 +12,13 @@ export async function register() {
     // Наличие товаров из остатков 1С, at 06:00 and 18:00 Moscow time.
     const { startOneCStockTimer } = await import("@/lib/onec-stock");
     startOneCStockTimer();
-    // Проценка по почте: replies, reminders, summaries, every half hour.
+    // Проценка: read replies and update summaries; supplier messages are only sent after confirmation.
     const { startPriceRequestTimer } = await import("@/lib/price-requests");
     startPriceRequestTimer();
     // Банки: Точка's statement at 10:00, 14:00 and 20:00 Moscow time.
     const { startBankTimer } = await import("@/lib/banks");
     startBankTimer();
-    // Заказ поставщику: agreed lines go out, invoices come in, every half hour.
+    // Заказ поставщику: read incoming invoices only; never send supplier mail in the background.
     const { startSupplierPurchaseTimer } = await import("@/lib/supplier-purchases");
     startSupplierPurchaseTimer();
     // Оплата по СБП and чеки АТОЛ: pending ones looked up every 2 minutes.

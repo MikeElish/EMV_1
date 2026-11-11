@@ -21,11 +21,14 @@ import {
 import { PAYMENT_REQUEST_STATUSES, type PaymentRequestInput } from "@/lib/validators/payment-requests";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 import { FUNDS, FUND_LABELS, type Fund } from "@/lib/fund-labels";
+import { PAYMENT_PURPOSE_CATEGORIES, PAYMENT_PURPOSE_LABELS } from "@/lib/payment-purpose";
+import { formatSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
 
 export type PaymentRequestRow = {
   id: string;
   number: number;
   createdAt: string;
+  managerId: string | null;
   companyId: string | null;
   companyName: string | null;
   inn: string | null;
@@ -34,7 +37,11 @@ export type PaymentRequestRow = {
   /** Where it came from: a supplier order, an extra cost; null -- by hand. */
   source: string | null;
   amount: number;
+  currency: SupplierCurrency;
+  currencyAmount: number | null;
+  exchangeRate: number | null;
   purpose: string | null;
+  purposeCategory: (typeof PAYMENT_PURPOSE_CATEGORIES)[number];
   fund: string;
   status: string;
   paidAt: string | null;
@@ -108,6 +115,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
   const [companyId, setCompanyId] = useState(request?.companyId ?? "");
   const [orderId, setOrderId] = useState(request?.orderId ?? "");
   const [fund, setFund] = useState(request?.fund ?? "FREE");
+  const [purposeCategory, setPurposeCategory] = useState(request?.purposeCategory ?? "OTHER");
   const [inn, setInn] = useState("");
   const [innNote, setInnNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +145,9 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const amount = parseRub(String(form.get("amount") ?? ""));
+    const amount = request?.currency !== undefined && request.currency !== "RUB"
+      ? request.amount
+      : parseRub(String(form.get("amount") ?? ""));
     if (Number.isNaN(amount)) return setError("Укажите сумму");
     const input: PaymentRequestInput = {
       id: request?.id ?? null,
@@ -145,6 +155,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
       orderId: orderId || null,
       amount,
       purpose: String(form.get("purpose") ?? ""),
+      purposeCategory,
       fund,
     };
     const body = new FormData();
@@ -169,39 +180,45 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
         <form onSubmit={submit} className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-sm text-foreground/60">Контрагент *</label>
-              <SearchSelect
-                value={companyId}
-                onChange={setCompanyId}
-                emptyLabel="— не выбран —"
-                options={data.companies.map((c) => ({ value: c.id, label: c.name, hint: [c.inn && `ИНН ${c.inn}`, c.kpp && `КПП ${c.kpp}`].filter(Boolean).join(" ") }))}
-                className="mt-1"
-              />
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={inn}
-                  onChange={(e) => setInn(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      findByInn();
-                    }
-                  }}
-                  placeholder="или ИНН"
-                  inputMode="numeric"
-                  className="w-40 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-foreground/50"
-                />
-                <button
-                  type="button"
-                  onClick={findByInn}
-                  disabled={pending || !inn.trim()}
-                  className="rounded-md border border-foreground/20 px-3 py-1.5 text-sm hover:bg-foreground/5 disabled:opacity-50"
-                >
-                  Найти по ИНН
-                </button>
-              </div>
-              {innNote && <p className="mt-1 text-xs text-foreground/60">{innNote}</p>}
-              {company?.inn && <p className="mt-1 text-xs text-foreground/50">ИНН {company.inn}</p>}
+              <label className="text-sm text-foreground/60">{request?.managerId ? "Получатель (менеджер)" : "Контрагент *"}</label>
+              {request?.managerId ? (
+                <p className="mt-1 rounded-md border border-foreground/10 px-3 py-2 text-sm">{request.companyName ?? "Менеджер"}</p>
+              ) : (
+                <>
+                  <SearchSelect
+                    value={companyId}
+                    onChange={setCompanyId}
+                    emptyLabel="— не выбран —"
+                    options={data.companies.map((c) => ({ value: c.id, label: c.name, hint: [c.inn && `ИНН ${c.inn}`, c.kpp && `КПП ${c.kpp}`].filter(Boolean).join(" ") }))}
+                    className="mt-1"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={inn}
+                      onChange={(e) => setInn(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          findByInn();
+                        }
+                      }}
+                      placeholder="или ИНН"
+                      inputMode="numeric"
+                      className="w-40 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-foreground/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={findByInn}
+                      disabled={pending || !inn.trim()}
+                      className="rounded-md border border-foreground/20 px-3 py-1.5 text-sm hover:bg-foreground/5 disabled:opacity-50"
+                    >
+                      Найти по ИНН
+                    </button>
+                  </div>
+                  {innNote && <p className="mt-1 text-xs text-foreground/60">{innNote}</p>}
+                  {company?.inn && <p className="mt-1 text-xs text-foreground/50">ИНН {company.inn}</p>}
+                </>
+              )}
             </div>
             <div>
               <label className="text-sm text-foreground/60">Заказ</label>
@@ -214,10 +231,36 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
               />
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <div>
-              <label className="text-sm text-foreground/60">Сумма, ₽ *</label>
-              <input name="amount" defaultValue={rub(request?.amount ?? 0)} inputMode="decimal" placeholder="0,00" className={inputClass} />
+              <label className="text-sm text-foreground/60">Сумма, {request?.currency ?? "RUB"} *</label>
+              <input
+                name="amount"
+                defaultValue={request?.currency !== undefined && request.currency !== "RUB"
+                  ? rub(request.currencyAmount ?? 0)
+                  : rub(request?.amount ?? 0)}
+                inputMode="decimal"
+                placeholder="0,00"
+                disabled={request?.currency !== undefined && request.currency !== "RUB"}
+                className={`${inputClass} disabled:opacity-70`}
+              />
+              {request?.currency !== undefined && request.currency !== "RUB" && (
+                <p className="mt-1 text-xs text-foreground/50">
+                  Эквивалент для сверки с банковской выпиской: {formatRub(request.amount)}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-sm text-foreground/60">Категория *</label>
+              <SearchSelect
+                value={purposeCategory}
+                onChange={(value) => setPurposeCategory(value as typeof purposeCategory)}
+                options={PAYMENT_PURPOSE_CATEGORIES.map((category) => ({
+                  value: category,
+                  label: PAYMENT_PURPOSE_LABELS[category],
+                }))}
+                className="mt-1"
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="text-sm text-foreground/60">Назначение</label>
@@ -226,13 +269,12 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
           </div>
           <div className="max-w-sm">
             <label className="text-sm text-foreground/60">Фонд *</label>
-            <select value={fund} onChange={(e) => setFund(e.target.value)} className={inputClass}>
-              {FUNDS.map((f) => (
-                <option key={f} value={f}>
-                  {FUND_LABELS[f]}
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              value={fund}
+              onChange={setFund}
+              options={FUNDS.map((value) => ({ value, label: FUND_LABELS[value] }))}
+              className="mt-1"
+            />
             <p className="mt-1 text-xs text-foreground/50">Оплатить заявку можно, только если в фонде хватает денег (Финансы → Фонды).</p>
           </div>
           <div>
@@ -343,7 +385,7 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
     return requests.filter(
       (r) =>
         (!onlyOpen || r.status === "Требуется оплата") &&
-        (!q || [r.number, r.companyName, r.inn, r.orderNumber, r.source, r.purpose, r.status].filter(Boolean).join(" ").toLowerCase().includes(q))
+        (!q || [r.number, r.companyName, r.inn, r.orderNumber, r.source, PAYMENT_PURPOSE_LABELS[r.purposeCategory], r.purpose, r.status].filter(Boolean).join(" ").toLowerCase().includes(q))
     );
   }, [requests, search, onlyOpen]);
   const total = filtered.reduce((s, r) => s + (r.status === "Требуется оплата" ? r.amount : 0), 0);
@@ -398,11 +440,16 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
                   </td>
                   <td className="py-2 pr-4">
                     <div>{r.companyName ?? "—"}</div>
-                    <div className="text-xs text-foreground/50">{[r.source, r.purpose].filter(Boolean).join(" · ")}</div>
+                    <div className="text-xs text-foreground/50">{[PAYMENT_PURPOSE_LABELS[r.purposeCategory], r.source, r.purpose].filter(Boolean).join(" · ")}</div>
                   </td>
                   <td className="py-2 pr-4">{r.inn ?? ""}</td>
                   <td className="whitespace-nowrap py-2 pr-4">{r.orderNumber ?? "—"}</td>
-                  <td className="whitespace-nowrap py-2 pr-4 text-right">{formatRub(r.amount)}</td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-right">
+                    {r.currency !== "RUB" && r.currencyAmount !== null
+                      ? formatSupplierCurrency(r.currencyAmount, r.currency)
+                      : formatRub(r.amount)}
+                    {r.currency !== "RUB" && <div className="text-xs text-foreground/50">{formatRub(r.amount)} экв.</div>}
+                  </td>
                   <td className="py-2 pr-4">
                     <StatusSelect request={r} />
                     {r.payment && <div className="mt-1 text-xs text-foreground/50">{r.payment}</div>}

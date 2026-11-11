@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
+import { orderLineTotal } from "@/lib/order-pricing";
 
 // Отчёты → Бонусы of an employee for a period:
 //  - income: the lines of the orders they manage (Order.managerId) that are
@@ -52,6 +53,7 @@ export async function salaryReport(employeeId: string, from: string, to: string)
           select: {
             priceSnapshot: true,
             quantity: true,
+            bonus: true,
             supplierOrderLines: { where: { price: { gt: 0 } }, select: { price: true }, orderBy: { createdAt: "desc" }, take: 1 },
             offer: { select: { price: true } },
             product: { select: { offers: { where: { selected: true }, select: { price: true } }, pricing: { select: { purchasePrice: true } } } },
@@ -73,7 +75,7 @@ export async function salaryReport(employeeId: string, from: string, to: string)
     let cost = 0;
     let unknown = 0;
     for (const i of o.items) {
-      sale += i.priceSnapshot * i.quantity;
+      sale += orderLineTotal(i);
       const purchase = i.supplierOrderLines[0]?.price || i.offer?.price || i.product.offers[0]?.price || i.product.pricing?.purchasePrice || 0;
       if (!purchase) unknown++;
       cost += purchase * i.quantity;

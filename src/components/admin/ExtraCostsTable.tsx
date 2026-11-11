@@ -59,6 +59,7 @@ let nextKey = 1;
 function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: () => void }) {
   const [data, setData] = useState<ExtraCostFormData | null>(null);
   const [kind, setKind] = useState(cost?.kind ?? EXTRA_COST_KINDS[0]);
+  const [status, setStatus] = useState(cost?.status ?? EXTRA_COST_STATUSES[0]);
   const [supplierId, setSupplierId] = useState(cost?.supplierId ?? "");
   const [orderId, setOrderId] = useState(cost?.orderId ?? "");
   const [employeeId, setEmployeeId] = useState(cost?.employeeId ?? "");
@@ -170,11 +171,12 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
           <div className="grid gap-3 sm:grid-cols-4">
             <div>
               <label className="text-sm text-foreground/60">Вид расходов *</label>
-              <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputClass}>
-                {EXTRA_COST_KINDS.map((k) => (
-                  <option key={k}>{k}</option>
-                ))}
-              </select>
+              <SearchSelect
+                value={kind}
+                onChange={setKind}
+                options={EXTRA_COST_KINDS.map((value) => ({ value, label: value }))}
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="text-sm text-foreground/60">№ документа</label>
@@ -186,11 +188,13 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
             </div>
             <div>
               <label className="text-sm text-foreground/60">Статус</label>
-              <select name="status" defaultValue={cost?.status ?? EXTRA_COST_STATUSES[0]} className={inputClass}>
-                {EXTRA_COST_STATUSES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+              <SearchSelect
+                name="status"
+                value={status}
+                onChange={setStatus}
+                options={EXTRA_COST_STATUSES.map((value) => ({ value, label: value }))}
+                className="mt-1"
+              />
             </div>
           </div>
 

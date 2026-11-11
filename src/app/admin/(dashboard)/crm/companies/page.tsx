@@ -2,9 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { CompaniesTable, type CompanyBalance } from "@/components/admin/CompaniesTable";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
+import { orderLineTotal } from "@/lib/order-pricing";
+import { getMyAccess } from "@/lib/access-server";
 
 export default async function CrmCompaniesPage() {
-  const [companies, managers, orders] = await Promise.all([
+  const [companies, managers, orders, me] = await Promise.all([
     prisma.company.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.user.findMany({
       where: { role: { not: "CUSTOMER" } },
@@ -21,11 +23,12 @@ export default async function CrmCompaniesPage() {
         shippedAt: true,
         paid: true,
         totalAmount: true,
-        items: { select: { status: true, priceSnapshot: true, quantity: true, paid: true } },
+        items: { select: { status: true, priceSnapshot: true, quantity: true, bonus: true, paid: true } },
         user: { select: { companyId: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
+    getMyAccess(),
   ]);
 
   const balances: Record<string, CompanyBalance> = {};
@@ -36,11 +39,11 @@ export default async function CrmCompaniesPage() {
     // Payment is per line: only paid, not cancelled lines count.
     const paidAmount = order.items
       .filter((i) => i.paid && i.status !== "CANCELLED")
-      .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
+      .reduce((sum, i) => sum + orderLineTotal(i), 0);
     // Lines ship one by one, so only the shipped ones count.
     const shippedAmount = order.items
       .filter((i) => SHIPPED_STATUSES.includes(i.status))
-      .reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0);
+      .reduce((sum, i) => sum + orderLineTotal(i), 0);
 
     const entry = balances[companyId] ?? { balance: 0, orders: [] };
     entry.balance += paidAmount - shippedAmount;
@@ -58,7 +61,7 @@ export default async function CrmCompaniesPage() {
 
   return (
     <CrmPage>
-      <CompaniesTable companies={companies} managers={managers} balances={balances} />
+      <CompaniesTable companies={companies} managers={managers} balances={balances} canEditSupplierMarkup={me?.role === "OWNER"} />
     </CrmPage>
   );
 }

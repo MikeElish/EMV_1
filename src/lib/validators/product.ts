@@ -10,6 +10,7 @@ export const productSchema = z.object({
   retailPrice: z.number().int().min(0, "Цена не может быть отрицательной"),
   dealerPrice: z.number().int().min(0, "Цена не может быть отрицательной"),
   supplierId: z.string().trim().optional(),
+  noOffer: z.boolean().default(false),
   // The first supplier offer, entered with a new product (or a product that
   // has no offers yet, e.g. one imported from 1С).
   deliveryDays: z.number().int().min(0).max(365).optional(),

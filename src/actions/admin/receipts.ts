@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { accessDenied, requireSection } from "@/lib/access-server";
+import { accessDenied, assignedOrderDenied, requireSection } from "@/lib/access-server";
 import { OneCError } from "@/lib/onec";
 import { supplierVatRate } from "@/lib/onec-purchase";
 import { counterpartyRef } from "@/lib/onec-invoice";
@@ -30,7 +30,7 @@ async function fileOf(formData: FormData) {
 
 /** «+ Поступление»: the supplier order lines that may arrive, by supplier. */
 export async function getReceivableLines() {
-  await requireSection("warehouse", "view");
+  await requireSection("warehouse.receipts", "view");
   const lines = await prisma.supplierOrderLine.findMany({
     where: { status: { in: [...RECEIVABLE] }, receiptId: null, supplierId: { not: null } },
     include: {
@@ -58,7 +58,7 @@ export async function getReceivableLines() {
 
 /** The supplier's VAT rate as in its latest Поступление in 1С. */
 export async function receiptVatRate(supplierId: string): Promise<string | null> {
-  await requireSection("warehouse", "view");
+  await requireSection("warehouse.receipts", "view");
   const company = await prisma.company.findUnique({ where: { id: String(supplierId) }, select: { id: true, oneCRef: true, inn: true, name: true } });
   if (!company) return null;
   try {
@@ -70,7 +70,7 @@ export async function receiptVatRate(supplierId: string): Promise<string | null>
 
 /** «Провести»: the УПД into 1С, the lines delivered. `data` -- JSON of the card, `file` -- the УПД. */
 export async function createReceipt(formData: FormData): Promise<ReceiptResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.receipts");
   if (denied) return denied;
   let input: { supplierId: string; warehouseRef: string; docNumber: string; docDate: string; vatRate: string; note: string; lines: { lineId: string; price: number }[] };
   try {
@@ -109,12 +109,14 @@ export async function createReceipt(formData: FormData): Promise<ReceiptResult> 
 
 /** Выдача: «Выдан» / «Передан в ТК» with its note and the ТН. */
 export async function handOver(formData: FormData): Promise<ReceiptResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.handover");
   if (denied) return denied;
   const kind = String(formData.get("kind") ?? "") as HandoverKind;
   if (!HANDOVER_KINDS.includes(kind)) return { ok: false, error: "Некорректный вид выдачи" };
   try {
     const orderId = String(formData.get("orderId") ?? "");
+    const assignmentDenied = await assignedOrderDenied(orderId);
+    if (assignmentDenied) return assignmentDenied;
     const n = await handOverOrder({ orderId, kind, note: String(formData.get("note") ?? "").trim().slice(0, 300), file: await fileOf(formData) });
     revalidate();
     // The УПД follows; if 1С fails, «Сформировать УПД» in the row repeats it.
@@ -133,8 +135,10 @@ export async function handOver(formData: FormData): Promise<ReceiptResult> {
 
 /** «Сформировать УПД»: the shipped lines without one. */
 export async function issueUpd(orderId: string): Promise<ReceiptResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.handover");
   if (denied) return denied;
+  const assignmentDenied = await assignedOrderDenied(String(orderId));
+  if (assignmentDenied) return assignmentDenied;
   try {
     const upd = await issueOrderUpd(String(orderId));
     revalidate();

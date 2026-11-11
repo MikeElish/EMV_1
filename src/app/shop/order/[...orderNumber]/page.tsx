@@ -5,6 +5,7 @@ import { formatRub, formatShopPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { payableLines, sbpAvailable } from "@/lib/sbp";
 import { SbpPayButton } from "@/components/shop/SbpPayButton";
+import { formatOrderLineUnitPrice, orderLineTotal } from "@/lib/order-pricing";
 
 export default async function OrderConfirmationPage({
   params,
@@ -42,7 +43,10 @@ export default async function OrderConfirmationPage({
             <span>
               {item.nameSnapshot} × {item.quantity}
             </span>
-            <span>{formatShopPrice(item.priceSnapshot * item.quantity)}</span>
+            <span>
+              {item.bonus > 0 && <span className="mr-2 text-xs text-foreground/50">{formatOrderLineUnitPrice(item)} за шт. · </span>}
+              {formatShopPrice(orderLineTotal(item))}
+            </span>
           </div>
         ))}
         <div className="mt-2 flex justify-between border-t border-foreground/10 pt-2 font-semibold">

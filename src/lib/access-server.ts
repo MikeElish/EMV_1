@@ -48,6 +48,25 @@ export async function accessDenied(
   };
 }
 
+/** A staff member can edit only orders assigned to them; the owner can edit all. */
+export async function assignedManagerDenied(managerId: string | null): Promise<{ ok: false; error: string } | null> {
+  const me = await getMyAccess();
+  if (!me) return { ok: false, error: "Требуется вход" };
+  if (me.role === "OWNER" || managerId === me.userId) return null;
+  return { ok: false, error: "Редактировать может только закреплённый менеджер или владелец" };
+}
+
+export async function assignedOrderDenied(orderId: string): Promise<{ ok: false; error: string } | null> {
+  const me = await getMyAccess();
+  if (!me) return { ok: false, error: "Требуется вход" };
+  if (me.role === "OWNER") return null;
+  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { managerId: true } });
+  if (!order) return { ok: false, error: "Заказ не найден" };
+  return order.managerId === me.userId
+    ? null
+    : { ok: false, error: "Редактировать может только закреплённый менеджер или владелец" };
+}
+
 /** For pages and actions with other answers: no access -- off to the start. */
 export async function requireSection(keys: string | string[], level: AccessLevel = "view"): Promise<{ userId: string }> {
   const me = await getMyAccess();

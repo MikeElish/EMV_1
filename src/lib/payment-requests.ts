@@ -2,11 +2,13 @@ import "server-only";
 import path from "path";
 import { mkdir, writeFile } from "fs/promises";
 import PDFDocument from "pdfkit";
-import type { BankTransaction } from "@prisma/client";
+import { Prisma, type BankTransaction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { SELLER } from "@/lib/invoice-pdf";
 import { rublesInWords } from "@/lib/money-words";
+import { purposeCategoryForExtraCost } from "@/lib/payment-purpose";
+import { MAX_MONEY_MINOR, parseSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
 
 // Финансы → Заявки на оплату. A supplier's invoice (Заказ поставщику) or an
 // extra cost in «Требуется оплата» becomes a request; one can be added by
@@ -42,8 +44,61 @@ export async function storeRequestFile(requestId: string, kind: "INVOICE" | "PAY
 
 /** The supplier's invoice came: the request for its supplier order (its sum -- of the lines), with the file. */
 export async function requestForPurchase(purchaseId: string, invoice?: { fileName: string; fileUrl: string }) {
-  const purchase = await prisma.supplierPurchase.findUniqueOrThrow({ where: { id: purchaseId }, include: { lines: true, supplier: { select: { inn: true } } } });
-  const amount = purchase.lines.reduce((s, l) => s + l.price * l.quantity, 0);
+  const purchase = await prisma.supplierPurchase.findUniqueOrThrow({
+    where: { id: purchaseId },
+    include: {
+      lines: { include: { orderItem: { select: { orderId: true } } } },
+      supplier: { select: { inn: true } },
+    },
+  });
+  const currencies = new Set(purchase.lines.map((line) => parseSupplierCurrency(line.currency) ?? "RUB"));
+  if (currencies.size > 1) throw new Error("В одном заказе поставщику нельзя смешивать валюты");
+  const currency: SupplierCurrency = parseSupplierCurrency(purchase.lines[0]?.currency) ?? "RUB";
+  const currencyAmount = currency === "RUB"
+    ? null
+    : purchase.lines.reduce((sum, line) => sum + (line.quotedPrice ?? line.price) * line.quantity, 0);
+  const amount = currency === "RUB"
+    ? purchase.lines.reduce((sum, line) => sum + line.price * line.quantity, 0)
+    : purchase.lines.reduce((sum, line) => {
+        const rate = line.exchangeRate;
+        if (rate == null || !(rate > 0)) throw new Error("Для валютного заказа не задан курс валюты");
+        return sum + Math.round((line.quotedPrice ?? line.price) * line.quantity * rate);
+      }, 0);
+  if (
+    !Number.isSafeInteger(amount) || amount <= 0 || amount > MAX_MONEY_MINOR ||
+    (currencyAmount !== null && (!Number.isSafeInteger(currencyAmount) || currencyAmount <= 0 || currencyAmount > MAX_MONEY_MINOR))
+  ) {
+    throw new Error("Сумма заказа превышает допустимую сумму заявки на оплату");
+  }
+  const exchangeRate = currencyAmount && currencyAmount > 0 ? amount / currencyAmount : 1;
+  const orderNumbers = [...new Set(purchase.lines.map((line) => line.buyerOrderNumber).filter((value): value is string => !!value))];
+  const orders = orderNumbers.length
+    ? await prisma.order.findMany({ where: { orderNumber: { in: orderNumbers } }, select: { id: true, orderNumber: true } })
+    : [];
+  const orderIdByNumber = new Map(orders.map((order) => [order.orderNumber, order.id]));
+  const lineOrderIds = purchase.lines.map((line) =>
+    line.forStock
+      ? null
+      : line.orderItem?.orderId ?? orderIdByNumber.get(line.buyerOrderNumber ?? "") ?? null,
+  );
+  const distinctOrderIds = new Set(lineOrderIds);
+  let orderId =
+    purchase.lines.length > 0 &&
+    purchase.lines.every((line) => !line.forStock) &&
+    distinctOrderIds.size === 1
+      ? [...distinctOrderIds][0] ?? null
+      : null;
+  if (
+    orderId === null &&
+    purchase.orderId &&
+    purchase.lines.length > 0 &&
+    purchase.lines.every((line) => !line.forStock && !line.orderItem?.orderId && !line.buyerOrderNumber)
+  ) {
+    orderId = purchase.orderId;
+  }
+  if (purchase.orderId !== orderId) {
+    await prisma.supplierPurchase.update({ where: { id: purchaseId }, data: { orderId } });
+  }
   const existing = await prisma.paymentRequest.findUnique({ where: { purchaseId } });
   const request =
     existing ??
@@ -52,13 +107,29 @@ export async function requestForPurchase(purchaseId: string, invoice?: { fileNam
         purchaseId,
         companyId: purchase.supplierId,
         inn: purchase.supplier.inn,
-        orderId: purchase.orderId,
+        orderId,
         amount,
+        currency,
+        currencyAmount,
+        exchangeRate,
         purpose: `Счёт по заказу поставщику № ${purchase.number}`,
+        purposeCategory: "GOODS",
       },
     }));
-  if (existing && existing.status === "Требуется оплата" && existing.amount !== amount) {
-    await prisma.paymentRequest.update({ where: { id: existing.id }, data: { amount } });
+  if (existing) {
+    const data: Prisma.PaymentRequestUpdateInput = {
+      ...(existing.status === "Требуется оплата" && existing.amount !== amount ? { amount } : {}),
+      ...(existing.status === "Требуется оплата" && (
+        existing.currency !== currency ||
+        existing.currencyAmount !== currencyAmount ||
+        existing.exchangeRate !== exchangeRate
+      ) ? { currency, currencyAmount, exchangeRate } : {}),
+      ...(existing.status === "Требуется оплата" ? { purposeCategory: "GOODS" } : {}),
+      ...(existing.status === "Требуется оплата" && existing.orderId !== orderId
+        ? { order: orderId ? { connect: { id: orderId } } : { disconnect: true } }
+        : {}),
+    };
+    if (Object.keys(data).length) await prisma.paymentRequest.update({ where: { id: existing.id }, data });
   }
   if (invoice) await prisma.paymentRequestFile.create({ data: { requestId: request.id, kind: "INVOICE", ...invoice } });
   await matchRequest(request.id);
@@ -83,6 +154,7 @@ export async function syncExtraCostRequest(extraCostId: string) {
     orderId: cost.orderId,
     amount: cost.amount,
     purpose: [cost.kind, cost.number && `№ ${cost.number}`].filter(Boolean).join(" "),
+    purposeCategory: purposeCategoryForExtraCost(cost.kind),
     status: "Требуется оплата",
   };
   const request = existing

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
 import { deliveryMethodFromNote } from "@/lib/delivery";
-import { sendPriceRequests } from "@/lib/price-requests";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
 import {
   manualOrderSchema,
@@ -84,6 +83,23 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
   if (products.length !== productIds.length) {
     return { ok: false, error: "Часть товаров не найдена — обновите окно заказа" };
   }
+  const selectedOfferIds = [...new Set(items.flatMap((item) => item.offerId ? [item.offerId] : []))];
+  if (selectedOfferIds.length) {
+    const offers = await prisma.supplierOffer.findMany({
+      where: {
+        id: { in: selectedOfferIds },
+        noOffer: false,
+        price: { gt: 0 },
+        supplierId: { not: null },
+        supplier: { is: { isOwn: false } },
+      },
+      select: { id: true, productId: true },
+    });
+    const offerById = new Map(offers.map((offer) => [offer.id, offer]));
+    if (items.some((item) => item.offerId && offerById.get(item.offerId)?.productId !== item.productId)) {
+      return { ok: false, error: "Выбранное предложение поставщика больше недоступно — обновите заказ" };
+    }
+  }
   const nameById = new Map(products.map((p) => [p.id, p.name]));
 
   const statuses = await initialLineStatuses(items, deferred);
@@ -104,6 +120,7 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
       items: {
         create: items.map((i, index) => ({
           productId: i.productId,
+          offerId: i.offerId || null,
           nameSnapshot: nameById.get(i.productId)!,
           priceSnapshot: i.price,
           quantity: i.quantity,
@@ -117,7 +134,6 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
 
   await orderMissingFromSuppliers(created.id);
   await applyOrderSurcharges(created.id);
-  void sendPriceRequests(created.id).catch((error) => console.error("[price-requests] order", orderNumber, error));
   revalidatePath("/admin/crm/orders");
   revalidatePath("/admin/warehouse/replenishment");
   revalidatePath("/admin/crm/supplier-orders");

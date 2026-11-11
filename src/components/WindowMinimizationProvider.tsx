@@ -11,14 +11,18 @@ import {
 type MinimizedWindow = {
   id: string;
   title: string;
+  originPath: string;
+  minimized: boolean;
   restore: () => void;
   close: () => void;
 };
 
 type WindowMinimizationContextValue = {
   hasMinimizedWindows: boolean;
+  persistentPaths: string[];
   registerWindow: (window: MinimizedWindow) => void;
   unregisterWindow: (id: string) => void;
+  restoreWindow: (id: string) => void;
 };
 
 const WindowMinimizationContext =
@@ -41,13 +45,25 @@ export function WindowMinimizationProvider({
   const unregisterWindow = useCallback((id: string) => {
     setWindows((current) => current.filter((window) => window.id !== id));
   }, []);
+  const restoreWindow = useCallback((id: string) => {
+    const window = windows.find((item) => item.id === id);
+    if (!window) return;
+    window.restore();
+    setWindows((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, minimized: false } : item,
+      ),
+    );
+  }, [windows]);
   const contextValue = useMemo(
     () => ({
-      hasMinimizedWindows: windows.length > 0,
+      hasMinimizedWindows: windows.some((window) => window.minimized),
+      persistentPaths: [...new Set(windows.map((window) => window.originPath))],
       registerWindow,
       unregisterWindow,
+      restoreWindow,
     }),
-    [registerWindow, unregisterWindow, windows.length],
+    [registerWindow, restoreWindow, unregisterWindow, windows],
   );
 
   return (
@@ -55,12 +71,12 @@ export function WindowMinimizationProvider({
       value={contextValue}
     >
       {children}
-      {windows.length > 0 && (
+      {windows.some((window) => window.minimized) && (
         <aside
           aria-label="Свёрнутые окна"
           className="fixed bottom-4 right-4 z-[2147483647] flex max-h-[50vh] w-72 flex-col gap-2 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 p-2 text-white shadow-2xl"
         >
-          {windows.map((window) => (
+          {windows.filter((window) => window.minimized).map((window) => (
             <div
               key={window.id}
               className="flex min-w-0 items-center gap-1 rounded-lg bg-white/10"
@@ -68,8 +84,7 @@ export function WindowMinimizationProvider({
               <button
                 type="button"
                 onClick={() => {
-                  window.restore();
-                  unregisterWindow(window.id);
+                  restoreWindow(window.id);
                 }}
                 aria-label={`Восстановить: ${window.title}`}
                 title={`Восстановить: ${window.title}`}

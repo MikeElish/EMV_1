@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import nextPkg from "next/package.json";
 import { getDesktopRelease } from "@/lib/desktop-release";
 import { DesktopZoomSlider } from "@/components/admin/DesktopZoomSlider";
+import { getMyAccess } from "@/lib/access-server";
+import { prisma } from "@/lib/prisma";
+import { ManualInputSettings } from "@/components/admin/ManualInputSettings";
 
 function formatDuration(seconds: number) {
   const days = Math.floor(seconds / 86400);
@@ -26,6 +29,7 @@ function databaseInfo() {
 
 export default async function SiteSettingsPage() {
   const headersList = await headers();
+  const me = await getMyAccess();
   const host = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "—";
   const protocol = headersList.get("x-forwarded-proto") ?? "http";
 
@@ -49,7 +53,10 @@ export default async function SiteSettingsPage() {
     ["База данных", databaseInfo()],
     ["Каталог приложения", process.cwd()],
   ];
-  const release = await getDesktopRelease();
+  const [release, manualSettings] = await Promise.all([
+    getDesktopRelease(),
+    me?.role === "OWNER" ? prisma.siteSettings.findUnique({ where: { id: 1 } }) : Promise.resolve(null),
+  ]);
 
   return (
     <div>
@@ -93,6 +100,12 @@ export default async function SiteSettingsPage() {
           </div>
         ))}
       </dl>
+      {me?.role === "OWNER" && (
+        <section className="mt-8 max-w-2xl rounded-md border border-foreground/10 p-4">
+          <h2 className="mb-3 font-semibold">Режим работы</h2>
+          <ManualInputSettings enabled={manualSettings?.manualInputEnabled ?? false} />
+        </section>
+      )}
     </div>
   );
 }

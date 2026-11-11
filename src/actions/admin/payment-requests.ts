@@ -10,6 +10,7 @@ import { markRequestPaid, matchRequest, paymentsFor, storeRequestFile, syncExtra
 import { PAYMENT_REQUEST_STATUSES, type PaymentRequestInput } from "@/lib/validators/payment-requests";
 import { FUNDS } from "@/lib/fund-labels";
 import { fundCanPay } from "@/lib/funds";
+import { PAYMENT_PURPOSE_CATEGORIES } from "@/lib/payment-purpose";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -51,18 +52,24 @@ export async function savePaymentRequest(formData: FormData): Promise<ActionResu
   }
   const amount = Math.round(Number(input.amount));
   if (!(amount > 0)) return { ok: false, error: "Укажите сумму" };
-  if (!input.companyId) return { ok: false, error: "Выберите контрагента" };
-  const company = await prisma.company.findUnique({ where: { id: input.companyId }, select: { inn: true } });
-  if (!company) return { ok: false, error: "Контрагент не найден" };
+  const existing = input.id ? await prisma.paymentRequest.findUnique({ where: { id: input.id }, select: { id: true, managerId: true, inn: true } }) : null;
+  if (input.id && !existing) return { ok: false, error: "Заявка не найдена" };
+  if (existing?.managerId && input.companyId) return { ok: false, error: "Заявка менеджеру не может быть привязана к контрагенту" };
+  if (!input.companyId && !existing?.managerId) return { ok: false, error: "Выберите контрагента" };
+  const company = input.companyId
+    ? await prisma.company.findUnique({ where: { id: input.companyId }, select: { inn: true } })
+    : null;
+  if (input.companyId && !company) return { ok: false, error: "Контрагент не найден" };
   const file = formData.get("file");
   if (file instanceof File && file.size > MAX_FILE_SIZE) return { ok: false, error: "Файл больше 20 МБ" };
 
   const data = {
-    companyId: input.companyId,
-    inn: company.inn,
+    companyId: input.companyId || null,
+    inn: company?.inn ?? existing?.inn ?? null,
     orderId: input.orderId || null,
     amount,
     purpose: String(input.purpose ?? "").trim().slice(0, 500) || null,
+    purposeCategory: PAYMENT_PURPOSE_CATEGORIES.includes(input.purposeCategory) ? input.purposeCategory : "OTHER",
     fund: (FUNDS as readonly string[]).includes(input.fund) ? input.fund : "FREE",
   };
   const saved = input.id

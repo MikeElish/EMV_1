@@ -31,6 +31,7 @@ const manualOrderFieldsSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1, "Выберите товар в каждой строке"),
+        offerId: z.string().trim().min(1).optional(),
         quantity: z.number().int().min(1, "Количество должно быть не меньше 1").max(9999),
         price: z.number().int().min(0, "Цена не может быть отрицательной"),
       })

@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { OneCError } from "@/lib/onec";
 import { getWarehouseData } from "@/lib/onec-warehouse";
+import { requireSection } from "@/lib/access-server";
 
 export default async function WarehouseIndexPage() {
+  await requireSection("warehouse.stock", "view");
   let warehouses: Awaited<ReturnType<typeof getWarehouseData>>["warehouses"];
   try {
     ({ warehouses } = await getWarehouseData());

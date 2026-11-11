@@ -49,7 +49,11 @@ export async function quoteSurcharges(
   const ids = picked.map((l) => l.productId);
   const [offers, pricing] = await Promise.all([
     prisma.supplierOffer.findMany({
-      where: { OR: [{ productId: { in: ids }, selected: true }, { id: { in: picked.flatMap((l) => (l.offerId ? [l.offerId] : [])) } }] },
+      where: {
+        noOffer: false,
+        price: { gt: 0 },
+        OR: [{ productId: { in: ids }, selected: true }, { id: { in: picked.flatMap((l) => (l.offerId ? [l.offerId] : [])) } }],
+      },
       select: { id: true, productId: true, price: true, selected: true },
     }),
     prisma.productPricing.findMany({ where: { productId: { in: ids } }, select: { productId: true, purchasePrice: true } }),
@@ -77,7 +81,7 @@ export async function applyOrderSurcharges(orderId: string) {
       paid: true,
       supplierOrderLines: { where: { price: { gt: 0 } }, select: { price: true }, take: 1 },
       offer: { select: { price: true } },
-      product: { select: { offers: { where: { selected: true }, select: { price: true } }, pricing: { select: { purchasePrice: true } } } },
+      product: { select: { offers: { where: { selected: true, noOffer: false }, select: { price: true } }, pricing: { select: { purchasePrice: true } } } },
     },
   });
   if (!items.length || items.some((i) => i.paid)) return;

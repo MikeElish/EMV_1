@@ -1,10 +1,1052 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  isActive  Boolean    @default(true)
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+}
+
+model Product {
+  id                  String              @id @default(cuid())
+  sku                 String              @unique
+  name                String
+  slug                String              @unique
+  description         String?
+  price               Int
+  stock               Int                 @default(0)
+  images              String[]
+  categoryId          String
+  brand               String?
+  attributes          Json?
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  newArrivalAt        DateTime            @default(now())
+  oneCNoMatch         Boolean             @default(false)
+  pendingRegistration Boolean             @default(false)
+  extraCostLines      ExtraCostLine[]
+  oneCLinks           OneCProductLink[]
+  orderItems          OrderItem[]
+  category            Category            @relation(fields: [categoryId], references: [id])
+  pricing             ProductPricing?
+  repairLines         RepairLine[]
+  searchLogs          SearchLog[]
+  offers              SupplierOffer[]
+  priceRequestLines   PriceRequestLine[]
+  supplierOrderLines  SupplierOrderLine[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([newArrivalAt])
+}
+
+model OneCIgnoredGood {
+  ref       String   @id
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model NewsletterSubscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  source         String
+  consentAt      DateTime  @default(now())
+  consentIp      String?
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  token          String    @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model NewsletterInvite {
+  email     String    @id
+  name      String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model StoragePlace {
+  warehouseRef String
+  itemRef      String
+  place        String
+  updatedAt    DateTime @updatedAt
+
+  @@id([warehouseRef, itemRef])
+}
+
+model OneCProductLink {
+  ref       String   @id
+  productId String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model ProductPricing {
+  productId     String   @id
+  purchasePrice Int
+  retailPrice   Int
+  dealerPrice   Int
+  supplierId    String?
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier      Company? @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+}
+
+model SupplierOffer {
+  id                     String              @id @default(cuid())
+  productId              String
+  supplierId             String?
+  /// RUB equivalent including the configured markup for foreign-currency offers.
+  price                  Int
+  /// Supplier's quoted amount in `currency`.
+  quotedPrice            Int?
+  currency               String              @default("RUB")
+  exchangeRate           Float?              @default(1)
+  logisticsMarkupPercent Float               @default(0)
+  deliveryDays           Int?
+  quality                String?
+  warehouse              String?
+  selected               Boolean             @default(false)
+  noOffer                Boolean             @default(false)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  fileName               String?
+  fileUrl                String?
+  priceUpdatedAt         DateTime            @default(now())
+  orderItems             OrderItem[]
+  product                Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier               Company?            @relation(fields: [supplierId], references: [id])
+  supplierOrderLines     SupplierOrderLine[]
+
+  @@index([productId])
+  @@index([supplierId])
+}
+
+model SupplierOrderLine {
+  id                     String              @id @default(cuid())
+  productId              String
+  supplierId             String?
+  offerId                String?
+  /// RUB equivalent; for foreign-currency lines this includes the configured markup.
+  price                  Int
+  /// Amount payable to the supplier in `currency`.
+  quotedPrice            Int?
+  currency               String              @default("RUB")
+  exchangeRate           Float?              @default(1)
+  logisticsMarkupPercent Float               @default(0)
+  quantity               Int
+  deliveryDays           Int?
+  quality                String?
+  warehouse              String?
+  buyerOrderNumber       String?
+  forStock               Boolean             @default(false)
+  orderItemId            String?
+  createdAt              DateTime            @default(now())
+  status                 SupplierOrderStatus @default(TO_CHECK)
+  purchaseId             String?
+  receiptId              String?
+  noOffer                Boolean             @default(false)
+  offer                  SupplierOffer?      @relation(fields: [offerId], references: [id])
+  orderItem              OrderItem?          @relation(fields: [orderItemId], references: [id])
+  product                Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchase               SupplierPurchase?   @relation(fields: [purchaseId], references: [id])
+  receipt                SupplierReceipt?    @relation(fields: [receiptId], references: [id])
+  supplier               Company?            @relation(fields: [supplierId], references: [id])
+
+  @@index([productId])
+  @@index([orderItemId])
+}
+
+model PriceSettings {
+  id              Int   @id @default(1)
+  retailMarkup    Float @default(30)
+  wholesaleMarkup Float @default(20)
+  dealerMarkup    Float @default(15)
+}
+
+model Order {
+  id                 String             @id @default(cuid())
+  orderNumber        String             @unique
+  customerName       String
+  customerPhone      String
+  customerEmail      String?
+  deliveryNote       String?
+  status             OrderStatus        @default(AWAITING_PAYMENT)
+  totalAmount        Int
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deliveryDate       DateTime?
+  paid               Boolean            @default(false)
+  userId             String?
+  shippedAt          DateTime?
+  plannedPaymentDate DateTime?
+  deferred           Boolean            @default(false)
+  invoiceRef         String?
+  invoiceNumber      String?
+  invoiceDate        DateTime?
+  handover           String?
+  handoverAt         DateTime?
+  handoverNote       String?
+  termsAcceptedAt    DateTime?
+  managerId          String?
+  buyerCompanyId     String?
+  bankTransactions   BankTransaction[]
+  cashReceipts       CashReceipt[]
+  claims             Claim[]
+  extraCosts         ExtraCost[]
+  buyerCompany       Company?           @relation("OrderBuyerCompany", fields: [buyerCompanyId], references: [id])
+  manager            User?              @relation("OrderManager", fields: [managerId], references: [id])
+  user               User?              @relation(fields: [userId], references: [id])
+  documents          OrderDocument[]
+  items              OrderItem[]
+  payments           Payment[]
+  paymentRequests    PaymentRequest[]
+  priceRequests      PriceRequest[]
+  supplierPurchases  SupplierPurchase[]
+
+  @@index([status])
+  @@index([userId])
+  @@index([buyerCompanyId])
+}
+
+model Service {
+  id             String          @id @default(cuid())
+  name           String
+  code           String?         @unique
+  unit           String?
+  price          Int             @default(0)
+  description    String?
+  isActive       Boolean         @default(true)
+  oneCRef        String?         @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  extraCosts     ExtraCost[]
+  extraCostLines ExtraCostLine[]
+  repairLines    RepairLine[]
+}
+
+model ExtraCost {
+  id             String          @id @default(cuid())
+  number         String          @default("")
+  date           DateTime        @default(now())
+  orderId        String?
+  serviceId      String?
+  amount         Int
+  note           String?
+  createdAt      DateTime        @default(now())
+  fileName       String?
+  fileUrl        String?
+  kind           String          @default("Иные затраты")
+  status         String          @default("Требуется оплата")
+  supplierId     String?
+  employeeId     String?
+  employee       User?           @relation("ExtraCostEmployee", fields: [employeeId], references: [id])
+  order          Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service        Service?        @relation(fields: [serviceId], references: [id])
+  supplier       Company?        @relation("ExtraCostSupplier", fields: [supplierId], references: [id])
+  lines          ExtraCostLine[]
+  paymentRequest PaymentRequest?
+
+  @@index([orderId])
+  @@index([supplierId])
+  @@index([employeeId])
+}
+
+/// *
+///  * Табличная часть of a cost: «Товары» (catalogue products) or «Услуги» (services of 1С).
+model ExtraCostLine {
+  id          String    @id @default(cuid())
+  extraCostId String
+  kind        String
+  productId   String?
+  serviceId   String?
+  name        String
+  quantity    Float
+  price       Int
+  sum         Int
+  extraCost   ExtraCost @relation(fields: [extraCostId], references: [id], onDelete: Cascade)
+  product     Product?  @relation(fields: [productId], references: [id])
+  service     Service?  @relation(fields: [serviceId], references: [id])
+
+  @@index([extraCostId])
+}
+
+model OrderDocument {
+  id         String                @id @default(cuid())
+  orderId    String
+  category   OrderDocumentCategory
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime              @default(now())
+  order      Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, category])
+}
+
+model OrderItem {
+  id                     String              @id @default(cuid())
+  orderId                String
+  productId              String
+  nameSnapshot           String
+  priceSnapshot          Int
+  quantity               Int
+  cancelled              Boolean             @default(false)
+  status                 OrderStatus         @default(AWAITING_PAYMENT)
+  statusNotifyPending    Boolean             @default(false)
+  stockWrittenOff        Boolean             @default(false)
+  deferred               Boolean             @default(false)
+  deliveryConfirmPending Boolean             @default(false)
+  deliveryDate           DateTime?
+  deliveryMethod         DeliveryMethod?
+  deliveryPrevMethod     DeliveryMethod?
+  paid                   Boolean             @default(false)
+  offerId                String?
+  saleRef                String?
+  surcharge              Int                 @default(0)
+  bonus                  Int                 @default(0)
+  claims                 Claim[]
+  offer                  SupplierOffer?      @relation(fields: [offerId], references: [id])
+  order                  Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product                Product             @relation(fields: [productId], references: [id])
+  supplierOrderLines     SupplierOrderLine[]
+
+  @@index([orderId])
+  @@index([productId, status])
+  @@index([statusNotifyPending])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  status          PaymentStatus @default(PENDING)
+  confirmationUrl String?
+  rawPayload      Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  amount          Int
+  lineIds         String[]
+  operationId     String?       @unique
+  paidAt          DateTime?
+  receipts        CashReceipt[]
+  order           Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model CashReceipt {
+  id        String   @id @default(cuid())
+  orderId   String
+  paymentId String?
+  kind      String
+  lineIds   String[]
+  amount    Int
+  atolUuid  String?
+  status    String   @default("new")
+  error     String?
+  fiscal    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id])
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model CashboxSettings {
+  id              Int      @id @default(1)
+  atolLogin       String   @default("")
+  atolPasswordEnc String?
+  atolGroupCode   String   @default("")
+  sno             String   @default("osn")
+  vat             String   @default("vat22")
+  inn             String   @default("")
+  email           String   @default("")
+  paymentAddress  String   @default("https://emv.one")
+  receiptsEnabled Boolean  @default(false)
+  sbpEnabled      Boolean  @default(false)
+  bankAccountId   String?
+  customerCode    String?
+  merchantId      String?
+  updatedAt       DateTime @updatedAt
+}
+
+model User {
+  id                    String            @id @default(cuid())
+  lastName              String?
+  firstName             String?
+  patronymic            String?
+  login                 String            @unique
+  passwordHash          String
+  email                 String?           @unique
+  phone                 String?
+  role                  Role
+  companyId             String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  defaultDeliveryMethod DeliveryMethod?
+  defaultSettlement     String?
+  defaultStreet         String?
+  defaultHouse          String?
+  defaultApartment      String?
+  defaultTerminal       String?
+  mailLogin             String?
+  mailPasswordEnc       String?
+  emailVerifiedAt       DateTime?
+  emailCodeHash         String?
+  emailCodeExpiresAt    DateTime?
+  emailCodeSentAt       DateTime?
+  emailCodeAttempts     Int               @default(0)
+  mailSenderName        String?
+  mailSignature         String?
+  mailPageSize          Int               @default(30)
+  mailSignatureLogo     Bytes?
+  mailSignatureLogoType String?
+  personalDataConsentAt DateTime?
+  access                Json?
+  salaryPercent         Float?
+  position              String?
+  salary                Int?
+  bonusSettlements      BonusSettlement[]
+  managedCompanies      Company[]         @relation("CompanyManager")
+  extraCosts            ExtraCost[]       @relation("ExtraCostEmployee")
+  mailRules             MailRule[]
+  mailRuleState         MailRuleState?
+  managedOrders         Order[]           @relation("OrderManager")
+  orders                Order[]
+  PaymentRequest        PaymentRequest[]
+  payrollRows           PayrollRow[]
+  company               Company?          @relation("CompanyUsers", fields: [companyId], references: [id])
+  invitation            UserInvitation?
+
+  @@index([role])
+  @@index([companyId])
+}
+
+model UserInvitation {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model MailSettings {
+  id          Int      @id @default(1)
+  smtpHost    String
+  smtpPort    Int
+  imapHost    String
+  imapPort    Int
+  login       String
+  passwordEnc String
+  senderEmail String
+  senderName  String?
+  updatedAt   DateTime @updatedAt
+}
+
+model OneCSettings {
+  id               Int       @id @default(1)
+  baseUrl          String
+  login            String
+  passwordEnc      String
+  updatedAt        DateTime  @updatedAt
+  stockSyncedAt    DateTime?
+  stockSyncSummary String?
+}
+
+model YandexFleetSettings {
+  id        Int      @id @default(1)
+  parkId    String
+  clientId  String
+  apiKeyEnc String
+  updatedAt DateTime @updatedAt
+}
+
+model GlonassSettings {
+  id          Int      @id @default(1)
+  serverUrl   String
+  login       String
+  passwordEnc String
+  updatedAt   DateTime @updatedAt
+}
+
+model Company {
+  id                          String              @id @default(cuid())
+  name                        String
+  inn                         String?
+  ogrn                        String?
+  address                     String?
+  contract                    String?
+  type                        String?
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  managerId                   String?
+  hasContract                 Boolean             @default(false)
+  paymentType                 CompanyPaymentType  @default(PREPAYMENT)
+  paymentDeferralDays         Int?
+  kpp                         String?
+  oneCRef                     String?             @unique
+  isOwn                       Boolean             @default(false)
+  priceType                   CompanyPriceType    @default(WHOLESALE)
+  individualMarkup            Float?
+  contactEmail                String?
+  contactName                 String?
+  contactPhone                String?
+  bonusSettlements            BonusSettlement[]
+  manager                     User?               @relation("CompanyManager", fields: [managerId], references: [id])
+  documents                   CompanyDocument[]
+  extraCosts                  ExtraCost[]         @relation("ExtraCostSupplier")
+  buyerOrders                 Order[]             @relation("OrderBuyerCompany")
+  bonusCompanyPaymentRequests PaymentRequest[]    @relation("PaymentRequest_bonusCompanyIdToCompany")
+  paymentRequests             PaymentRequest[]    @relation("PaymentRequestCompany")
+  priceRequests               PriceRequest[]      @relation("PriceRequestSupplier")
+  suppliedProducts            ProductPricing[]
+  supplierOffers              SupplierOffer[]
+  supplierOrderLines          SupplierOrderLine[]
+  supplierProfile             SupplierProfile?
+  supplierPurchases           SupplierPurchase[]  @relation("SupplierPurchaseSupplier")
+  supplierReceipts            SupplierReceipt[]   @relation("SupplierReceiptSupplier")
+  users                       User[]              @relation("CompanyUsers")
+
+  @@index([managerId])
+}
+
+model CompanyDocument {
+  id         String   @id @default(cuid())
+  companyId  String
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model Vehicle {
+  id             String            @id @default(cuid())
+  brand          String
+  model          String
+  licensePlate   String            @unique
+  vin            String            @unique
+  color          String
+  year           Int
+  ptsNumber      String
+  ptsIssueDate   DateTime
+  stsNumber      String
+  stsIssueDate   DateTime
+  status         VehicleStatus     @default(FREE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  leasingMonthly Int?
+  fuelReceipts   FuelReceipt[]
+  repairs        Repair[]
+  documents      VehicleDocument[]
+
+  @@index([status])
+}
+
+model VehicleDocument {
+  id         String   @id @default(cuid())
+  vehicleId  String
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+}
+
+model FuelReceipt {
+  id            String   @id @default(cuid())
+  date          DateTime
+  driverName    String
+  vehicleId     String
+  fuelType      FuelType
+  liters        Float
+  pricePerLiter Int
+  totalAmount   Int
+  vatRate       Int?
+  stationInn    String
+  stationName   String
+  fileName      String
+  fileUrl       String
+  createdAt     DateTime @default(now())
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([date])
+  @@index([vehicleId])
+}
+
+model DriverApplication {
+  id                       String                  @id @default(cuid())
+  name                     String
+  phone                    String
+  drivingExperienceYears   Int?
+  previousDriverExperience Boolean
+  status                   DriverApplicationStatus @default(NEW)
+  createdAt                DateTime                @default(now())
+
+  @@index([status])
+}
+
+model SearchLog {
+  id          String           @id @default(cuid())
+  productId   String?
+  brand       String
+  sku         String
+  name        String?
+  inSystem    Boolean
+  totalCount  Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  product     Product?         @relation(fields: [productId], references: [id])
+  dailyCounts SearchLogDaily[]
+
+  @@unique([brand, sku])
+  @@index([productId])
+  @@index([inSystem])
+}
+
+model SearchLogDaily {
+  id          String    @id @default(cuid())
+  searchLogId String
+  date        DateTime
+  count       Int       @default(0)
+  searchLog   SearchLog @relation(fields: [searchLogId], references: [id], onDelete: Cascade)
+
+  @@unique([searchLogId, date])
+  @@index([searchLogId])
+}
+
+model BulkSearchRequest {
+  id        String   @id @default(cuid())
+  rows      Json
+  createdAt DateTime @default(now())
+}
+
+model MailRule {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  enabled        Boolean  @default(true)
+  position       Int      @default(0)
+  matchAll       Boolean  @default(true)
+  conditions     Json
+  attachments    String   @default("any")
+  moveTo         String?
+  markRead       Boolean  @default(false)
+  flag           Boolean  @default(false)
+  remove         Boolean  @default(false)
+  forwardTo      String?
+  replyText      String?
+  stopProcessing Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, position])
+}
+
+model MailRuleState {
+  userId      String   @id
+  uidValidity String
+  lastUid     Int
+  replied     Json     @default("{}")
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// *
+///  * Почта: a letter's line in the list (from, to, subject, date, attachments)
+///  * -- never changes for its uid, and Yandex is slow to give it, so it is read
+///  * once (src/lib/mail/messages.ts). Flags are always asked fresh.
+model MailSummary {
+  userId      String
+  folder      String
+  uidValidity String
+  uid         Int
+  data        Json
+  createdAt   DateTime @default(now())
+
+  @@id([userId, folder, uidValidity, uid])
+}
+
+model RoleAccess {
+  role      Role     @id
+  access    Json
+  updatedAt DateTime @updatedAt
+}
+
+model Repair {
+  id        String           @id @default(cuid())
+  date      DateTime
+  vehicleId String
+  type      RepairType
+  shop      RepairShop
+  status    RepairStatus     @default(PLANNED)
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  vehicle   Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  documents RepairDocument[]
+  lines     RepairLine[]
+
+  @@index([vehicleId])
+  @@index([date])
+}
+
+model RepairLine {
+  id        String         @id @default(cuid())
+  repairId  String
+  kind      RepairLineKind
+  productId String?
+  serviceId String?
+  name      String
+  quantity  Float
+  price     Int
+  createdAt DateTime       @default(now())
+  product   Product?       @relation(fields: [productId], references: [id])
+  repair    Repair         @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  service   Service?       @relation(fields: [serviceId], references: [id])
+
+  @@index([repairId])
+}
+
+model RepairDocument {
+  id         String   @id @default(cuid())
+  repairId   String
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+  repair     Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+
+  @@index([repairId])
+}
+
+/// *
+///  * Проценка по почте: a supplier asked for prices of an order's lines. The
+///  * reply's table becomes offers; a day without one -- a reminder; two days --
+///  * the summary to the shop's mailbox (src/lib/price-requests.ts).
+model PriceRequest {
+  id                String             @id @default(cuid())
+  orderId           String
+  supplierId        String
+  email             String
+  contactName       String?
+  items             Json
+  messageId         String?
+  sentAt            DateTime           @default(now())
+  remindedAt        DateTime?
+  answeredAt        DateTime?
+  answerNote        String?
+  summarySentAt     DateTime?
+  answerBody        String?
+  answerReviewedAt  DateTime?
+  tokenHash         String?            @unique
+  managerNotifiedAt DateTime?
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplier          Company            @relation("PriceRequestSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+  lines             PriceRequestLine[]
+
+  @@unique([orderId, supplierId])
+  @@index([orderId])
+  @@index([supplierId])
+  @@index([answeredAt])
+}
+
+model PriceRequestLine {
+  requestId String
+  productId String
+  status    PriceRequestLineStatus @default(PENDING)
+  request   PriceRequest           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  product   Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, productId])
+  @@index([productId])
+}
+
+/// *
+///  * Возврат / рекламация of a shipped order line: the customer asks in «Мои
+///  * заказы» (reason, photos), the staff decide in CRM → Рекламации; a defect
+///  * goes to the supplier as a claim (src/lib/claims.ts).
+model Claim {
+  id              String    @id @default(cuid())
+  number          Int       @unique @default(autoincrement())
+  orderId         String
+  orderItemId     String
+  userId          String?
+  quantity        Int
+  reason          String
+  description     String
+  photos          String[]
+  status          String    @default("Новая")
+  resolution      String?
+  answer          String?
+  supplierClaimAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderItemId])
+  @@index([status])
+}
+
+/// *
+///  * A bank account of the shop (Настройки → Банки): Точка by its API, others by
+///  * their statement in the 1С «Клиент-банк» format (src/lib/banks.ts).
+model BankAccount {
+  id            String            @id @default(cuid())
+  name          String
+  kind          String
+  accountNumber String
+  bik           String?
+  tokenEnc      String?
+  isActive      Boolean           @default(true)
+  lastSyncAt    DateTime?
+  lastSyncNote  String?
+  createdAt     DateTime          @default(now())
+  syncHours     String            @default("10,14,20")
+  transactions  BankTransaction[]
+}
+
+/// *
+///  * A payment of a statement; an incoming one is matched with an order and marks it paid.
+model BankTransaction {
+  id               String          @id @default(cuid())
+  bankAccountId    String
+  externalId       String
+  date             DateTime
+  incoming         Boolean
+  amount           Int
+  counterpartyName String?
+  counterpartyInn  String?
+  purpose          String?
+  documentNumber   String?
+  orderId          String?
+  matchNote        String?
+  createdAt        DateTime        @default(now())
+  bankAccount      BankAccount     @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  order            Order?          @relation(fields: [orderId], references: [id])
+  paymentRequest   PaymentRequest?
+
+  @@unique([bankAccountId, externalId])
+  @@index([date])
+  @@index([orderId])
+}
+
+/// *
+///  * Заказ поставщику: the lines of one supplier for one customer order (or
+///  * without one), sent with an Excel sheet; the supplier's invoice from the
+///  * reply makes them «Требуется оплата» (src/lib/supplier-purchases.ts).
+model SupplierPurchase {
+  id             String                 @id @default(cuid())
+  number         Int                    @unique @default(autoincrement())
+  supplierId     String
+  orderId        String?
+  email          String?
+  contactName    String?
+  messageId      String?
+  invoiceTokenHash String?               @unique
+  sentAt         DateTime?
+  invoiceAt      DateTime?
+  createdAt      DateTime               @default(now())
+  paymentRequest PaymentRequest?
+  lines          SupplierOrderLine[]
+  order          Order?                 @relation(fields: [orderId], references: [id])
+  supplier       Company                @relation("SupplierPurchaseSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+  files          SupplierPurchaseFile[]
+
+  @@index([supplierId])
+  @@index([orderId])
+}
+
+/// *
+///  * A file of a supplier order: its invoice, the payment order, others.
+model SupplierPurchaseFile {
+  id         String           @id @default(cuid())
+  purchaseId String
+  kind       String
+  fileName   String
+  fileUrl    String
+  createdAt  DateTime         @default(now())
+  purchase   SupplierPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+}
+
+/// *
+///  * Склад → Поступление: the supplier's УПД received at a warehouse -- the
+///  * «Поступление» written and posted in 1С, its lines «Поставлено»
+///  * (src/lib/supplier-receipts.ts).
+model SupplierReceipt {
+  id           String              @id @default(cuid())
+  number       Int                 @unique @default(autoincrement())
+  supplierId   String
+  warehouseRef String
+  docNumber    String
+  docDate      DateTime
+  vatRate      String
+  amount       Int
+  oneCRef      String?
+  oneCNumber   String?
+  fileName     String?
+  fileUrl      String?
+  note         String?
+  createdAt    DateTime            @default(now())
+  lines        SupplierOrderLine[]
+  supplier     Company             @relation("SupplierReceiptSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
+
+/// *
+///  * Финансы → Заявки на оплату: what the shop has to pay -- a supplier's
+///  * invoice of a supplier order, an extra cost, or one added by hand.
+///  * `amount` stays in RUB for bank reconciliation; foreign invoice amounts are
+///  * kept separately in `currencyAmount`. An outgoing payment of a statement
+///  * to the same ИНН for the same sum closes it
+///  * (src/lib/payment-requests.ts).
+model PaymentRequest {
+  id                String                 @id @default(cuid())
+  number            Int                    @unique @default(autoincrement())
+  companyId         String?
+  inn               String?
+  orderId           String?
+  purchaseId        String?                @unique
+  extraCostId       String?                @unique
+  amount            Int
+  currency          String                 @default("RUB")
+  currencyAmount    Int?
+  exchangeRate      Float?                 @default(1)
+  purpose           String?
+  status            String                 @default("Требуется оплата")
+  paidAt            DateTime?
+  bankTransactionId String?                @unique
+  createdAt         DateTime               @default(now())
+  fund              String                 @default("FREE")
+  purposeCategory   PaymentPurposeCategory @default(OTHER)
+  managerId         String?
+  bonusCompanyId    String?
+  bonusPeriodFrom   DateTime?
+  bonusPeriodTo     DateTime?
+  bonusSettlementId String?                @unique
+  bankTransaction   BankTransaction?       @relation(fields: [bankTransactionId], references: [id])
+  bonusCompany      Company?               @relation("PaymentRequest_bonusCompanyIdToCompany", fields: [bonusCompanyId], references: [id])
+  bonusSettlement   BonusSettlement?       @relation(fields: [bonusSettlementId], references: [id])
+  company           Company?               @relation("PaymentRequestCompany", fields: [companyId], references: [id])
+  extraCost         ExtraCost?             @relation(fields: [extraCostId], references: [id], onDelete: Cascade)
+  manager           User?                  @relation(fields: [managerId], references: [id])
+  order             Order?                 @relation(fields: [orderId], references: [id])
+  purchase          SupplierPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  files             PaymentRequestFile[]
+
+  @@unique([managerId, bonusCompanyId, bonusPeriodFrom, bonusPeriodTo])
+  @@index([status])
+  @@index([companyId])
+}
+
+/// *
+///  * A file of a payment request: the invoice, the payment order, others.
+model PaymentRequestFile {
+  id        String         @id @default(cuid())
+  requestId String
+  kind      String
+  fileName  String
+  fileUrl   String
+  createdAt DateTime       @default(now())
+  request   PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model PayrollRow {
+  id          String   @id @default(cuid())
+  month       String
+  userId      String
+  position    String?
+  calculation String
+  accrued     Int
+  cash        Int      @default(0)
+  output      Int?
+  manual      Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([month, userId])
+}
+
+/// *
+///  * Supplier profile: brands and categories a supplier works with. Used to
+///  * route price requests to suppliers who may not carry the exact SKU but
+///  * supply the brand or category.
+model SupplierProfile {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()"))
+  companyId              String   @unique
+  brands                 String   @default("")
+  categories             String   @default("")
+  logisticsMarkupPercent Float    @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  company                Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model TaxSettings {
+  id             Int       @id @default(1)
+  patentCost     Int       @default(0)
+  patentFrom     DateTime?
+  patentTo       DateTime?
+  insuranceFixed Int       @default(5739000)
+  updatedAt      DateTime  @updatedAt
+}
+
+model BonusSettlement {
+  id             String          @id @default(cuid())
+  managerId      String
+  companyId      String
+  periodFrom     DateTime
+  periodTo       DateTime
+  bonusOverride  Int?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  manager        User            @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  paymentRequest PaymentRequest?
+
+  @@unique([managerId, companyId, periodFrom, periodTo])
+  @@index([companyId, periodFrom, periodTo])
+}
+
+model SiteSettings {
+  id                 Int      @id @default(1)
+  manualInputEnabled Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
 }
 
 enum OrderStatus {
@@ -13,11 +1055,8 @@ enum OrderStatus {
   SHIPPED_AWAITING_PAYMENT
   CANCELLED
   DONE
-  // Something ordered is not in stock -- staff check it (Проценка).
   CHECKING
-  // In stock and paid (or on agreed deferral).
   READY_TO_SHIP
-  // Not in stock, paid (or on agreed deferral) -- waits for the supplier.
   AWAITING_SUPPLY
 }
 
@@ -40,173 +1079,6 @@ enum PaymentStatus {
   CANCELED
 }
 
-model Category {
-  id        String     @id @default(cuid())
-  name      String
-  slug      String     @unique
-  parentId  String?
-  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryTree")
-  products  Product[]
-  // Shown in the shop. Switching it also switches every product inside
-  // (and in sub-categories) -- see setCategoryActive.
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-}
-
-model Product {
-  id           String      @id @default(cuid())
-  sku          String      @unique
-  name         String
-  slug         String      @unique
-  description  String?
-  price        Int
-  stock        Int         @default(0)
-  images       String[]
-  categoryId   String
-  category     Category    @relation(fields: [categoryId], references: [id])
-  brand        String?
-  attributes   Json?
-  isActive     Boolean     @default(true)
-  orderItems   OrderItem[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  // Bumped to now() on creation and whenever stock increases -- drives the
-  // "Новое поступление" section independently of createdAt/updatedAt.
-  newArrivalAt DateTime    @default(now())
-
-  searchLogs         SearchLog[]
-  pricing            ProductPricing?
-  offers             SupplierOffer[]
-  supplierOrderLines SupplierOrderLine[]
-  repairLines        RepairLine[]
-  extraCostLines     ExtraCostLine[]
-
-  // Cards in 1С:Бухгалтерия this product stands for (1С often holds the same
-  // article on several cards).
-  oneCLinks   OneCProductLink[]
-  // Confirmed in «Сопоставление с 1С»: there is no such card in 1С yet.
-  oneCNoMatch Boolean           @default(false)
-
-  @@index([categoryId])
-  @@index([isActive])
-  @@index([newArrivalAt])
-}
-
-// One 1С card (Catalog_Номенклатура Ref_Key) -> the site product it is. The
-// first link is the card new documents for the product are written with.
-// 1С cards removed from the site on purpose (office supplies, services...):
-// the import no longer offers them as new products.
-model OneCIgnoredGood {
-  ref       String   @id
-  name      String
-  createdAt DateTime @default(now())
-}
-
-// Рассылка: who agreed to get the shop's news by e-mail. 38-ФЗ «О рекламе»
-// (ст. 18) needs the consent beforehand and the shop to prove it: when, from
-// where, from which address. Only confirmed and not unsubscribed addresses
-// are mailed.
-model NewsletterSubscriber {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  // checkout | account | form
-  source         String
-  consentAt      DateTime  @default(now())
-  consentIp      String?
-  // The address is the subscriber's: a verified account, or the link in the
-  // confirmation letter (form).
-  confirmedAt    DateTime?
-  unsubscribedAt DateTime?
-  // Secret of the confirm / unsubscribe links.
-  token          String    @unique
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-// Рассылка → Приглашения: a personal letter asking to subscribe (not an
-// advert: it asks for the consent). Addresses typed in CRM; clients of CRM
-// and 1С with an e-mail are offered too.
-model NewsletterInvite {
-  email     String    @id
-  name      String?
-  sentAt    DateTime?
-  createdAt DateTime  @default(now())
-}
-
-// Склад: where a 1С item lies on a 1С warehouse (cell, shelf), typed by
-// staff. The quantities come from 1С documents (src/lib/onec-warehouse.ts).
-model StoragePlace {
-  // Catalog_Склады Ref_Key.
-  warehouseRef String
-  // Catalog_Номенклатура Ref_Key.
-  itemRef      String
-  place        String
-  updatedAt    DateTime @updatedAt
-
-  @@id([warehouseRef, itemRef])
-}
-
-model OneCProductLink {
-  ref       String   @id
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@index([productId])
-}
-
-// Internal prices live apart from Product on purpose: storefront pages pass
-// whole Product rows to client components, so anything on Product ends up in
-// every visitor's page source. Product.price is the wholesale price -- the
-// one shown on the site.
-model ProductPricing {
-  productId     String   @id
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  purchasePrice Int
-  retailPrice   Int
-  dealerPrice   Int
-  supplierId    String?
-  supplier      Company? @relation(fields: [supplierId], references: [id])
-
-  @@index([supplierId])
-}
-
-// A supplier's offer for a product (card → «Цены»). The selected one is the
-// purchase price behind the site prices (ProductPricing mirrors it). Entered
-// with a new product; later updates come from «Проценка».
-model SupplierOffer {
-  id                 String              @id @default(cuid())
-  productId          String
-  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
-  supplierId         String?
-  supplier           Company?            @relation(fields: [supplierId], references: [id])
-  // Purchase price, kopecks.
-  price              Int
-  deliveryDays       Int?
-  quality            String?
-  selected           Boolean             @default(false)
-  // The supplier's quote / price list behind it (Проценка).
-  fileName           String?
-  fileUrl            String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  // «Дата обновления» / «Актуальность»: changes only with the price or the
-  // delivery time.
-  priceUpdatedAt     DateTime            @default(now())
-  supplierOrderLines SupplierOrderLine[]
-  orderItems         OrderItem[]
-
-  @@index([productId])
-  @@index([supplierId])
-}
-
-// CRM → «Заказ поставщику»: what has to be bought -- from «Заказать» in
-// Проценка, or a customer order line that isn't in stock.
-// Проверить / В запросе ↔ the customer line's «Проверка заказа»; Проверено ↔
-// «Требуется оплата»; Заказать / Требуется оплата / Заказано ↔ «Ожидание
-// поставки»; Поставлено ↔ «Готов к отгрузке».
 enum SupplierOrderStatus {
   TO_CHECK
   REQUESTED
@@ -217,308 +1089,10 @@ enum SupplierOrderStatus {
   DELIVERED
 }
 
-model SupplierOrderLine {
-  id           String              @id @default(cuid())
-  productId    String
-  product      Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
-  supplierId   String?
-  supplier     Company?            @relation(fields: [supplierId], references: [id])
-  offerId      String?
-  offer        SupplierOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  // Purchase price per unit, kopecks.
-  price        Int
-  quantity     Int
-  deliveryDays Int?
-  quality      String?
-  status       SupplierOrderStatus @default(TO_CHECK)
-  // The customer order line it covers, if any.
-  orderItemId  String?
-  orderItem    OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  purchaseId   String?
-  purchase     SupplierPurchase?   @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
-  // Склад → Поступление that brought it.
-  receiptId    String?
-  receipt      SupplierReceipt?    @relation(fields: [receiptId], references: [id], onDelete: SetNull)
-  createdAt    DateTime            @default(now())
-
-  @@index([productId])
-  @@index([orderItemId])
-}
-
-// Singleton (id is always 1): default markups over the purchase price,
-// in percent, applied to new and imported products.
-model PriceSettings {
-  id              Int   @id @default(1)
-  retailMarkup    Float @default(30)
-  wholesaleMarkup Float @default(20)
-  dealerMarkup    Float @default(15)
-}
-
-model Order {
-  id                 String             @id @default(cuid())
-  orderNumber        String             @unique
-  customerName       String
-  customerPhone      String
-  customerEmail      String?
-  deliveryNote       String?
-  // Derived from the lines: their common status, or the least advanced one
-  // while they differ (src/lib/order-status.ts).
-  status             OrderStatus        @default(AWAITING_PAYMENT)
-  paid               Boolean            @default(false)
-  // "Отсрочка": payment after shipment is agreed for this order. Taken from
-  // the customer company's terms at creation, editable in CRM → Заказы.
-  deferred           Boolean            @default(false)
-  deliveryDate       DateTime?
-  // Set once, automatically, the first time the order enters
-  // SHIPPED_AWAITING_PAYMENT -- distinct from deliveryDate, which staff set
-  // by hand as a planned delivery date.
-  shippedAt          DateTime?
-  // shippedAt + the customer's company paymentDeferralDays, computed at the
-  // same moment shippedAt is set, only when that company's paymentType is
-  // DEFERRED. Null for prepayment/no-company orders (plain paid/unpaid).
-  plannedPaymentDate DateTime?
-  totalAmount        Int
-  // «Счет на оплату» made from the order in 1С (src/lib/order-invoice.ts): its
-  // number comes from 1С; a new one replaces the same 1С document.
-  invoiceRef         String?
-  invoiceNumber      String?
-  invoiceDate        DateTime?
-  // Склад → Выдача: «Выдан» or «Передан в ТК» (the company and waybill
-  // number in handoverNote, the ТН among the order's documents).
-  handover           String?
-  handoverAt         DateTime?
-  handoverNote       String?
-  // A private customer ticked «Согласие с условиями поставки» at checkout.
-  termsAcceptedAt    DateTime?
-  // The employee whose sale it is (Отчёты → Зарплата): the client company's
-  // manager or whoever made it in CRM; changed in CRM → Заказы.
-  managerId          String?
-  manager            User?              @relation("OrderManager", fields: [managerId], references: [id], onDelete: SetNull)
-  userId             String?
-  user               User?              @relation(fields: [userId], references: [id])
-  buyerCompanyId     String?
-  buyerCompany       Company?            @relation("OrderBuyerCompany", fields: [buyerCompanyId], references: [id], onDelete: SetNull)
-  items              OrderItem[]
-  documents          OrderDocument[]
-  extraCosts         ExtraCost[]
-  priceRequests      PriceRequest[]
-  claims             Claim[]
-  bankTransactions   BankTransaction[]
-  supplierPurchases  SupplierPurchase[]
-  paymentRequests    PaymentRequest[]
-  payments           Payment[]
-  cashReceipts       CashReceipt[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-
-  @@index([status])
-  @@index([userId])
-  @@index([buyerCompanyId])
-}
-
-// Services (delivery, forwarding …) -- CRM → Услуги. Not sold in the shop.
-model Service {
-  id             String          @id @default(cuid())
-  name           String
-  code           String?         @unique
-  unit           String?
-  price          Int             @default(0)
-  description    String?
-  isActive       Boolean         @default(true)
-  // Catalog_Номенклатура Ref_Key of the 1С card (Услуга = true).
-  oneCRef        String?         @unique
-  extraCosts     ExtraCost[]
-  extraCostLines ExtraCostLine[]
-  repairLines    RepairLine[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-}
-
-// Additional costs of an order (delivery etc.) -- CRM → Доп.расходы. Shown
-// in CRM → Заказы as «Доп.расходы», added to «ИТОГО».
-model ExtraCost {
-  id             String          @id @default(cuid())
-  // The supplier's document (счёт, акт), as typed.
-  number         String          @default("")
-  date           DateTime        @default(now())
-  // Логистика, Иные затраты, Билеты, Проживание (EXTRA_COST_KINDS).
-  kind           String          @default("Иные затраты")
-  // Not every cost belongs to an order (tickets, a hotel).
-  orderId        String?
-  order          Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  supplierId     String?
-  supplier       Company?        @relation("ExtraCostSupplier", fields: [supplierId], references: [id])
-  serviceId      String?
-  service        Service?        @relation(fields: [serviceId], references: [id])
-  // Kopecks: the sum of the lines, or typed when there are none.
-  amount         Int
-  // Требуется оплата, Оплачено, Отменено.
-  status         String          @default("Требуется оплата")
-  fileName       String?
-  fileUrl        String?
-  note           String?
-  lines          ExtraCostLine[]
-  paymentRequest PaymentRequest?
-  // The employee it is charged to (Отчёты → Зарплата).
-  employeeId     String?
-  employee       User?           @relation("ExtraCostEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
-  createdAt      DateTime        @default(now())
-
-  @@index([orderId])
-  @@index([supplierId])
-  @@index([employeeId])
-}
-
-/**
- * Табличная часть of a cost: «Товары» (catalogue products) or «Услуги» (services of 1С).
- */
-model ExtraCostLine {
-  id          String    @id @default(cuid())
-  extraCostId String
-  extraCost   ExtraCost @relation(fields: [extraCostId], references: [id], onDelete: Cascade)
-  // GOODS or SERVICE.
-  kind        String
-  productId   String?
-  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  serviceId   String?
-  service     Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  name        String
-  quantity    Float
-  // Kopecks.
-  price       Int
-  sum         Int
-
-  @@index([extraCostId])
-}
-
-model OrderDocument {
-  id         String                @id @default(cuid())
-  orderId    String
-  order      Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  category   OrderDocumentCategory
-  fileName   String
-  fileUrl    String
-  uploadedAt DateTime              @default(now())
-
-  @@index([orderId, category])
-}
-
-model OrderItem {
-  id                     String              @id @default(cuid())
-  orderId                String
-  order                  Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId              String
-  product                Product             @relation(fields: [productId], references: [id])
-  nameSnapshot           String
-  priceSnapshot          Int
-  // Part of priceSnapshot (per unit) added by the small-order / minimum-margin
-  // rules for lines «Под заказ» (src/lib/order-surcharge.ts).
-  surcharge              Int                 @default(0)
-  quantity               Int
-  cancelled              Boolean             @default(false)
-  // Each line moves through the statuses on its own; cancelled mirrors
-  // status == CANCELLED.
-  status                 OrderStatus         @default(AWAITING_PAYMENT)
-  // Changed while the rest of the order sits in other statuses: the customer
-  // gets one summary letter at the next 5-minute mark.
-  statusNotifyPending    Boolean             @default(false)
-  // Shipped lines have been taken off Product.stock.
-  stockWrittenOff        Boolean             @default(false)
-  // The supplier offer the customer picked in the shop (several offers).
-  offerId                String?
-  offer                  SupplierOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  supplierOrderLines     SupplierOrderLine[]
-  claims                 Claim[]
-  // Payment and planned delivery per line; Order.paid/deferred/deliveryDate
-  // are derived from these (src/lib/order-status.ts).
-  paid                   Boolean             @default(false)
-  deferred               Boolean             @default(false)
-  deliveryDate           DateTime?
-  // Delivery type chosen at checkout. Changed in CRM, it waits for the
-  // customer's confirmation: deliveryPrevMethod keeps what they had chosen,
-  // to return to if they decline.
-  deliveryMethod         DeliveryMethod?
-  deliveryPrevMethod     DeliveryMethod?
-  deliveryConfirmPending Boolean             @default(false)
-  // Склад → Выдача: the 1С «Реализация» (УПД) it was shipped by; "" --
-  // handed over there, the УПД not made yet; null -- not shipped by the site.
-  saleRef                String?
-
-  @@index([orderId])
-  @@index([productId, status])
-  @@index([statusNotifyPending])
-}
-
-// Оплата по СБП (Точка, платёжная ссылка) of the order's lines «Требуется
-// оплата» -- src/lib/sbp.ts. SUCCEEDED marks those lines paid.
-model Payment {
-  id              String        @id @default(cuid())
-  orderId         String
-  order           Order         @relation(fields: [orderId], references: [id])
-  // Точка's operationId.
-  operationId     String?       @unique
-  // Kopecks.
-  amount          Int
-  lineIds         String[]
-  status          PaymentStatus @default(PENDING)
-  // The payment link.
-  confirmationUrl String?
-  paidAt          DateTime?
-  rawPayload      Json?
-  receipts        CashReceipt[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  @@index([orderId])
-  @@index([status])
-}
-
-// A receipt of the online cash register (АТОЛ Онлайн) -- src/lib/cash-receipts.ts.
-model CashReceipt {
-  id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id])
-  paymentId String?
-  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  // PREPAYMENT -- «Предоплата 100%» when paid; FULL_PAYMENT -- «Полный
-  // расчёт» (the advance offset) when handed over.
-  kind      String
-  lineIds   String[]
-  // Kopecks.
-  amount    Int
-  // АТОЛ's uuid of the document; status new / wait / done / fail.
-  atolUuid  String?
-  status    String   @default("new")
-  error     String?
-  // The fiscal data of a done one (ФН, ФД, ФП, time).
-  fiscal    Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orderId])
-  @@index([status])
-}
-
-// Настройки → Касса и СБП (one row).
-model CashboxSettings {
-  id              Int      @id @default(1)
-  // АТОЛ Онлайн: login, password (secret-box), group code.
-  atolLogin       String   @default("")
-  atolPasswordEnc String?
-  atolGroupCode   String   @default("")
-  // Система налогообложения (osn, usn_income …) and the VAT type of goods (vat22 …).
-  sno             String   @default("osn")
-  vat             String   @default("vat22")
-  inn             String   @default("")
-  email           String   @default("")
-  paymentAddress  String   @default("https://emv.one")
-  receiptsEnabled Boolean  @default(false)
-  // СБП: the Точка account whose token takes payments; its customerCode and merchantId.
-  sbpEnabled      Boolean  @default(false)
-  bankAccountId   String?
-  customerCode    String?
-  merchantId      String?
-  updatedAt       DateTime @updatedAt
+enum PriceRequestLineStatus {
+  PENDING
+  OFFER
+  NO_OFFER
 }
 
 enum Role {
@@ -535,197 +1109,11 @@ enum Role {
   DRIVER
 }
 
-model User {
-  id                    String          @id @default(cuid())
-  lastName              String?
-  firstName             String?
-  patronymic            String?
-  login                 String          @unique
-  passwordHash          String
-  email                 String?         @unique
-  phone                 String?
-  role                  Role
-  companyId             String?
-  company               Company?        @relation("CompanyUsers", fields: [companyId], references: [id])
-  managedCompanies      Company[]       @relation("CompanyManager")
-  orders                Order[]
-  managedOrders         Order[]         @relation("OrderManager")
-  extraCosts            ExtraCost[]     @relation("ExtraCostEmployee")
-  // Отчёты → Зарплата: «К выплате» = this % of the profit of the period.
-  salaryPercent         Float?
-  // Финансы → Зарплата: «Оклад» (kopecks a month) and «Должность».
-  salary                Int?
-  position              String?
-  payrollRows           PayrollRow[]
-  // Saved from the customer's own "Настройки" card and pre-filled into new
-  // checkouts -- independent of the checkout page's own localStorage memory.
-  defaultDeliveryMethod DeliveryMethod?
-  defaultSettlement     String?
-  defaultStreet         String?
-  defaultHouse          String?
-  defaultApartment      String?
-  defaultTerminal       String?
-  // Personal mailbox for staff correspondence -- server/ports come from the
-  // site's MailSettings, only the credentials are per user. Never set for
-  // CUSTOMER accounts.
-  mailLogin             String?
-  mailPasswordEnc       String?
-  // Own preferences from Почта → Настройки.
-  mailSenderName        String?
-  mailSignature         String?
-  // Image appended to the signature, sent as an inline (cid) attachment.
-  mailSignatureLogo     Bytes?
-  mailSignatureLogoType String?
-  mailPageSize          Int             @default(30)
-  // Карточка пользователя → Доступ: { "<section key>": "edit" | "view" | "hide" }
-  // (src/lib/access.ts). A missing key takes the section's default.
-  access                Json?
-  // E-mail confirmation for self-registered customers. Null = not yet
-  // confirmed. The 6-digit code is stored only as a sha256 hash.
-  emailVerifiedAt       DateTime?
-  emailCodeHash         String?
-  emailCodeExpiresAt    DateTime?
-  emailCodeSentAt       DateTime?
-  emailCodeAttempts     Int             @default(0)
-  // «Согласие на обработку персональных данных» (152-ФЗ): ticked at
-  // registration, or in the dialog on first sign-in for accounts created by
-  // staff. Null = not given yet.
-  personalDataConsentAt DateTime?
-  mailRules             MailRule[]
-  mailRuleState         MailRuleState?
-  invitation            UserInvitation?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-
-  @@index([role])
-  @@index([companyId])
-}
-
-model UserInvitation {
-  id        String    @id @default(cuid())
-  userId    String    @unique
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([expiresAt])
-}
-
-// Singleton (id is always 1): the site's own mailbox, used to send
-// informational emails, plus the server settings every user mailbox reuses.
-model MailSettings {
-  id          Int      @id @default(1)
-  smtpHost    String
-  smtpPort    Int
-  imapHost    String
-  imapPort    Int
-  login       String
-  passwordEnc String
-  senderEmail String
-  senderName  String?
-  updatedAt   DateTime @updatedAt
-}
-
-// Singleton (id is always 1): 1С:Бухгалтерия (1С:Фреш) reached over the
-// standard OData interface with a dedicated integration user.
-model OneCSettings {
-  id               Int       @id @default(1)
-  baseUrl          String
-  login            String
-  passwordEnc      String
-  updatedAt        DateTime  @updatedAt
-  // Daily stock sync (src/lib/onec-stock.ts): when it last ran and its
-  // outcome as shown in Настройки → 1С.
-  stockSyncedAt    DateTime?
-  stockSyncSummary String?
-}
-
-// Singleton (id is always 1): Яндекс.Флот (Яндекс Про) park connection for
-// the Fleet API (fleet-api.taxi.yandex.net).
-model YandexFleetSettings {
-  id        Int      @id @default(1)
-  parkId    String
-  clientId  String
-  apiKeyEnc String
-  updatedAt DateTime @updatedAt
-}
-
-// Singleton (id is always 1): GlonassSoft monitoring account whose map is
-// shown in Таксопарк → Диспетчерская.
-model GlonassSettings {
-  id          Int      @id @default(1)
-  serverUrl   String
-  login       String
-  passwordEnc String
-  updatedAt   DateTime @updatedAt
-}
-
-model Company {
-  id                  String              @id @default(cuid())
-  name                String
-  inn                 String?
-  ogrn                String?
-  address             String?
-  contract            String?
-  type                String?
-  users               User[]              @relation("CompanyUsers")
-  buyerOrders         Order[]             @relation("OrderBuyerCompany")
-  managerId           String?
-  manager             User?               @relation("CompanyManager", fields: [managerId], references: [id])
-  // "Договор" checkbox -- the contract number field is only editable while
-  // this is checked.
-  hasContract         Boolean             @default(false)
-  paymentType         CompanyPaymentType  @default(PREPAYMENT)
-  // Only meaningful when paymentType is DEFERRED.
-  paymentDeferralDays Int?
-  // The prices its people see in the shop and get in CRM orders.
-  priceType           CompanyPriceType    @default(WHOLESALE)
-  // INDIVIDUAL only: % over the purchase price.
-  individualMarkup    Float?
-  // Who gets the price requests (Проценка по почте) and supplier orders.
-  contactName         String?
-  contactEmail        String?
-  contactPhone        String?
-  documents           CompanyDocument[]
-  suppliedProducts    ProductPricing[]
-  supplierOffers      SupplierOffer[]
-  supplierOrderLines  SupplierOrderLine[]
-  extraCosts          ExtraCost[]         @relation("ExtraCostSupplier")
-  priceRequests       PriceRequest[]      @relation("PriceRequestSupplier")
-  supplierPurchases   SupplierPurchase[]  @relation("SupplierPurchaseSupplier")
-  supplierReceipts    SupplierReceipt[]   @relation("SupplierReceiptSupplier")
-  paymentRequests     PaymentRequest[]    @relation("PaymentRequestCompany")
-  kpp                 String?
-  // Link to 1С:Бухгалтерия (Catalog_Контрагенты Ref_Key).
-  oneCRef             String?             @unique
-  // The site's own company ("EMV"): every employee belongs to it. Exactly
-  // one row has it (src/lib/own-company.ts); it can't be deleted.
-  isOwn               Boolean             @default(false)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-
-  @@index([managerId])
-}
-
-model CompanyDocument {
-  id         String   @id @default(cuid())
-  companyId  String
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fileName   String
-  fileUrl    String
-  uploadedAt DateTime @default(now())
-
-  @@index([companyId])
-}
-
 enum CompanyPaymentType {
   PREPAYMENT
   DEFERRED
 }
 
-// Розница / Опт (the shop's own prices) / Дилер, or the company's own markup.
 enum CompanyPriceType {
   RETAIL
   WHOLESALE
@@ -746,200 +1134,23 @@ enum VehicleStatus {
   DECOMMISSIONED
 }
 
-model Vehicle {
-  id             String            @id @default(cuid())
-  brand          String
-  model          String
-  licensePlate   String            @unique
-  vin            String            @unique
-  color          String
-  year           Int
-  ptsNumber      String
-  ptsIssueDate   DateTime
-  stsNumber      String
-  stsIssueDate   DateTime
-  // Status transition logic isn't defined yet -- every vehicle is created as
-  // FREE for now.
-  status         VehicleStatus     @default(FREE)
-  // Финансы → Фонды «Лизинг»: the monthly lease payment, kopecks.
-  leasingMonthly Int?
-  documents      VehicleDocument[]
-  fuelReceipts   FuelReceipt[]
-  repairs        Repair[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-
-  @@index([status])
-}
-
-model VehicleDocument {
-  id         String   @id @default(cuid())
-  vehicleId  String
-  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  fileName   String
-  fileUrl    String
-  uploadedAt DateTime @default(now())
-
-  @@index([vehicleId])
-}
-
 enum FuelType {
   AI95
   AI92
   LPG
 }
 
-// Таксопарк → Заправки: one fuel receipt (чек АЗС) of a park car.
-model FuelReceipt {
-  id            String   @id @default(cuid())
-  date          DateTime
-  driverName    String
-  vehicleId     String
-  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
-  fuelType      FuelType
-  liters        Float
-  // Kopecks; totalAmount = liters × pricePerLiter, rounded.
-  pricePerLiter Int
-  totalAmount   Int
-  // Percent; null = без НДС.
-  vatRate       Int?
-  stationInn    String
-  stationName   String
-  fileName      String
-  fileUrl       String
-  createdAt     DateTime @default(now())
-
-  @@index([date])
-  @@index([vehicleId])
-}
-
-model DriverApplication {
-  id                       String                  @id @default(cuid())
-  name                     String
-  phone                    String
-  drivingExperienceYears   Int?
-  previousDriverExperience Boolean
-  status                   DriverApplicationStatus @default(NEW)
-  createdAt                DateTime                @default(now())
-
-  @@index([status])
-}
-
-model SearchLog {
-  id          String           @id @default(cuid())
-  productId   String?
-  product     Product?         @relation(fields: [productId], references: [id])
-  brand       String
-  sku         String
-  name        String?
-  inSystem    Boolean
-  totalCount  Int              @default(0)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  dailyCounts SearchLogDaily[]
-
-  @@unique([brand, sku])
-  @@index([productId])
-  @@index([inSystem])
-}
-
-model SearchLogDaily {
-  id          String    @id @default(cuid())
-  searchLogId String
-  searchLog   SearchLog @relation(fields: [searchLogId], references: [id], onDelete: Cascade)
-  date        DateTime
-  count       Int       @default(0)
-
-  @@unique([searchLogId, date])
-  @@index([searchLogId])
-}
-
-// Short-lived handoff between the bulk-search upload action and the results
-// page -- stores only the raw input rows so stock is always re-resolved live
-// against the current product table rather than a stale snapshot.
-model BulkSearchRequest {
-  id        String   @id @default(cuid())
-  rows      Json
-  createdAt DateTime @default(now())
-}
-
-// Почта → Настройки → «Правила обработки писем» (as in Яндекс.Почта). Applied
-// by the site to new letters in the employee's Входящие (src/lib/mail/rules.ts).
-model MailRule {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name           String
-  enabled        Boolean  @default(true)
-  position       Int      @default(0)
-  // true: all conditions must match; false: any of them.
-  matchAll       Boolean  @default(true)
-  // [{ field, op, value }] -- see MailRuleCondition.
-  conditions     Json
-  // "any" | "with" | "without" (attachments)
-  attachments    String   @default("any")
-  moveTo         String?
-  markRead       Boolean  @default(false)
-  flag           Boolean  @default(false)
-  remove         Boolean  @default(false)
-  forwardTo      String?
-  replyText      String?
-  stopProcessing Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([userId, position])
-}
-
-// Where rule processing of a user's Входящие got to.
-model MailRuleState {
-  userId      String   @id
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  uidValidity String
-  lastUid     Int
-  // Auto-replies: { address: ISO time } -- one reply per sender a day.
-  replied     Json     @default("{}")
-  updatedAt   DateTime @updatedAt
-}
-
-/**
- * Почта: a letter's line in the list (from, to, subject, date, attachments)
- * -- never changes for its uid, and Yandex is slow to give it, so it is read
- * once (src/lib/mail/messages.ts). Flags are always asked fresh.
- */
-model MailSummary {
-  userId      String
-  folder      String
-  uidValidity String
-  uid         Int
-  data        Json
-  createdAt   DateTime @default(now())
-
-  @@id([userId, folder, uidValidity, uid])
-}
-
-// Настройки → Доступ: the access template of a role ({ "<section key>":
-// "edit" | "view" | "hide" }, src/lib/access.ts). Users of the role follow it
-// unless their own card sets them apart (User.access); saving the template
-// drops those personal settings.
-model RoleAccess {
-  role      Role     @id
-  access    Json
-  updatedAt DateTime @updatedAt
-}
-
-// Таксопарк → Ремонт: a repair card of a park vehicle with its works and materials.
 enum RepairType {
-  SCHEDULED_SERVICE // Плановое ТО
-  BODY // Кузовной
-  UNIT // Агрегатный
-  OPERATIONAL // Оперативный
-  TIRES // Шиномонтаж
+  SCHEDULED_SERVICE
+  BODY
+  UNIT
+  OPERATIONAL
+  TIRES
 }
 
 enum RepairShop {
-  MECHANIC // Механик (own)
-  THIRD_PARTY // Сторонний
+  MECHANIC
+  THIRD_PARTY
 }
 
 enum RepairStatus {
@@ -950,331 +1161,17 @@ enum RepairStatus {
   CANCELLED
 }
 
-model Repair {
-  id        String           @id @default(cuid())
-  date      DateTime
-  vehicleId String
-  vehicle   Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  type      RepairType
-  shop      RepairShop
-  status    RepairStatus     @default(PLANNED)
-  note      String?
-  lines     RepairLine[]
-  documents RepairDocument[]
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  @@index([vehicleId])
-  @@index([date])
-}
-
 enum RepairLineKind {
-  SERVICE // работа (CRM → Услуги)
-  PRODUCT // материал (CRM → Товары)
+  SERVICE
+  PRODUCT
 }
 
-// A work or a material of a repair. The name and price are copied when the
-// line is added; the catalogue card stays linked when it was picked from it.
-model RepairLine {
-  id        String         @id @default(cuid())
-  repairId  String
-  repair    Repair         @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  kind      RepairLineKind
-  productId String?
-  product   Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
-  serviceId String?
-  service   Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  name      String
-  quantity  Float
-  // Per unit, kopecks.
-  price     Int
-  createdAt DateTime       @default(now())
-
-  @@index([repairId])
-}
-
-model RepairDocument {
-  id         String   @id @default(cuid())
-  repairId   String
-  repair     Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  fileName   String
-  fileUrl    String
-  uploadedAt DateTime @default(now())
-
-  @@index([repairId])
-}
-
-/**
- * Проценка по почте: a supplier asked for prices of an order's lines. The
- * reply's table becomes offers; a day without one -- a reminder; two days --
- * the summary to the shop's mailbox (src/lib/price-requests.ts).
- */
-model PriceRequest {
-  id            String    @id @default(cuid())
-  orderId       String
-  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  supplierId    String
-  supplier      Company   @relation("PriceRequestSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
-  email         String
-  contactName   String?
-  // [{ productId, quantity }] asked.
-  items         Json
-  // Message-ID of the letter: the reply refers to it.
-  messageId     String?
-  sentAt        DateTime  @default(now())
-  remindedAt    DateTime?
-  answeredAt    DateTime?
-  // What the reply gave: «3 позиции загружено» or why nothing was.
-  answerNote    String?
-  // Plain-text body of a reply that needs manual review.
-  answerBody    String?
-  answerReviewedAt DateTime?
-  summarySentAt DateTime?
-
-  @@index([orderId])
-  @@index([supplierId])
-  @@index([answeredAt])
-}
-
-/**
- * Возврат / рекламация of a shipped order line: the customer asks in «Мои
- * заказы» (reason, photos), the staff decide in CRM → Рекламации; a defect
- * goes to the supplier as a claim (src/lib/claims.ts).
- */
-model Claim {
-  id              String    @id @default(cuid())
-  number          Int       @unique @default(autoincrement())
-  orderId         String
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItemId     String
-  orderItem       OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  userId          String?
-  quantity        Int
-  // Брак, Не подошло, Пересорт, Другое (CLAIM_REASONS).
-  reason          String
-  description     String
-  photos          String[]
-  // Новая, На проверке, Принята, Отклонена, Закрыта (CLAIM_STATUSES).
-  status          String    @default("Новая")
-  // Возврат денег, Зачёт в следующий заказ, Замена товара.
-  resolution      String?
-  // Seen by the customer in the letters and «Мои заказы».
-  answer          String?
-  supplierClaimAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([orderId])
-  @@index([orderItemId])
-  @@index([status])
-}
-
-/**
- * A bank account of the shop (Настройки → Банки): Точка by its API, others by
- * their statement in the 1С «Клиент-банк» format (src/lib/banks.ts).
- */
-model BankAccount {
-  id            String            @id @default(cuid())
-  name          String
-  // TOCHKA_API or STATEMENT_FILE.
-  kind          String
-  accountNumber String
-  bik           String?
-  // Точка: the JWT of «Интеграции и API», encrypted (secret-box).
-  tokenEnc      String?
-  isActive      Boolean           @default(true)
-  // Точка: Moscow hours of the automatic statement, «10,14,20».
-  syncHours     String            @default("10,14,20")
-  lastSyncAt    DateTime?
-  lastSyncNote  String?
-  transactions  BankTransaction[]
-  createdAt     DateTime          @default(now())
-}
-
-/**
- * A payment of a statement; an incoming one is matched with an order and marks it paid.
- */
-model BankTransaction {
-  id               String          @id @default(cuid())
-  bankAccountId    String
-  bankAccount      BankAccount     @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
-  // The bank's transaction id, or date|number|amount|ИНН for a statement file.
-  externalId       String
-  date             DateTime
-  incoming         Boolean
-  // Kopecks.
-  amount           Int
-  counterpartyName String?
-  counterpartyInn  String?
-  purpose          String?
-  documentNumber   String?
-  orderId          String?
-  order            Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  // How it was matched, or why not.
-  matchNote        String?
-  // An outgoing one: the payment request it closed.
-  paymentRequest   PaymentRequest?
-  createdAt        DateTime        @default(now())
-
-  @@unique([bankAccountId, externalId])
-  @@index([date])
-  @@index([orderId])
-}
-
-/**
- * Заказ поставщику: the lines of one supplier for one customer order (or
- * without one), sent with an Excel sheet; the supplier's invoice from the
- * reply makes them «Требуется оплата» (src/lib/supplier-purchases.ts).
- */
-model SupplierPurchase {
-  id             String                 @id @default(cuid())
-  number         Int                    @unique @default(autoincrement())
-  supplierId     String
-  supplier       Company                @relation("SupplierPurchaseSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
-  orderId        String?
-  order          Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  email          String?
-  contactName    String?
-  messageId      String?
-  sentAt         DateTime?
-  invoiceAt      DateTime?
-  lines          SupplierOrderLine[]
-  files          SupplierPurchaseFile[]
-  paymentRequest PaymentRequest?
-  createdAt      DateTime               @default(now())
-
-  @@index([supplierId])
-  @@index([orderId])
-}
-
-/**
- * A file of a supplier order: its invoice, the payment order, others.
- */
-model SupplierPurchaseFile {
-  id         String           @id @default(cuid())
-  purchaseId String
-  purchase   SupplierPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  // INVOICE, PAYMENT or OTHER.
-  kind       String
-  fileName   String
-  fileUrl    String
-  createdAt  DateTime         @default(now())
-
-  @@index([purchaseId])
-}
-
-/**
- * Склад → Поступление: the supplier's УПД received at a warehouse -- the
- * «Поступление» written and posted in 1С, its lines «Поставлено»
- * (src/lib/supplier-receipts.ts).
- */
-model SupplierReceipt {
-  id           String              @id @default(cuid())
-  number       Int                 @unique @default(autoincrement())
-  supplierId   String
-  supplier     Company             @relation("SupplierReceiptSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
-  // Catalog_Склады Ref_Key.
-  warehouseRef String
-  // The supplier's УПД.
-  docNumber    String
-  docDate      DateTime
-  vatRate      String
-  // Kopecks.
-  amount       Int
-  oneCRef      String?
-  oneCNumber   String?
-  fileName     String?
-  fileUrl      String?
-  note         String?
-  lines        SupplierOrderLine[]
-  createdAt    DateTime            @default(now())
-
-  @@index([supplierId])
-}
-
-/**
- * Финансы → Заявки на оплату: what the shop has to pay -- a supplier's
- * invoice of a supplier order, an extra cost, or one added by hand. An
- * outgoing payment of a statement to the same ИНН for the same sum closes it
- * (src/lib/payment-requests.ts).
- */
-model PaymentRequest {
-  id                String               @id @default(cuid())
-  number            Int                  @unique @default(autoincrement())
-  companyId         String?
-  company           Company?             @relation("PaymentRequestCompany", fields: [companyId], references: [id], onDelete: SetNull)
-  // The payee's ИНН as typed, when there is no company.
-  inn               String?
-  orderId           String?
-  order             Order?               @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  purchaseId        String?              @unique
-  purchase          SupplierPurchase?    @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  extraCostId       String?              @unique
-  extraCost         ExtraCost?           @relation(fields: [extraCostId], references: [id], onDelete: Cascade)
-  // Kopecks.
-  amount            Int
-  purpose           String?
-  // Требуется оплата, Оплачено, Отменено.
-  status            String               @default("Требуется оплата")
-  // Финансы → Фонды: the fund it is paid from (src/lib/funds.ts FUNDS).
-  fund              String               @default("FREE")
-  paidAt            DateTime?
-  bankTransactionId String?              @unique
-  bankTransaction   BankTransaction?     @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
-  files             PaymentRequestFile[]
-  createdAt         DateTime             @default(now())
-
-  @@index([status])
-  @@index([companyId])
-}
-
-/**
- * A file of a payment request: the invoice, the payment order, others.
- */
-model PaymentRequestFile {
-  id        String         @id @default(cuid())
-  requestId String
-  request   PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  // INVOICE, PAYMENT or OTHER.
-  kind      String
-  fileName  String
-  fileUrl   String
-  createdAt DateTime       @default(now())
-
-  @@index([requestId])
-}
-
-// Финансы → Зарплата: an employee's line of a month, worked out from the rule
-// (src/lib/payroll.ts) and kept once corrected or the payslips are made.
-model PayrollRow {
-  id          String   @id @default(cuid())
-  // "2026-10".
-  month       String
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  position    String?
-  // How it was counted, as shown in «Расчет».
-  calculation String
-  // Kopecks: «Начислено» and the part paid in cash («Наличные»).
-  accrued     Int
-  cash        Int      @default(0)
-  // A driver's «выработка» of the month (his % is of it), typed in.
-  output      Int?
-  // Corrected by hand: not recounted.
-  manual      Boolean  @default(false)
-  updatedAt   DateTime @updatedAt
-
-  @@unique([month, userId])
-}
-
-// Финансы → Налоги: what the statements don't tell (one row).
-model TaxSettings {
-  id             Int       @id @default(1)
-  // Патент (такси): its cost and term.
-  patentCost     Int       @default(0)
-  patentFrom     DateTime?
-  patentTo       DateTime?
-  // Фиксированные взносы ИП of the year, kopecks.
-  insuranceFixed Int       @default(5739000)
-  updatedAt      DateTime  @updatedAt
+enum PaymentPurposeCategory {
+  GOODS
+  SERVICES
+  DELIVERY
+  RENT
+  BONUSES
+  OTHER
+  SALARY
 }

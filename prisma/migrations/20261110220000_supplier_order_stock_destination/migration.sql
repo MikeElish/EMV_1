@@ -1,0 +1,2 @@
+ALTER TABLE "SupplierOrderLine"
+ADD COLUMN "forStock" BOOLEAN NOT NULL DEFAULT false;

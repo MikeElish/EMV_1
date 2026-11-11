@@ -42,11 +42,22 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "finance.payment-requests", label: "Заявки на оплату", path: "/admin/finance/payment-requests" },
       { key: "finance.summary", label: "Сводный отчёт", path: "/admin/finance/summary" },
       { key: "finance.funds", label: "Фонды", path: "/admin/finance/funds" },
+      { key: "finance.bonuses", label: "Бонусы", path: "/admin/finance/bonuses" },
       { key: "finance.payroll", label: "Зарплата", path: "/admin/finance/payroll" },
       { key: "finance.taxes", label: "Налоги", path: "/admin/finance/taxes" },
     ],
   },
-  { label: "Склад", path: "/admin/warehouse", sections: [{ key: "warehouse", label: "Склад", path: "/admin/warehouse" }] },
+  {
+    label: "Склад",
+    path: "/admin/warehouse",
+    sections: [
+      { key: "warehouse.stock", label: "Остатки", path: "/admin/warehouse" },
+      { key: "warehouse.receipts", label: "Поступление", path: "/admin/warehouse/receipts" },
+      { key: "warehouse.handover", label: "Выдача", path: "/admin/warehouse/handover" },
+      { key: "warehouse.adjustments", label: "Списание/Оприходование", path: "/admin/warehouse/adjustments" },
+      { key: "warehouse.replenishment", label: "Пополнение остатков", path: "/admin/warehouse/replenishment" },
+    ],
+  },
   {
     label: "Таксопарк",
     path: "/admin/taxi-fleet",
@@ -105,6 +116,12 @@ const isLevel = (v: unknown): v is AccessLevel => v === "edit" || v === "view" |
 
 /** Отчёты was one section before its tabs: what was set for it holds for each tab. */
 function legacy(own: Record<string, unknown>, byRole: Record<string, unknown>, key: string): unknown {
+  if (key.startsWith("warehouse.")) {
+    return isLevel(own.warehouse) ? own.warehouse : byRole.warehouse;
+  }
+  if (key === "finance.bonuses") {
+    return isLevel(own["finance.payroll"]) ? own["finance.payroll"] : byRole["finance.payroll"];
+  }
   if (!key.startsWith("reports.")) return undefined;
   return isLevel(own.reports) ? own.reports : byRole.reports;
 }

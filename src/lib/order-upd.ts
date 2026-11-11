@@ -7,6 +7,7 @@ import { dateText, noteAddress } from "@/lib/order-invoice";
 import { renderUpdPdf } from "@/lib/upd-pdf";
 import { uploadOrderDocumentFile } from "@/lib/order-document-storage";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
+import { expandLineBonus } from "@/lib/order-pricing";
 
 // The УПД of what an order shipped from Склад → Выдача: the Реализация and
 // its Счет-фактура in 1С, the PDF into the order's «УПД». Each line is
@@ -40,14 +41,27 @@ export async function issueOrderUpd(orderId: string): Promise<{ number: string; 
   if (!company) throw new Error(`Покупатель «${order.customerName}» не найден среди компаний — УПД оформляется компании`);
   const contractNumber = company.hasContract && company.contract ? company.contract.replace(/^№\s*/, "").trim() : null;
 
+  const saleLines = items.flatMap((item) =>
+    expandLineBonus({
+      product: item.product,
+      sku: item.product.sku,
+      name: item.nameSnapshot,
+      quantity: item.quantity,
+      price: item.priceSnapshot,
+      bonus: item.bonus,
+    })
+  );
   const sale = await createOneCSale({
     buyer: await counterpartyRef(company),
     contractNumber,
     invoiceRef: order.invoiceRef,
-    lines: items.map((i) => ({ product: i.product, quantity: i.quantity, price: i.priceSnapshot })),
+    lines: saleLines.map((line) => ({ product: line.product, quantity: line.quantity, price: line.price })),
     comment: `Заказ ${order.orderNumber} с сайта emv.one`,
   });
-  await prisma.orderItem.updateMany({ where: { id: { in: items.map((i) => i.id) } }, data: { saleRef: sale.saleRef } });
+  await prisma.orderItem.updateMany({
+    where: { id: { in: items.map((i) => i.id) } },
+    data: { saleRef: sale.saleRef, deliveryDate: sale.date },
+  });
 
   const terminal = order.deliveryNote?.match(/Терминал: ([^\n]+)/)?.[1]?.trim();
   const address = company.address ?? "";
@@ -67,7 +81,7 @@ export async function issueOrderUpd(orderId: string): Promise<{ number: string; 
         : `Заказ № ${order.orderNumber}`,
     transport: order.handover === "Передан в ТК" ? (order.handoverNote ?? "") : "",
     vatRate: sale.vatRate,
-    lines: items.map((i, n) => ({ sku: i.product.sku, name: i.nameSnapshot, quantity: i.quantity, price: i.priceSnapshot, vat: sale.lineVat[n] })),
+    lines: saleLines.map((line, n) => ({ sku: line.sku, name: line.name, quantity: line.quantity, price: line.price, vat: sale.lineVat[n] })),
   });
   const fileName = `УПД № ${sale.number} от ${ruDate(sale.date)}.pdf`;
   const fileUrl = await uploadOrderDocumentFile(orderId, "UPD", pdf, fileName);

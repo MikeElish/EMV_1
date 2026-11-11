@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getSuppliers } from "@/lib/price-settings";
+import { getMyAccess } from "@/lib/access-server";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { PriceCheckBoard } from "@/components/admin/PriceCheckBoard";
 
@@ -7,7 +8,7 @@ import { PriceCheckBoard } from "@/components/admin/PriceCheckBoard";
 // the right.
 export default async function CrmPriceCheckPage({ searchParams }: PageProps<"/admin/crm/price-check">) {
   const { product } = await searchParams;
-  const [products, updated, checking, suppliers] = await Promise.all([
+  const [products, updated, checking, suppliers, me] = await Promise.all([
     prisma.product.findMany({
       select: { id: true, brand: true, name: true, sku: true, category: { select: { name: true } } },
       orderBy: { name: "asc" },
@@ -15,6 +16,7 @@ export default async function CrmPriceCheckPage({ searchParams }: PageProps<"/ad
     prisma.supplierOffer.groupBy({ by: ["productId"], _max: { priceUpdatedAt: true } }),
     prisma.orderItem.groupBy({ by: ["productId"], where: { status: "CHECKING" }, _count: true }),
     getSuppliers(),
+    getMyAccess(),
   ]);
   const updatedOf = new Map(updated.map((u) => [u.productId, u._max.priceUpdatedAt]));
   const checkingOf = new Map(checking.map((c) => [c.productId, c._count]));
@@ -32,6 +34,7 @@ export default async function CrmPriceCheckPage({ searchParams }: PageProps<"/ad
           checking: checkingOf.get(p.id) ?? 0,
         }))}
         suppliers={suppliers}
+        canSetConversion={me?.role === "OWNER"}
         initialProductId={typeof product === "string" ? product : undefined}
       />
     </CrmPage>

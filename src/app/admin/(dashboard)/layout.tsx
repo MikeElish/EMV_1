@@ -9,6 +9,7 @@ import { resolveAccess } from "@/lib/access";
 import { AccessProvider, ViewOnlyBanner } from "@/components/admin/AccessContext";
 import { AdminLocation, AdminMobileMenu } from "@/components/admin/AdminMobileMenu";
 import { RememberAdminPlace } from "@/components/admin/AdminPlaces";
+import { PersistentAdminPages } from "@/components/admin/PersistentAdminPages";
 import { Suspense } from "react";
 
 export default async function AdminDashboardLayout({
@@ -67,7 +68,7 @@ export default async function AdminDashboardLayout({
               <RememberAdminPlace />
             </Suspense>
             <ViewOnlyBanner />
-            {children}
+            <PersistentAdminPages>{children}</PersistentAdminPages>
           </AccessProvider>
         </main>
       </div>

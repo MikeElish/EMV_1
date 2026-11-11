@@ -14,6 +14,7 @@ import { lookupCompanyByInn, type ActionResult } from "@/actions/crm/companies";
 import type { Party } from "@/lib/dadata";
 import type { Role } from "@prisma/client";
 import { CompanyDocumentsModal } from "@/components/admin/CompanyDocumentsModal";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type Manager = { id: string; lastName: string | null; firstName: string | null; login: string; role: Role };
 
@@ -36,6 +37,7 @@ export function CompanyForm({
   const [hasContract, setHasContract] = useState(initial?.hasContract ?? false);
   const [paymentType, setPaymentType] = useState(initial?.paymentType ?? "PREPAYMENT");
   const [priceType, setPriceType] = useState(initial?.priceType ?? "WHOLESALE");
+  const [managerId, setManagerId] = useState(initial?.managerId ?? "");
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [requisites, setRequisites] = useState({
     name: initial?.name ?? "",
@@ -286,18 +288,16 @@ export function CompanyForm({
           <label htmlFor="paymentType" className="text-sm text-foreground/60">
             Вид оплаты
           </label>
-          <select
+          <SearchSelect
             id="paymentType"
             value={paymentType}
-            onChange={(e) => setPaymentType(e.target.value as CompanyInput["paymentType"])}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          >
-            {COMPANY_PAYMENT_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {COMPANY_PAYMENT_TYPE_LABELS[value]}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setPaymentType(value as CompanyInput["paymentType"])}
+            options={COMPANY_PAYMENT_TYPES.map((value) => ({
+              value,
+              label: COMPANY_PAYMENT_TYPE_LABELS[value],
+            }))}
+            className="mt-1"
+          />
         </div>
         {paymentType === "DEFERRED" && (
           <div>
@@ -322,18 +322,16 @@ export function CompanyForm({
           <label htmlFor="priceType" className="text-sm text-foreground/60">
             Тип цен
           </label>
-          <select
+          <SearchSelect
             id="priceType"
             value={priceType}
-            onChange={(e) => setPriceType(e.target.value as CompanyInput["priceType"])}
-            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-          >
-            {COMPANY_PRICE_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {COMPANY_PRICE_TYPE_LABELS[value]}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setPriceType(value as CompanyInput["priceType"])}
+            options={COMPANY_PRICE_TYPES.map((value) => ({
+              value,
+              label: COMPANY_PRICE_TYPE_LABELS[value],
+            }))}
+            className="mt-1"
+          />
         </div>
         {priceType === "INDIVIDUAL" && (
           <div>
@@ -360,22 +358,18 @@ export function CompanyForm({
         <label htmlFor="managerId" className="text-sm text-foreground/60">
           Закреплённый менеджер
         </label>
-        <select
+        <SearchSelect
           id="managerId"
           name="managerId"
-          defaultValue={initial?.managerId ?? ""}
-          className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-        >
-          <option value="">— не назначен —</option>
-          {managers.map((m) => {
-            const fullName = [m.lastName, m.firstName].filter(Boolean).join(" ") || m.login;
-            return (
-              <option key={m.id} value={m.id}>
-                {fullName} — {ROLE_LABELS[m.role]}
-              </option>
-            );
-          })}
-        </select>
+          value={managerId}
+          onChange={setManagerId}
+          emptyLabel="— не назначен —"
+          options={managers.map((manager) => ({
+            value: manager.id,
+            label: `${[manager.lastName, manager.firstName].filter(Boolean).join(" ") || manager.login} — ${ROLE_LABELS[manager.role]}`,
+          }))}
+          className="mt-1"
+        />
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

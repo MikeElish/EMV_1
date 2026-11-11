@@ -1,6 +1,6 @@
 "use client";
 
-import { CrmPage, CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -11,6 +11,7 @@ import { DeleteButton } from "@/components/admin/DeleteButton";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CompanyBalanceTab, type CompanyOrderRow } from "@/components/admin/CompanyBalanceTab";
+import { SupplierProfileTab } from "@/components/admin/SupplierProfileTab";
 import { formatRub } from "@/lib/money";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 
@@ -18,26 +19,31 @@ type Manager = { id: string; lastName: string | null; firstName: string | null; 
 
 export type CompanyBalance = { balance: number; orders: CompanyOrderRow[] };
 
-type Tab = "info" | "balance";
+type Tab = "info" | "balance" | "profile";
 
 const TAB_LABELS: Record<Tab, string> = {
   info: "Основная информация",
   balance: "Баланс",
+  profile: "Профиль",
 };
 
 export function CompaniesTable({
   companies,
   managers,
   balances,
+  canEditSupplierMarkup,
 }: {
   companies: Company[];
   managers: Manager[];
   balances: Record<string, CompanyBalance>;
+  canEditSupplierMarkup: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Company | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("info");
   const [search, setSearch] = useRememberedState("search", "");
+  const isSupplier = selected?.type?.toLowerCase().includes("поставщик") ?? false;
+  const visibleTabs = (Object.keys(TAB_LABELS) as Tab[]).filter((tab) => tab !== "profile" || isSupplier);
 
   function openCompany(company: Company, tab: Tab = "info") {
     setSelected(company);
@@ -141,7 +147,7 @@ export function CompaniesTable({
           <h2 className="text-xl font-bold">Компания: {selected.name}</h2>
 
           <div className="mt-4 flex gap-4 border-b border-foreground/10">
-            {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -156,6 +162,18 @@ export function CompaniesTable({
               </button>
             ))}
           </div>
+
+          {/* Show "Профиль" tab only for suppliers */}
+          {isSupplier && activeTab === "profile" && (
+            <div className="mt-4">
+              <SupplierProfileTab
+                key={selected.id}
+                companyId={selected.id}
+                companyName={selected.name}
+                canEditMarkup={canEditSupplierMarkup}
+              />
+            </div>
+          )}
 
           {activeTab === "info" ? (
             <>
@@ -196,9 +214,9 @@ export function CompaniesTable({
                 />
               </div>
             </>
-          ) : (
+          ) : activeTab === "balance" ? (
             <CompanyBalanceTab orders={balances[selected.id]?.orders ?? []} />
-          )}
+          ) : null}
         </Modal>
       )}
     </>

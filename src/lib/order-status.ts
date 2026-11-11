@@ -7,6 +7,8 @@ import {
 } from "@/lib/validators/orders";
 import { noticeLineStatusChanges } from "@/lib/order-notifications";
 import { supplierStatusFor } from "@/lib/validators/supplier-orders";
+import { priceWithSupplierLogistics } from "@/lib/supplier-pricing";
+import { parseSupplierCurrency } from "@/lib/supplier-currency";
 
 // Order lines carry their own status; the order's status is derived from
 // them. Every status change goes through setLineStatuses so stock, totals,
@@ -39,9 +41,8 @@ export async function freeStock(db: Db, productIds: string[]): Promise<Map<strin
 }
 
 /**
- * Statuses for the lines of a new order: not enough free stock -> Проверка
- * заказа; in stock -> Готов к отгрузке when paid or on deferral, else
- * Требуется оплата.
+ * Statuses for the lines of a new order: not enough free stock -> В работе;
+ * in stock -> Готов к отгрузке when paid or on deferral, else Требуется оплата.
  */
 export async function initialLineStatuses(
   lines: { productId: string; quantity: number }[],
@@ -50,7 +51,11 @@ export async function initialLineStatuses(
   const left = await freeStock(prisma, lines.map((l) => l.productId));
   return lines.map((line) => {
     const free = left.get(line.productId) ?? 0;
-    if (free < line.quantity) return "CHECKING";
+    if (free < line.quantity) {
+      const available = Math.max(0, free);
+      left.set(line.productId, available - Math.min(available, line.quantity));
+      return "IN_PROGRESS";
+    }
     if (!canShip) return "AWAITING_PAYMENT";
     left.set(line.productId, free - line.quantity);
     return "READY_TO_SHIP";
@@ -61,6 +66,7 @@ type SummaryLine = {
   status: OrderStatus;
   priceSnapshot: number;
   quantity: number;
+  bonus: number;
   paid: boolean;
   deferred: boolean;
   deliveryDate: Date | null;
@@ -77,7 +83,7 @@ function orderSummary(lines: SummaryLine[]) {
   const dates = active.map((l) => l.deliveryDate?.getTime()).filter((t): t is number => t !== undefined);
   return {
     status: aggregateOrderStatus(lines.map((l) => l.status)),
-    totalAmount: active.reduce((sum, l) => sum + l.priceSnapshot * l.quantity, 0),
+    totalAmount: active.reduce((sum, l) => sum + l.priceSnapshot * l.quantity + l.bonus, 0),
     paid: active.length > 0 && unpaid.length === 0,
     deferred: unpaid.length > 0 && unpaid.every((l) => l.deferred),
     deliveryDate: dates.length ? new Date(Math.max(...dates)) : null,
@@ -112,30 +118,59 @@ export async function targetLines(itemId: string, scope: "item" | "order") {
  * Заказ поставщику: the missing quantity, from the offer the customer picked
  * (or the product's selected one).
  */
-export async function orderMissingFromSuppliers(orderId: string) {
+export async function orderMissingFromSuppliers(orderId: string, productIds?: string[]) {
   const lines = await prisma.orderItem.findMany({
-    where: { orderId, status: "CHECKING" },
-    select: { id: true, productId: true, quantity: true, offerId: true },
+    where: {
+      orderId,
+      status: { in: ["CHECKING", "IN_PROGRESS"] },
+      product: { pendingRegistration: false },
+      ...(productIds ? { productId: { in: productIds } } : {}),
+    },
+    select: { id: true, productId: true, quantity: true, offerId: true, status: true },
   });
   if (!lines.length) return;
   const left = await freeStock(prisma, lines.map((l) => l.productId));
+  for (const line of lines) {
+    if (line.status === "IN_PROGRESS") {
+      left.set(line.productId, (left.get(line.productId) ?? 0) + line.quantity);
+    }
+  }
   for (const line of lines) {
     const free = Math.max(0, left.get(line.productId) ?? 0);
     const missing = line.quantity - Math.min(free, line.quantity);
     left.set(line.productId, free - (line.quantity - missing));
     if (missing <= 0) continue;
-    const offer = line.offerId
-      ? await prisma.supplierOffer.findUnique({ where: { id: line.offerId } })
-      : await prisma.supplierOffer.findFirst({ where: { productId: line.productId, selected: true } });
+    const supplier = { supplier: { select: { supplierProfile: { select: { logisticsMarkupPercent: true } } } } };
+    const directOffer = line.offerId
+      ? await prisma.supplierOffer.findFirst({
+          where: { id: line.offerId, productId: line.productId, noOffer: false, price: { gt: 0 } },
+          include: supplier,
+        })
+      : null;
+    const offer =
+      directOffer ??
+      (await prisma.supplierOffer.findFirst({
+        where: { productId: line.productId, noOffer: false, price: { gt: 0 } },
+        orderBy: [{ selected: "desc" }, { priceUpdatedAt: "desc" }],
+        include: supplier,
+      }));
+    const quotedPrice = offer?.quotedPrice ?? offer?.price ?? 0;
+    const currency = parseSupplierCurrency(offer?.currency) ?? "RUB";
+    const logisticsMarkup = offer?.supplier?.supplierProfile?.logisticsMarkupPercent ?? 0;
     await prisma.supplierOrderLine.create({
       data: {
         productId: line.productId,
         supplierId: offer?.supplierId ?? null,
         offerId: offer?.id ?? null,
-        price: offer?.price ?? 0,
+        price: currency === "RUB" ? priceWithSupplierLogistics(offer?.price ?? 0, logisticsMarkup) : offer?.price ?? 0,
+        quotedPrice,
+        currency,
+        exchangeRate: offer?.exchangeRate ?? 1,
+        logisticsMarkupPercent: offer?.logisticsMarkupPercent ?? 0,
         quantity: missing,
         deliveryDays: offer?.deliveryDays ?? null,
         quality: offer?.quality ?? null,
+        warehouse: offer?.warehouse ?? null,
         orderItemId: line.id,
       },
     });

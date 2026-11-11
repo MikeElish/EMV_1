@@ -112,7 +112,7 @@ export type ProductMatching = {
 export async function computeProductMatching(goods: OneCGood[]): Promise<ProductMatching> {
   const [products, links, ignored] = await Promise.all([
     prisma.product.findMany({
-      select: { id: true, sku: true, name: true, brand: true, oneCNoMatch: true },
+      select: { id: true, sku: true, name: true, brand: true, oneCNoMatch: true, pendingRegistration: true },
       orderBy: { sku: "asc" },
     }),
     prisma.oneCProductLink.findMany({ select: { ref: true, productId: true } }),
@@ -142,6 +142,11 @@ export async function computeProductMatching(goods: OneCGood[]): Promise<Product
   const claimed = new Set<string>();
   for (const p of products) {
     if (linkedProducts.has(p.id)) continue;
+    if (p.pendingRegistration) {
+      result.siteOnly++;
+      (bySku.get(matchKey(p.sku)) ?? []).forEach((good) => claimed.add(good.ref));
+      continue;
+    }
     if (p.oneCNoMatch) {
       result.siteOnly++;
       continue;

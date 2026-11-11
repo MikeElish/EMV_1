@@ -11,6 +11,7 @@ import { PaymentStatusBadge } from "@/components/shop/PaymentStatusBadge";
 import { SuggestField } from "@/components/SuggestField";
 import { DeliveryConfirmCell } from "@/components/shop/DeliveryConfirmCell";
 import { DELIVERY_METHOD_LABELS } from "@/lib/delivery";
+import { formatOrderLineUnitPrice, orderLineTotal } from "@/lib/order-pricing";
 import type { Order, OrderItem } from "@prisma/client";
 
 // Payment is per line; the planned payment date belongs to the order.
@@ -45,6 +46,8 @@ type Row = {
   item: OrderItem & { product: { sku: string } | null; claims: LineClaim[] };
 };
 
+const FINISHED_STATUSES = new Set(["DONE", "CANCELLED"]);
+
 const COLUMNS: {
   key: string;
   label: string;
@@ -58,7 +61,7 @@ const COLUMNS: {
   {
     key: "total",
     label: "Всего",
-    accessor: (r) => formatRub(r.item.priceSnapshot * r.item.quantity),
+    accessor: (r) => formatRub(orderLineTotal(r.item)),
   },
   {
     key: "status",
@@ -92,10 +95,14 @@ export function CustomerOrdersTable({
   const [filters, setFilters] = useState<Record<string, string>>(
     initialOrderNumber ? { orderNumber: initialOrderNumber } : {}
   );
+  const [unfinishedOnly, setUnfinishedOnly] = useState(false);
 
   const rows: Row[] = useMemo(
-    () => orders.flatMap((order) => order.items.map((item) => ({ order, item }))),
-    [orders]
+    () =>
+      orders
+        .filter((order) => !unfinishedOnly || order.items.some((item) => !FINISHED_STATUSES.has(item.status)))
+        .flatMap((order) => order.items.map((item) => ({ order, item }))),
+    [orders, unfinishedOnly]
   );
 
   const columnOptions = useMemo(() => {
@@ -134,6 +141,10 @@ export function CustomerOrdersTable({
 
   return (
     <>
+    <label className="mb-4 flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+      <input type="checkbox" checked={unfinishedOnly} onChange={(event) => setUnfinishedOnly(event.target.checked)} />
+      Не завершённые заказы
+    </label>
     <div className="space-y-4 sm:hidden">
       <input
         type="search"
@@ -170,8 +181,8 @@ export function CustomerOrdersTable({
                   />
                 </div>
                 <p className="text-foreground/70">
-                  {item.quantity} × {formatRub(item.priceSnapshot)} ={" "}
-                  <span className="font-medium text-foreground">{formatRub(item.priceSnapshot * item.quantity)}</span>
+                  {item.quantity} × {item.bonus > 0 ? formatOrderLineUnitPrice(item) : formatRub(item.priceSnapshot)} ={" "}
+                  <span className="font-medium text-foreground">{formatRub(orderLineTotal(item))}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <OrderStatusBadge status={item.status} />
@@ -235,8 +246,8 @@ export function CustomerOrdersTable({
               </td>
               <td className="py-2 pr-4">{item.product?.sku ?? "—"}</td>
               <td className="py-2 pr-4">{item.quantity}</td>
-              <td className="py-2 pr-4">{formatRub(item.priceSnapshot)}</td>
-              <td className="py-2 pr-4">{formatRub(item.priceSnapshot * item.quantity)}</td>
+              <td className="py-2 pr-4">{item.bonus > 0 ? formatOrderLineUnitPrice(item) : formatRub(item.priceSnapshot)}</td>
+              <td className="py-2 pr-4">{formatRub(orderLineTotal(item))}</td>
               <td className="py-2 pr-4">
                 <OrderStatusBadge status={item.status} />
               </td>

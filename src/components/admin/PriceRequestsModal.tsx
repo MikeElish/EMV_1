@@ -5,21 +5,15 @@ import { Modal } from "@/components/Modal";
 import {
   applyPriceReplyReview,
   listPriceRequests,
-  requestPricesForOrder,
   type PriceRequestView,
 } from "@/actions/admin/price-check";
 
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
-/**
- * Проценка → «Запросы КП»: letters to suppliers about orders' lines in
- * «Проверка заказа» -- sent by themselves with a new order, or here by its number.
- */
+/** History and review of supplier quote requests. */
 export function PriceRequestsModal({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<PriceRequestView[] | null>(null);
-  const [orderNumber, setOrderNumber] = useState("");
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [reviewResult, setReviewResult] = useState<{ id: string; ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -30,15 +24,6 @@ export function PriceRequestsModal({ onClose }: { onClose: () => void }) {
       cancelled = true;
     };
   }, []);
-
-  function send() {
-    setResult(null);
-    startTransition(async () => {
-      const r = await requestPricesForOrder(orderNumber);
-      setResult(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
-      setRows(await listPriceRequests());
-    });
-  }
 
   function review(event: FormEvent<HTMLFormElement>, request: PriceRequestView) {
     event.preventDefault();
@@ -62,31 +47,11 @@ export function PriceRequestsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-5xl">
-      <h2 className="text-lg font-semibold">Запросы КП по почте</h2>
+      <h2 className="text-lg font-semibold">История запросов КП</h2>
       <p className="mt-1 text-sm text-foreground/60">
-        Позиции «Проверка заказа» уходят поставщикам из карточек товаров (на e-mail контактного лица компании) сами при новом
-        заказе. Ответ с таблицей вносится в проценку; без ответа через сутки — повторный запрос, через двое — сводка на emv@emv.one.
+        Запросы отправляются вручную из вкладки «Заказ поставщику». Здесь отображаются отправленные запросы и ответы.
       </p>
-      <div className="mt-4 flex items-center gap-2">
-        <input
-          value={orderNumber}
-          onChange={(e) => setOrderNumber(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && orderNumber.trim() && send()}
-          placeholder="Номер заказа, напр. 281026/1"
-          className="w-60 rounded-md border border-foreground/20 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-foreground/50"
-        />
-        <button
-          type="button"
-          onClick={send}
-          disabled={pending || !orderNumber.trim()}
-          className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background disabled:opacity-50"
-        >
-          {pending ? "Отправляем..." : "Запросить КП"}
-        </button>
-      </div>
-      {result && <p className={`mt-2 text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>{result.text}</p>}
-
-      <div className="mt-4 max-h-[55vh] overflow-auto">
+      <div className="mt-4 max-h-[65vh] overflow-auto">
         {rows === null ? (
           <p className="text-sm text-foreground/50">Загрузка...</p>
         ) : rows.length === 0 ? (
@@ -127,6 +92,23 @@ export function PriceRequestsModal({ onClose }: { onClose: () => void }) {
                       <span className="text-amber-700 dark:text-amber-400">{r.summarySentAt ? "КП не получено" : "Ждём ответ"}</span>
                     )}
                     {r.answerNote && <div className="text-xs text-foreground/50">{r.answerNote}</div>}
+                    <div className="mt-1 space-y-0.5">
+                      {r.requestedLines.map((line) => (
+                        <div
+                          key={line.productId}
+                          className={`text-xs ${
+                            line.status === "NO_OFFER"
+                              ? "text-red-700 dark:text-red-400"
+                              : line.status === "OFFER"
+                                ? "text-green-700 dark:text-green-500"
+                                : "text-foreground/50"
+                          }`}
+                          title={line.name}
+                        >
+                          {line.sku} — {line.status === "NO_OFFER" ? "Нет предложения" : line.status === "OFFER" ? "Предложение получено" : "Ожидаем ответ"}
+                        </div>
+                      ))}
+                    </div>
                     {r.answerBody && (
                       <details className="mt-2 max-w-xl">
                         <summary className="cursor-pointer text-xs underline underline-offset-2">

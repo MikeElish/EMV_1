@@ -7,6 +7,7 @@ import { deleteOrderDocumentFile, uploadOrderDocumentFile } from "@/lib/order-do
 import { deliveryMethodFromNote } from "@/lib/delivery";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
 import { termsText } from "@/lib/supply-terms";
+import { expandLineBonus, orderLineTotal } from "@/lib/order-pricing";
 
 // «Счет на оплату» of an order: written to 1С (its number), printed from the
 // shop's template into a PDF and put into the order's «Счета». A new one for
@@ -70,30 +71,40 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
   }
 
   const contractNumber = company.hasContract && company.contract ? company.contract.replace(/^№\s*/, "").trim() : null;
+  const invoiceLines = order.items.flatMap((item) =>
+    expandLineBonus({
+      product: item.product,
+      name: item.nameSnapshot,
+      sku: item.product.sku,
+      quantity: item.quantity,
+      price: item.priceSnapshot,
+      bonus: item.bonus,
+    })
+  );
   const saved = await saveOneCInvoice({
     ref: order.invoiceRef,
     number,
     buyer: await counterpartyRef(company),
     contractNumber,
-    lines: order.items.map((i) => ({ product: i.product, quantity: i.quantity, price: i.priceSnapshot })),
+    lines: invoiceLines.map((line) => ({ product: line.product, quantity: line.quantity, price: line.price })),
     comment: `Заказ ${order.orderNumber} с сайта emv.one`,
   });
 
   const method = deliveryMethodFromNote(order.deliveryNote) ?? "PICKUP";
   const terminal = order.deliveryNote?.match(/Терминал: ([^\n]+)/)?.[1]?.trim() ?? "";
-  const total = order.items.reduce((s, i) => s + i.priceSnapshot * i.quantity, 0);
+  const total = order.items.reduce((s, i) => s + orderLineTotal(i), 0);
   const data: InvoiceData = {
     number: saved.number,
     dateText: dateText(saved.date),
     buyer: [company.name, company.inn && `ИНН ${company.inn}`, company.kpp && `КПП ${company.kpp}`, company.address].filter(Boolean).join(",  "),
     basis: contractNumber ? `Договор: ${contractNumber}` : `Заказ № ${order.orderNumber}`,
-    lines: order.items.map((i) => ({
-      sku: i.product.sku,
-      name: i.nameSnapshot,
-      quantity: i.quantity,
+    lines: invoiceLines.map((line) => ({
+      sku: line.sku,
+      name: line.name,
+      quantity: line.quantity,
       unit: "шт",
-      price: i.priceSnapshot,
-      sum: i.priceSnapshot * i.quantity,
+      price: line.price,
+      sum: line.price * line.quantity,
     })),
     vatRate: saved.vatRate,
     vat: saved.vat,

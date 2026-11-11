@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createProduct } from "@/actions/admin/products";
-import { ProductForm } from "@/components/admin/ProductForm";
+import { NewProductForm } from "@/components/admin/NewProductForm";
 import { getMarkups, getSuppliers } from "@/lib/price-settings";
 
 export default async function NewProductPage() {
@@ -10,10 +10,5 @@ export default async function NewProductPage() {
     getMarkups(),
   ]);
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold">Новый товар</h1>
-      <ProductForm categories={categories} suppliers={suppliers} markups={markups} onSubmit={createProduct} />
-    </div>
-  );
+  return <NewProductForm categories={categories} suppliers={suppliers} markups={markups} onSubmit={createProduct} />;
 }

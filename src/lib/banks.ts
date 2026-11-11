@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/secret-box";
 import { applyPaymentTerms, refreshOrder } from "@/lib/order-status";
 import { matchOutgoing } from "@/lib/payment-requests";
+import { orderLineTotal } from "@/lib/order-pricing";
 
 // Банки: the shop's statements come in -- Точка by its Open API (on the
 // account's schedule and by «Выгрузить сейчас»), others as a 1С «Клиент-банк» file -- and an
@@ -188,8 +189,8 @@ const ACTIVE_LINE = { cancelled: false } as const;
 
 /** What the order still waits to be paid, kopecks. */
 async function unpaidOf(orderId: string) {
-  const lines = await prisma.orderItem.findMany({ where: { orderId, ...ACTIVE_LINE, paid: false }, select: { priceSnapshot: true, quantity: true } });
-  return lines.reduce((s, l) => s + l.priceSnapshot * l.quantity, 0);
+  const lines = await prisma.orderItem.findMany({ where: { orderId, ...ACTIVE_LINE, paid: false } });
+  return lines.reduce((s, l) => s + orderLineTotal(l), 0);
 }
 
 /** Matches an incoming payment; a full one marks the order's lines paid. Returns the note. */

@@ -3,6 +3,7 @@ import { getWarehouseData } from "@/lib/onec-warehouse";
 import { listAdjustments } from "@/lib/onec-stock-docs";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { AdjustmentsTable } from "@/components/admin/AdjustmentsTable";
+import { requireSection } from "@/lib/access-server";
 
 async function load() {
   try {
@@ -14,6 +15,7 @@ async function load() {
 }
 
 export default async function AdjustmentsPage() {
+  await requireSection("warehouse.adjustments", "view");
   const loaded = await load();
   if (!loaded.ok) return <p className="text-sm text-red-600">{loaded.error}</p>;
   const name = new Map(loaded.data.warehouses.map((w) => [w.ref, w.name]));

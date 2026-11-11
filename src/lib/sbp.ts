@@ -4,6 +4,7 @@ import { decryptSecret } from "@/lib/secret-box";
 import { tochkaApi } from "@/lib/banks";
 import { applyPaymentTerms, refreshOrder } from "@/lib/order-status";
 import { checkReceipts, issueReceipt } from "@/lib/cash-receipts";
+import { orderLineTotal } from "@/lib/order-pricing";
 
 // Оплата по СБП: a private customer pays the order's lines «Требуется оплата»
 // by Точка's payment link (интернет-эквайринг, SBP only). The payment is
@@ -50,7 +51,7 @@ export async function payableLines(orderId: string) {
   });
   if (!order || order.user?.company) return null;
   if (!order.items.length) return null;
-  return { lineIds: order.items.map((i) => i.id), amount: order.items.reduce((s, i) => s + i.priceSnapshot * i.quantity, 0) };
+  return { lineIds: order.items.map((i) => i.id), amount: order.items.reduce((s, i) => s + orderLineTotal(i), 0) };
 }
 
 /** Whether the shop offers СБП now. */

@@ -47,7 +47,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
 
   const [offers, mainOffer, related] = await Promise.all([
     getShopOffers([product.id]),
-    prisma.supplierOffer.findFirst({ where: { productId: product.id, selected: true }, select: { deliveryDays: true } }),
+    prisma.supplierOffer.findFirst({ where: { productId: product.id, selected: true, noOffer: false }, select: { deliveryDays: true } }),
     relatedProducts(product),
   ]);
   const intro = productIntro({ ...product, categoryName: product.category.name, deliveryDays: mainOffer?.deliveryDays ?? null });

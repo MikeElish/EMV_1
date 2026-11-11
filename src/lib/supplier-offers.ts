@@ -5,9 +5,17 @@ import { getMarkups } from "@/lib/price-settings";
 import { applyMarkup, markupOf, tierPrice, type Markups, type PriceTier } from "@/lib/pricing";
 
 type Db = Prisma.TransactionClient | typeof prisma;
+type OfferPricing = {
+  currency?: string;
+  quotedPrice?: number;
+  exchangeRate?: number | null;
+  logisticsMarkupPercent?: number;
+};
 
 /** Makes `offerId` the product's selected offer (the one behind the site prices). */
 export async function selectOffer(db: Db, productId: string, offerId: string) {
+  const offer = await db.supplierOffer.findFirst({ where: { id: offerId, productId, noOffer: false, price: { gt: 0 } } });
+  if (!offer) throw new Error("Нельзя выбрать предложение без цены");
   await db.supplierOffer.updateMany({ where: { productId, NOT: { id: offerId } }, data: { selected: false } });
   return db.supplierOffer.update({ where: { id: offerId }, data: { selected: true } });
 }
@@ -19,9 +27,15 @@ export async function selectOffer(db: Db, productId: string, offerId: string) {
 export async function recordOffer(
   db: Db,
   productId: string,
-  offer: { supplierId: string | null; price: number; deliveryDays?: number | null; quality?: string | null }
+  offer: { supplierId: string | null; price: number; deliveryDays?: number | null; quality?: string | null; warehouse?: string | null } & OfferPricing
 ) {
-  const saved = await upsertSupplierOffer(db, productId, offer);
+  const saved = await upsertSupplierOffer(db, productId, {
+    ...offer,
+    currency: offer.currency ?? "RUB",
+    quotedPrice: offer.quotedPrice ?? offer.price,
+    exchangeRate: offer.exchangeRate ?? 1,
+    logisticsMarkupPercent: offer.logisticsMarkupPercent ?? 0,
+  });
   return selectOffer(db, productId, saved.id);
 }
 
@@ -34,7 +48,8 @@ export async function recordOffer(
 export async function upsertSupplierOffer(
   db: Db,
   productId: string,
-  offer: { supplierId: string | null; price: number; deliveryDays?: number | null; quality?: string | null }
+  offer: { supplierId: string | null; price: number; deliveryDays?: number | null; quality?: string | null; warehouse?: string | null } & OfferPricing,
+  { selectIfNone = true }: { selectIfNone?: boolean } = {}
 ) {
   const existing = await db.supplierOffer.findFirst({
     where: { productId, supplierId: offer.supplierId },
@@ -42,23 +57,62 @@ export async function upsertSupplierOffer(
   });
   const deliveryDays = offer.deliveryDays === undefined ? existing?.deliveryDays ?? null : offer.deliveryDays;
   const quality = offer.quality === undefined ? existing?.quality ?? null : offer.quality;
+  const warehouse = offer.warehouse === undefined ? existing?.warehouse ?? null : offer.warehouse;
+  const currency = offer.currency ?? existing?.currency ?? "RUB";
+  const quotedPrice = offer.quotedPrice ?? offer.price;
+  const exchangeRate = offer.exchangeRate === undefined ? existing?.exchangeRate ?? 1 : offer.exchangeRate;
+  const logisticsMarkupPercent = offer.logisticsMarkupPercent ?? existing?.logisticsMarkupPercent ?? 0;
   const saved = existing
     ? await db.supplierOffer.update({
         where: { id: existing.id },
         data: {
           price: offer.price,
+          quotedPrice,
+          currency,
+          exchangeRate,
+          logisticsMarkupPercent,
+          noOffer: false,
           deliveryDays,
           quality,
-          ...(existing.price !== offer.price || existing.deliveryDays !== deliveryDays
+          warehouse,
+          ...(existing.price !== offer.price ||
+          existing.quotedPrice !== quotedPrice ||
+          existing.currency !== currency ||
+          existing.exchangeRate !== exchangeRate ||
+          existing.logisticsMarkupPercent !== logisticsMarkupPercent ||
+          existing.deliveryDays !== deliveryDays
             ? { priceUpdatedAt: new Date() }
             : {}),
         },
       })
     : await db.supplierOffer.create({
-        data: { productId, supplierId: offer.supplierId, price: offer.price, deliveryDays, quality },
+        data: {
+          productId,
+          supplierId: offer.supplierId,
+          price: offer.price,
+          quotedPrice,
+          currency,
+          exchangeRate,
+          logisticsMarkupPercent,
+          deliveryDays,
+          quality,
+          warehouse,
+          noOffer: false,
+        },
       });
-  const hasSelected = await db.supplierOffer.count({ where: { productId, selected: true } });
-  return hasSelected ? saved : selectOffer(db, productId, saved.id);
+  if (saved.price <= 0 && existing?.selected) {
+    await db.supplierOffer.update({ where: { id: saved.id }, data: { selected: false } });
+    const fallback = await db.supplierOffer.findFirst({
+      where: { productId, noOffer: false, price: { gt: 0 } },
+      orderBy: [{ priceUpdatedAt: "desc" }, { createdAt: "desc" }],
+    });
+    if (fallback) {
+      await selectOffer(db, productId, fallback.id);
+      await syncSelectedOffer(db, productId);
+    }
+  }
+  const hasSelected = await db.supplierOffer.count({ where: { productId, selected: true, price: { gt: 0 } } });
+  return hasSelected || !selectIfNone || saved.price <= 0 ? saved : selectOffer(db, productId, saved.id);
 }
 
 /**
@@ -68,7 +122,7 @@ export async function upsertSupplierOffer(
  */
 export async function syncSelectedOffer(db: Db, productId: string) {
   const [selected, pricing, product] = await Promise.all([
-    db.supplierOffer.findFirst({ where: { productId, selected: true } }),
+    db.supplierOffer.findFirst({ where: { productId, selected: true, noOffer: false, price: { gt: 0 } } }),
     db.productPricing.findUnique({ where: { productId } }),
     db.product.findUnique({ where: { id: productId }, select: { price: true } }),
   ]);
@@ -96,6 +150,43 @@ export async function syncSelectedOffer(db: Db, productId: string) {
   });
 }
 
+/** Records a supplier's refusal and keeps site pricing on an available offer, or on request. */
+export async function markSupplierOfferNoOffer(db: Db, productId: string, supplierId: string) {
+  const existing = await db.supplierOffer.findFirst({ where: { productId, supplierId }, orderBy: { priceUpdatedAt: "desc" } });
+  if (existing) {
+    await db.supplierOffer.updateMany({
+      where: { productId, supplierId },
+      data: { noOffer: true, selected: false },
+    });
+  } else {
+    await db.supplierOffer.create({
+      data: { productId, supplierId, price: 0, noOffer: true },
+    });
+  }
+
+  const selected = await db.supplierOffer.findFirst({ where: { productId, selected: true, noOffer: false, price: { gt: 0 } } });
+  if (selected) return;
+
+  const fallback = await db.supplierOffer.findFirst({
+    where: { productId, noOffer: false, price: { gt: 0 } },
+    orderBy: [{ priceUpdatedAt: "desc" }, { createdAt: "desc" }],
+  });
+  if (fallback) {
+    await selectOffer(db, productId, fallback.id);
+    await syncSelectedOffer(db, productId);
+    return;
+  }
+
+  await db.supplierOffer.updateMany({ where: { productId }, data: { selected: false } });
+  const noPrice = { purchasePrice: 0, retailPrice: 0, dealerPrice: 0, supplierId: null };
+  await db.productPricing.upsert({
+    where: { productId },
+    create: { productId, ...noPrice },
+    update: noPrice,
+  });
+  await db.product.update({ where: { id: productId }, data: { price: 0 } });
+}
+
 import type { ShopOffer } from "@/lib/shop-offer";
 export type { ShopOffer };
 
@@ -109,7 +200,7 @@ export async function getShopOffers(productIds: string[], tier: PriceTier | null
   if (!productIds.length) return {};
   const [offers, pricing, products, defaults] = await Promise.all([
     prisma.supplierOffer.findMany({
-      where: { productId: { in: productIds } },
+      where: { productId: { in: productIds }, noOffer: false, price: { gt: 0 } },
       select: { id: true, productId: true, price: true, deliveryDays: true, quality: true, selected: true },
     }),
     prisma.productPricing.findMany({

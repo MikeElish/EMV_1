@@ -1,0 +1,5 @@
+ALTER TABLE "SupplierOffer"
+ADD COLUMN IF NOT EXISTS "noOffer" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "SupplierOrderLine"
+ADD COLUMN IF NOT EXISTS "buyerOrderNumber" TEXT;

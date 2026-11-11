@@ -1,5 +1,4 @@
 import "server-only";
-import ExcelJS from "exceljs";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import sanitizeHtml from "sanitize-html";
@@ -7,22 +6,23 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendSiteMail } from "@/lib/mailer";
 import { decryptSecret } from "@/lib/secret-box";
-import { analyzeOfferRows, sheetRows, writeOfferRows } from "@/lib/offer-import";
-import { analyzePriceReplyText, findFreeDeliveryTerm, requestedPriceProductIds } from "@/lib/price-reply-text";
+import { analyzeOfferRows, sheetRows, unpricedOfferProductIds, writeOfferRows } from "@/lib/offer-import";
+import {
+  analyzePriceReplyText,
+  findFreeDeliveryTerm,
+  noOfferPriceProductIds,
+  requestedPriceProductIds,
+} from "@/lib/price-reply-text";
 
-// Проценка по почте. Lines of an order that aren't in stock (Проверка
-// заказа) go to the suppliers known for those products -- to the contact of
-// the supplier's card, in an Excel sheet sorted by brand, the order number as
-// the subject, a copy to the shop's mailbox. Replies in either mailbox (the
-// site's and the shop's) are read, and their table becomes the supplier's
-// offers. No reply in a day -- a reminder; after two days -- the summary.
+// Supplier quote requests use a tokenized web form and are sent only after
+// an administrator confirms them. This timer only reads supplier replies and
+// updates internal price-check summaries.
 
 /** The shop's mailbox: a copy of every request and the summaries. */
 export const SHOP_MAILBOX = "emv@emv.one";
 const DAY = 24 * 60 * 60 * 1000;
+const NO_OFFER_AFTER = 2 * DAY;
 const TIMER_MS = 30 * 60 * 1000;
-
-type Item = { productId: string; quantity: number };
 
 /** Outside a request (the timer) Next has nothing to revalidate. */
 function refresh(...paths: string[]) {
@@ -35,111 +35,12 @@ function refresh(...paths: string[]) {
   }
 }
 
-const GREETING = (name: string | null) => (name ? `Добрый день, ${name}!` : "Добрый день!");
-const ASK = "Просим предоставить коммерческое предложение по запросу во вложении – заполните таблицу и направьте ответным письмом.";
-const ASK_AGAIN = "Повторно просим предоставить коммерческое предложение по запросу во вложении – заполните таблицу и направьте ответным письмом.";
 
 /**
- * The request sheet: Бренд, Наименование, Артикул, Количество, Цена, Итого,
- * Срок поставки, Качество (a list: Original / OEM / Analog), Артикул аналога --
- * the supplier fills the last five. Sorted by brand.
+ * Requests quotes only from suppliers with a recorded offer on a checking
+ * product in this order. The bearer link is stored as a hash and is disabled
+ * as soon as none of its requested order lines remains in «Проверка заказа».
  */
-export async function requestSheet(items: Item[]): Promise<Buffer> {
-  const products = await prisma.product.findMany({
-    where: { id: { in: items.map((i) => i.productId) } },
-    select: { id: true, sku: true, name: true, brand: true },
-  });
-  const byId = new Map(products.map((p) => [p.id, p]));
-  const rows = items
-    .map((i) => ({ ...byId.get(i.productId)!, quantity: i.quantity }))
-    .filter((r) => r.sku)
-    .sort((a, b) => (a.brand ?? "яяя").localeCompare(b.brand ?? "яяя", "ru") || a.name.localeCompare(b.name, "ru"));
-
-  const book = new ExcelJS.Workbook();
-  const sheet = book.addWorksheet("Запрос");
-  sheet.columns = [
-    { header: "Бренд", width: 16 },
-    { header: "Наименование", width: 42 },
-    { header: "Артикул", width: 18 },
-    { header: "Количество", width: 12 },
-    { header: "Цена", width: 12 },
-    { header: "Итого", width: 14 },
-    { header: "Срок поставки", width: 15 },
-    { header: "Качество", width: 12 },
-    { header: "Артикул аналога", width: 18 },
-  ];
-  sheet.getRow(1).font = { bold: true };
-  sheet.views = [{ state: "frozen", ySplit: 1 }];
-  rows.forEach((r, i) => {
-    const n = i + 2;
-    sheet.addRow([r.brand ?? "", r.name, r.sku, r.quantity, null, { formula: `IF(E${n}="","",D${n}*E${n})` }, null, null, null]);
-    sheet.getCell(`H${n}`).dataValidation = { type: "list", allowBlank: true, formulae: ['"Original,OEM,Analog"'] };
-  });
-  return Buffer.from(await book.xlsx.writeBuffer());
-}
-
-const sheetName = (orderNumber: string) => `Запрос ${orderNumber.replace(/\//g, "-")}.xlsx`;
-
-export type RequestsSent = { sent: string[]; noContact: string[]; noSupplier: string[]; already: string[] };
-
-/**
- * Asks the suppliers of the order's lines in «Проверка заказа» (each supplier
- * once per order). Suppliers without a contact e-mail and products without
- * a known supplier are listed back.
- */
-export async function sendPriceRequests(orderId: string): Promise<RequestsSent> {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      items: { where: { cancelled: false, status: "CHECKING" }, include: { product: { select: { sku: true } } } },
-      priceRequests: { select: { supplierId: true } },
-    },
-  });
-  const result: RequestsSent = { sent: [], noContact: [], noSupplier: [], already: [] };
-  if (!order || !order.items.length) return result;
-
-  const productIds = [...new Set(order.items.map((i) => i.productId))];
-  const [offers, pricing] = await Promise.all([
-    prisma.supplierOffer.findMany({ where: { productId: { in: productIds }, supplierId: { not: null } }, select: { productId: true, supplierId: true } }),
-    prisma.productPricing.findMany({ where: { productId: { in: productIds }, supplierId: { not: null } }, select: { productId: true, supplierId: true } }),
-  ]);
-  const quantity = new Map<string, number>();
-  for (const i of order.items) quantity.set(i.productId, (quantity.get(i.productId) ?? 0) + i.quantity);
-  const bySupplier = new Map<string, Set<string>>();
-  for (const o of [...offers, ...pricing]) bySupplier.set(o.supplierId!, (bySupplier.get(o.supplierId!) ?? new Set()).add(o.productId));
-  const covered = new Set([...bySupplier.values()].flatMap((s) => [...s]));
-  result.noSupplier = order.items.filter((i) => !covered.has(i.productId)).map((i) => i.product.sku);
-
-  const asked = new Set(order.priceRequests.map((r) => r.supplierId));
-  const suppliers = await prisma.company.findMany({ where: { id: { in: [...bySupplier.keys()] } } });
-  for (const supplier of suppliers) {
-    if (asked.has(supplier.id)) {
-      result.already.push(supplier.name);
-      continue;
-    }
-    if (!supplier.contactEmail) {
-      result.noContact.push(supplier.name);
-      continue;
-    }
-    const items: Item[] = [...bySupplier.get(supplier.id)!].map((productId) => ({ productId, quantity: quantity.get(productId)! }));
-    const messageId = await sendSiteMail({
-      to: supplier.contactEmail,
-      cc: SHOP_MAILBOX,
-      // Replies land in the shop's mailbox, which the site reads.
-      replyTo: SHOP_MAILBOX,
-      subject: order.orderNumber,
-      text: `${GREETING(supplier.contactName)}\n\n${ASK}\n\nЗаранее благодарим за ответ!`,
-      attachments: [{ filename: sheetName(order.orderNumber), content: await requestSheet(items) }],
-    });
-    await prisma.priceRequest.create({
-      data: { orderId, supplierId: supplier.id, email: supplier.contactEmail, contactName: supplier.contactName, items, messageId },
-    });
-    result.sent.push(supplier.name);
-  }
-  if (result.sent.length) refresh("/admin/crm/price-check");
-  return result;
-}
-
 // ---- Replies ------------------------------------------------------------------
 
 export type Mailbox = { host: string; port: number; user: string; pass: string };
@@ -205,6 +106,25 @@ export async function readPriceReplies(): Promise<number> {
           let note = "Ответ без таблицы — посмотрите письмо";
           let answerBody: string | null = null;
           let importedAttachment = false;
+          let replyText = "";
+          const source = await client.fetchOne(String(m.uid), { source: true }, { uid: true });
+          const rawSource = source && source.source;
+          if (typeof rawSource === "string" || Buffer.isBuffer(rawSource)) {
+            const parsed = await simpleParser(rawSource);
+            replyText = (
+              parsed.text ||
+              sanitizeHtml(parsed.html || "", { allowedTags: [], allowedAttributes: {} })
+            )
+              .trim()
+              .slice(0, 20_000);
+          }
+          const productIds = requestedPriceProductIds(request.items);
+          const products = await prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, sku: true, name: true, brand: true },
+          });
+          let offeredProductIds: string[] = [];
+          let attachmentNoOfferIds: string[] = [];
           for (const t of tables(m.bodyStructure as Part)) {
             const download = await client.download(String(m.uid), t.part, { uid: true });
             if (!download?.content) continue;
@@ -213,14 +133,22 @@ export async function readPriceReplies(): Promise<number> {
             const content = Buffer.concat(chunks);
             if (!content.length) continue;
             try {
-              const analysis = await analyzeOfferRows(sheetRows(content, t.name), request.supplierId, true);
-              if (!analysis.rows.length) continue;
-              const written = await writeOfferRows(request.supplierId, analysis.rows, false);
+              const rows = sheetRows(content, t.name);
+              const analysis = await analyzeOfferRows(rows, request.supplierId, true);
+              const unpricedIds = unpricedOfferProductIds(rows, products);
+              if (!analysis.rows.length && !unpricedIds.length) continue;
+              const written = analysis.rows.length
+                ? await writeOfferRows(request.supplierId, analysis.rows, false)
+                : { added: 0, updated: 0, skipped: 0, created: 0 };
+              offeredProductIds = analysis.rows
+                .flatMap((row) => (row.productId && row.price > 0 ? [row.productId] : []));
+              attachmentNoOfferIds = unpricedIds;
               const priced = written.added + written.updated;
               const analogs = analysis.rows.filter((r) => r.analog).map((r) => `${r.sku} → ${r.analog}`);
               note = [
                 `Цен получено: ${priced}`,
                 written.skipped && `нет в каталоге: ${analysis.rows.filter((r) => !r.productId).map((r) => r.sku).join(", ")}`,
+                unpricedIds.length && `нет предложения по артикулам: ${products.filter((p) => unpricedIds.includes(p.id)).map((p) => p.sku).join(", ")}`,
                 analogs.length && `аналоги: ${analogs.join("; ")}`,
               ]
                 .filter(Boolean)
@@ -231,34 +159,32 @@ export async function readPriceReplies(): Promise<number> {
               console.error("[price-requests] could not analyze reply attachment", t.name, error);
             }
           }
-          if (!importedAttachment) {
-            const source = await client.fetchOne(String(m.uid), { source: true }, { uid: true });
-            const rawSource = source && source.source;
-            if (typeof rawSource === "string") {
-              const parsed = await simpleParser(rawSource);
-              answerBody = (
-                parsed.text ||
-                sanitizeHtml(parsed.html || "", { allowedTags: [], allowedAttributes: {} })
-              )
-                .trim()
-                .slice(0, 20_000);
-              if (answerBody) {
-                const productIds = requestedPriceProductIds(request.items);
-                const products = await prisma.product.findMany({
-                  where: { id: { in: productIds } },
-                  select: { id: true, sku: true, name: true },
-                });
-                const candidates = analyzePriceReplyText(answerBody, products);
-                const deliveryTerm = findFreeDeliveryTerm(answerBody);
-                note = [
-                  "Ответ в теле письма — требуется проверка",
-                  candidates.length ? `найдены цены по артикулам: ${candidates.map((c) => c.sku).join(", ")}` : null,
-                  deliveryTerm,
-                ]
-                  .filter(Boolean)
-                  .join("; ");
-              }
-            }
+          if (offeredProductIds.length) {
+            await prisma.priceRequestLine.updateMany({
+              where: { requestId: request.id, productId: { in: offeredProductIds } },
+              data: { status: "OFFER" },
+            });
+          }
+          const refusedIds = [...new Set([...attachmentNoOfferIds, ...noOfferPriceProductIds(replyText, products)])]
+            .filter((productId) => !offeredProductIds.includes(productId));
+          if (refusedIds.length) {
+            await prisma.priceRequestLine.updateMany({
+              where: { requestId: request.id, productId: { in: refusedIds }, status: { not: "OFFER" } },
+              data: { status: "NO_OFFER" },
+            });
+          }
+          if (!importedAttachment && replyText) {
+            answerBody = replyText;
+            const candidates = analyzePriceReplyText(answerBody, products);
+            const deliveryTerm = findFreeDeliveryTerm(answerBody);
+            note = [
+              "Ответ в теле письма — требуется проверка",
+              candidates.length ? `найдены цены по артикулам: ${candidates.map((c) => c.sku).join(", ")}` : null,
+              refusedIds.length ? `нет предложения по артикулам: ${products.filter((p) => refusedIds.includes(p.id)).map((p) => p.sku).join(", ")}` : null,
+              deliveryTerm,
+            ]
+              .filter(Boolean)
+              .join("; ");
           }
           await prisma.priceRequest.update({
             where: { id: request.id },
@@ -287,25 +213,26 @@ export async function readPriceReplies(): Promise<number> {
 
 // ---- Reminders and the summary -------------------------------------------------
 
-export async function remindPriceRequests(): Promise<number> {
-  const due = await prisma.priceRequest.findMany({
-    where: { answeredAt: null, remindedAt: null, sentAt: { lt: new Date(Date.now() - DAY) } },
-    include: { order: { select: { orderNumber: true } } },
+/** Marks unanswered request lines as «Нет предложения» after the reminder window expires. */
+export async function markUnansweredPriceRequestsAsNoOffer(): Promise<number> {
+  const cutoff = new Date(Date.now() - NO_OFFER_AFTER);
+  const requests = await prisma.priceRequest.findMany({
+    where: { answeredAt: null, sentAt: { lt: cutoff } },
+    select: { id: true },
   });
-  for (const r of due) {
-    await sendSiteMail({
-      to: r.email,
-      cc: SHOP_MAILBOX,
-      // Replies land in the shop's mailbox, which the site reads.
-      replyTo: SHOP_MAILBOX,
-      subject: r.order.orderNumber,
-      text: `${GREETING(r.contactName)}\n\n${ASK_AGAIN}\n\nЗаранее благодарим за ответ!`,
-      attachments: [{ filename: sheetName(r.order.orderNumber), content: await requestSheet(r.items as Item[]) }],
-      ...(r.messageId ? { inReplyTo: r.messageId } : {}),
-    });
-    await prisma.priceRequest.update({ where: { id: r.id }, data: { remindedAt: new Date() } });
-  }
-  return due.length;
+  if (!requests.length) return 0;
+
+  const requestIds = requests.map((request) => request.id);
+  const updated = await prisma.priceRequestLine.updateMany({
+    where: { requestId: { in: requestIds }, status: "PENDING" },
+    data: { status: "NO_OFFER" },
+  });
+  await prisma.priceRequest.updateMany({
+    where: { id: { in: requestIds }, answeredAt: null },
+    data: { answerNote: "Ответ не получен за 48 часов; оставшиеся позиции отмечены «Нет предложения»" },
+  });
+  if (updated.count) refresh("/admin/crm/price-check");
+  return updated.count;
 }
 
 /** Two days after the requests of an order: «Проценка завершена» with who answered. */
@@ -321,9 +248,16 @@ export async function sendPriceSummaries(): Promise<number> {
       include: { supplier: { select: { name: true } }, order: { select: { orderNumber: true } } },
       orderBy: { sentAt: "asc" },
     });
-    const lines = requests.map(
-      (r) => `${r.supplier.name} — ${r.email} — ${r.answeredAt ? "КП получено" : "КП не получено"}${r.answerNote ? ` (${r.answerNote})` : ""}`
-    );
+    const requestLines = await prisma.priceRequestLine.findMany({
+      where: { requestId: { in: requests.map((request) => request.id) } },
+      include: { product: { select: { sku: true } } },
+    });
+    const lines = requests.map((r) => {
+      const noOffer = requestLines
+        .filter((line) => line.requestId === r.id && line.status === "NO_OFFER")
+        .map((line) => line.product.sku);
+      return `${r.supplier.name} — ${r.email} — ${r.answeredAt ? "КП получено" : "КП не получено"}${noOffer.length ? `; нет предложения: ${noOffer.join(", ")}` : ""}${r.answerNote ? ` (${r.answerNote})` : ""}`;
+    });
     await sendSiteMail({
       to: SHOP_MAILBOX,
       subject: `Проценка завершена — заказ ${requests[0].order.orderNumber}`,
@@ -336,13 +270,13 @@ export async function sendPriceSummaries(): Promise<number> {
 
 const timerState = globalThis as unknown as { __emvPriceRequestTimer?: NodeJS.Timeout };
 
-/** Every half hour: replies, reminders, summaries. */
+/** Every half hour: process replies and report completed requests. Quote requests are sent manually. */
 export function startPriceRequestTimer() {
   if (timerState.__emvPriceRequestTimer) return;
   timerState.__emvPriceRequestTimer = setInterval(async () => {
     for (const [name, step] of [
       ["replies", readPriceReplies],
-      ["reminders", remindPriceRequests],
+      ["no-offer", markUnansweredPriceRequestsAsNoOffer],
       ["summaries", sendPriceSummaries],
     ] as const) {
       try {

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { findCanonicalBrand } from "@/lib/normalize-brand";
 import { buildProductSlug } from "@/lib/slug";
 import { syncSelectedOffer, upsertSupplierOffer } from "@/lib/supplier-offers";
+import { MAX_MONEY_MINOR, parseSupplierCurrency, quotePriceInRub, type SupplierCurrency } from "@/lib/supplier-currency";
 
 // A supplier's price table -- Проценка → «Загрузить из Excel» and the
 // replies to the price requests by mail (src/lib/price-requests.ts) -- read,
@@ -28,6 +29,7 @@ export type OfferImportRow = {
   name: string;
   sku: string;
   price: number; // kopecks
+  currency: SupplierCurrency | null;
   deliveryDays: number | null;
   /** As the site names it («Оригинал», «Аналог (OEM)», «Аналог»); null: not given -- the offer keeps its own. */
   quality: string | null;
@@ -96,6 +98,8 @@ export async function analyzeOfferRows(raw: unknown[][], supplierId: string, ski
   const errors: { row: number; message: string }[] = [];
   const parsed: Omit<OfferImportRow, "productId" | "productName" | "kind" | "oldPrice">[] = [];
   const at = columnPositions(raw[0] ?? []);
+  const headerNames = (raw[0] ?? []).map((value) => String(value ?? "").trim().toLowerCase());
+  const currencyColumn = headerNames.findIndex((value) => value === "валюта" || value === "currency");
   raw.slice(1).forEach((cells, i) => {
     const row = i + 2;
     if (cells.every((c) => c === "" || c == null)) return;
@@ -111,12 +115,24 @@ export async function analyzeOfferRows(raw: unknown[][], supplierId: string, ski
       if (!skipUnpriced) errors.push({ row, message: `Артикул ${sku}: нет цены` });
       return;
     }
+    const priceMinor = kopecks(price);
+    if (!Number.isSafeInteger(priceMinor) || priceMinor > MAX_MONEY_MINOR) {
+      errors.push({ row, message: `Артикул ${sku}: цена слишком велика` });
+      return;
+    }
+    const currencyText = currencyColumn >= 0 ? String(cells[currencyColumn] ?? "").trim().toUpperCase() : "";
+    const currency = currencyText ? parseSupplierCurrency(currencyText) : null;
+    if (currencyText && !currency) {
+      errors.push({ row, message: `Неизвестная валюта «${currencyText}»` });
+      return;
+    }
     parsed.push({
       row,
       brand: findCanonicalBrand(brand) ?? brand,
       name,
       sku,
-      price: kopecks(price),
+      price: priceMinor,
+      currency,
       deliveryDays: parseDays(daysRaw),
       quality: parseQuality(qualityRaw),
       analog: String(analogRaw ?? "").trim() || null,
@@ -152,6 +168,45 @@ export async function analyzeOfferRows(raw: unknown[][], supplierId: string, ski
   return { rows, errors, duplicates: [...duplicates] };
 }
 
+/** Finds requested SKUs explicitly returned without a usable price. */
+export function unpricedOfferProductIds(
+  raw: unknown[][],
+  products: { id: string; sku: string; brand: string | null }[],
+): string[] {
+  if (!products.length) return [];
+  const at = columnPositions(raw[0] ?? []);
+  if (at[2] < 0) return [];
+  const bySku = new Map<string, typeof products>();
+  for (const product of products) {
+    const key = skuKey(product.sku);
+    bySku.set(key, [...(bySku.get(key) ?? []), product]);
+  }
+
+  const unpriced = new Set<string>();
+  for (const cells of raw.slice(1)) {
+    if (cells.every((cell) => cell === "" || cell == null)) continue;
+    const sku = String(cells[at[2]] ?? "").trim();
+    if (!sku) continue;
+
+    const quantity = num(at[3] < 0 ? "" : cells[at[3]]);
+    const priceValue = String(at[4] < 0 ? "" : cells[at[4]] ?? "").trim()
+      ? num(cells[at[4]])
+      : quantity > 0
+        ? num(at[5] < 0 ? "" : cells[at[5]]) / quantity
+        : num(at[5] < 0 ? "" : cells[at[5]]);
+    if (priceValue > 0) continue;
+
+    let candidates = bySku.get(skuKey(sku)) ?? [];
+    const rawBrand = String(at[0] < 0 ? "" : cells[at[0]] ?? "").trim();
+    if (candidates.length > 1 && rawBrand) {
+      const brandKey = (value: string) => (findCanonicalBrand(value) ?? value).toUpperCase();
+      candidates = candidates.filter((product) => brandKey(product.brand ?? "") === brandKey(rawBrand));
+    }
+    if (candidates.length === 1) unpriced.add(candidates[0].id);
+  }
+  return [...unpriced];
+}
+
 const NEW_FROM_PRICE_CHECK = { slug: "iz-procenki", name: "Из проценки — не распределено" };
 
 export type OfferWriteResult = { updated: number; added: number; created: number; skipped: number };
@@ -161,7 +216,13 @@ export type OfferWriteResult = { updated: number; added: number; created: number
  * with `createMissing`, unknown articles become new inactive products
  * (category «Из проценки — не распределено») with this offer.
  */
-export async function writeOfferRows(supplierId: string, rows: OfferImportRow[], createMissing: boolean): Promise<OfferWriteResult> {
+export async function writeOfferRows(
+  supplierId: string,
+  rows: OfferImportRow[],
+  createMissing: boolean,
+  pricing: { currency?: SupplierCurrency; exchangeRate?: number | null; logisticsMarkupPercent?: number } = {},
+): Promise<OfferWriteResult> {
+  const currency = pricing.currency ?? "RUB";
   let updated = 0;
   let added = 0;
   let created = 0;
@@ -199,13 +260,22 @@ export async function writeOfferRows(supplierId: string, rows: OfferImportRow[],
     } else if (r.kind === "update") updated++;
     else added++;
 
+    const rowCurrency = r.currency ?? currency;
+    const conversionConfigured = rowCurrency === currency;
+    const exchangeRate = rowCurrency === "RUB" ? 1 : conversionConfigured ? pricing.exchangeRate ?? null : null;
+    const logisticsMarkupPercent = rowCurrency === "RUB" ? 0 : conversionConfigured ? pricing.logisticsMarkupPercent ?? 70 : 70;
+    const priceRub = quotePriceInRub(r.price, rowCurrency, exchangeRate, logisticsMarkupPercent);
     await upsertSupplierOffer(prisma, productId, {
       supplierId,
-      price: r.price,
+      price: priceRub ?? 0,
+      quotedPrice: r.price,
+      currency: rowCurrency,
+      exchangeRate,
+      logisticsMarkupPercent,
       deliveryDays: r.deliveryDays,
       ...(r.quality ? { quality: String(r.quality).slice(0, 40) } : {}),
     });
-    await syncSelectedOffer(prisma, productId);
+    if (priceRub !== null) await syncSelectedOffer(prisma, productId);
   }
   return { updated, added, created, skipped };
 }

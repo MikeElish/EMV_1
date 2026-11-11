@@ -3,11 +3,19 @@
 import { useRouter } from "next/navigation";
 import { PRODUCTS_RETURN_KEY } from "@/components/admin/products-return";
 
+type Props = {
+  /** When true, a confirmation dialog is shown before leaving. */
+  hasChanges?: boolean;
+};
+
 /** Back to the page the card was opened from; the list restores its place itself. */
-export function ProductBackButton() {
+export function ProductBackButton({ hasChanges }: Props) {
   const router = useRouter();
 
   function back() {
+    if (hasChanges && !confirm("Выход без сохранения. Заполненные поля будут потеряны. Продолжить?")) {
+      return;
+    }
     let fromList = false;
     try {
       fromList = sessionStorage.getItem(PRODUCTS_RETURN_KEY) !== null;

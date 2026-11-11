@@ -2,6 +2,7 @@
 
 import { useEscape } from "@/lib/use-escape";
 import { useEffect, useId, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ThemedPortal } from "@/components/ThemedPortal";
 import { useWindowMinimization } from "@/components/WindowMinimizationProvider";
 
@@ -31,6 +32,7 @@ export function Modal({
   const [minimized, setMinimized] = useState(false);
   const id = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
   const { registerWindow, unregisterWindow } = useWindowMinimization();
 
   useEffect(() => {
@@ -59,6 +61,8 @@ export function Modal({
     registerWindow({
       id,
       title: windowTitle,
+      originPath: pathname,
+      minimized: true,
       restore: () => {
         setLayer(++latestModalLayer);
         setMinimized(false);

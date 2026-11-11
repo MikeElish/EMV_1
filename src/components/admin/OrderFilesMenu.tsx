@@ -11,7 +11,7 @@ const DOCUMENT_CATEGORIES = Object.keys(
   ORDER_DOCUMENT_CATEGORY_LABELS
 ) as OrderDocumentCategory[];
 
-export function OrderFilesMenu({ orderId }: { orderId: string }) {
+export function OrderFilesMenu({ orderId, canEdit }: { orderId: string; canEdit: boolean }) {
   const [modalCategory, setModalCategory] = useState<OrderDocumentCategory | null>(null);
 
   function handleCancel(close: () => void) {
@@ -42,13 +42,15 @@ export function OrderFilesMenu({ orderId }: { orderId: string }) {
                 {ORDER_DOCUMENT_CATEGORY_LABELS[category]}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => handleCancel(close)}
-              className="block w-full px-3 py-2 text-left text-red-600 hover:bg-foreground/5"
-            >
-              Отмена
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => handleCancel(close)}
+                className="block w-full px-3 py-2 text-left text-red-600 hover:bg-foreground/5"
+              >
+                Отмена
+              </button>
+            )}
           </>
         )}
       </DropdownMenu>
@@ -57,6 +59,7 @@ export function OrderFilesMenu({ orderId }: { orderId: string }) {
         <OrderDocumentsModal
           orderId={orderId}
           category={modalCategory}
+          canEdit={canEdit}
           onClose={() => setModalCategory(null)}
         />
       )}

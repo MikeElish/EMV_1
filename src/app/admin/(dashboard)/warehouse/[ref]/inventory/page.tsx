@@ -5,8 +5,10 @@ import { balances, getWarehouseData } from "@/lib/onec-warehouse";
 import { itemPrices } from "@/actions/admin/warehouse";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { InventorySheet } from "@/components/admin/InventorySheet";
+import { requireSection } from "@/lib/access-server";
 
 export default async function InventoryPage({ params }: PageProps<"/admin/warehouse/[ref]/inventory">) {
+  await requireSection("warehouse.stock", "view");
   const { ref } = await params;
   let data: Awaited<ReturnType<typeof getWarehouseData>>;
   try {

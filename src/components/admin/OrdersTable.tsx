@@ -12,6 +12,7 @@ import { NewOrderModal } from "@/components/admin/NewOrderModal";
 import { LinePriceCell } from "@/components/admin/LinePriceCell";
 import { AddOrderItemModal } from "@/components/admin/AddOrderItemModal";
 import { LineQuantityCell } from "@/components/admin/LineQuantityCell";
+import { LineBonusCell } from "@/components/admin/LineBonusCell";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DeliveryMethodCell } from "@/components/admin/DeliveryMethodCell";
 import { ExtraCostsButton, type ExtraCostRow } from "@/components/admin/ExtraCostsButton";
@@ -20,10 +21,12 @@ import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/clie
 import type { PaymentState } from "@/actions/admin/orders";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManagerSelect";
+import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/lib/order-pricing";
 
 type OrderLine = OrderItem & { product: { sku: string; stock: number } | null };
 
 export type OrderRow = Order & {
+  canEdit: boolean;
   items: OrderLine[];
   extraCosts: ExtraCostRow[];
   user: {
@@ -104,9 +107,6 @@ const TEXT_FILTERS: { key: keyof Filters; label: string }[] = [
   { key: "grand", label: "ИТОГО" },
 ];
 
-// «Группировать по заказам»: one read-only row per order.
-const GROUPED_KEY = "crm-orders-grouped";
-const UNFINISHED_KEY = "crm-orders-unfinished";
 /** «Не завершённые»: everything but Выполнен and Отменён (shipped and still unpaid counts as open). */
 const FINISHED: OrderStatus[] = ["DONE", "CANCELLED"];
 const GROUPED_COLUMNS = new Set<keyof Filters>([
@@ -178,6 +178,7 @@ export function OrdersTable({
   initialOrderNumber,
   canDelete = false,
   employees = [],
+  manualInputEnabled = false,
 }: {
   orders: OrderRow[];
   initialOrderNumber?: string;
@@ -185,6 +186,7 @@ export function OrdersTable({
   employees?: Employee[];
   /** Владелец: «Удалить» on every row. */
   canDelete?: boolean;
+  manualInputEnabled?: boolean;
 }) {
   const [filters, setFilters] = useRememberedState<Filters>(
     "filters",
@@ -193,39 +195,17 @@ export function OrdersTable({
   );
   const [syncedOrderNumber, setSyncedOrderNumber] = useState(initialOrderNumber);
   const [creating, setCreating] = useState(false);
-  const [grouped, setGrouped] = useState(false);
-  const [unfinished, setUnfinished] = useState(false);
-  // «Ручное редактирование» (owner): every line's price becomes a field.
-  const [manual, setManual] = useState(false);
-const [addingProduct, setAddingProduct] = useState(false);
-
-  // Remembered per browser.
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after hydration
-      if (localStorage.getItem(GROUPED_KEY) === "1") setGrouped(true);
-      if (localStorage.getItem(UNFINISHED_KEY) === "1") setUnfinished(true);
-    } catch {
-      // storage unavailable
-    }
-  }, []);
+  const [grouped, setGrouped] = useRememberedState("grouped", true);
+  const [unfinished, setUnfinished] = useRememberedState("unfinished", true);
+  const manual = canDelete && manualInputEnabled;
+  const [addingProduct, setAddingProduct] = useState(false);
 
   function toggleUnfinished(next: boolean) {
     setUnfinished(next);
-    try {
-      localStorage.setItem(UNFINISHED_KEY, next ? "1" : "0");
-    } catch {
-      // storage unavailable
-    }
   }
 
   function toggleGrouped(next: boolean) {
     setGrouped(next);
-    try {
-      localStorage.setItem(GROUPED_KEY, next ? "1" : "0");
-    } catch {
-      // storage unavailable
-    }
   }
 
   // Opening an order from the grouped list remembers that list (filters and
@@ -289,8 +269,8 @@ const [addingProduct, setAddingProduct] = useState(false);
       if (!grouped && filters.quantity && !has(String(item.quantity), filters.quantity))
         return false;
       if (filters.inStock && !has(String(item.product?.stock ?? ""), filters.inStock)) return false;
-      if (filters.price && !has(String(item.priceSnapshot / 100), filters.price)) return false;
-      if (filters.total && !has(String((grouped ? order.totalAmount : item.priceSnapshot * item.quantity) / 100), filters.total))
+      if (filters.price && !has(String(orderLineUnitPrice(item) / 100), filters.price)) return false;
+      if (filters.total && !has(String((grouped ? order.totalAmount : orderLineTotal(item)) / 100), filters.total))
         return false;
       if (filters.extra && !has(String(extra / 100), filters.extra)) return false;
       if (filters.grand && !has(String((order.totalAmount + extra) / 100), filters.grand))
@@ -373,32 +353,14 @@ const [addingProduct, setAddingProduct] = useState(false);
             Сбросить фильтры
           </button>
         )}
-        {canDelete && (
-          <>
-          <label className="ml-4 flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
-            <span>Ручное редактирование</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={manual}
-              onClick={() => setManual((m) => !m)}
-              className={`relative h-5 w-9 rounded-full transition-colors ${manual ? "bg-green-600" : "bg-foreground/20"}`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${manual ? "left-[18px]" : "left-0.5"}`}
-              />
-            </button>
-          </label>
-          {manual && (
-            <button
-              type="button"
-              onClick={() => setAddingProduct(true)}
-              className="ml-2 rounded-md border border-foreground/20 px-2 py-1 text-sm hover:bg-foreground/5"
-            >
-              + Товар в заказ
-            </button>
-          )}
-          </>
+        {manual && (
+          <button
+            type="button"
+            onClick={() => setAddingProduct(true)}
+            className="ml-2 rounded-md border border-foreground/20 px-2 py-1 text-sm hover:bg-foreground/5"
+          >
+            + Товар в заказ
+          </button>
         )}
       </div>
 
@@ -426,6 +388,7 @@ const [addingProduct, setAddingProduct] = useState(false);
                 <th className="py-2 pr-4">Доставка</th>
                 <th className="py-2 pr-4">Дата поставки</th>
                 <th className="py-2 pr-4">Оплата</th>
+                {!grouped && manual && <th className="py-2 pr-4">Бонус</th>}
                 {!grouped && <th className="py-2 pr-4">Файлы</th>}
                 {canDelete && <th className="py-2" />}
               </tr>
@@ -491,6 +454,7 @@ const [addingProduct, setAddingProduct] = useState(false);
                     ))}
                   </select>
                 </th>
+                {!grouped && manual && <th className="pb-2 pr-4" />}
                 {!grouped && <th className="pb-2 pr-4" />}
                 {canDelete && <th className="pb-2" />}
               </tr>
@@ -556,7 +520,7 @@ const [addingProduct, setAddingProduct] = useState(false);
                 {filtered.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={TEXT_FILTERS.length + 5}
+                      colSpan={TEXT_FILTERS.length + 5 + (manual ? 1 : 0)}
                       className="py-4 text-sm text-foreground/40"
                     >
                       Ничего не найдено.
@@ -577,9 +541,14 @@ const [addingProduct, setAddingProduct] = useState(false);
                         <td className="py-2 pr-4">
                           {customer}
                           {/* Once per order: its first line. */}
-                          {order.items[0]?.id === item.id && (
-                            <OrderManagerSelect orderId={order.id} managerId={order.managerId} employees={employees} />
-                          )}
+                          {order.items[0]?.id === item.id &&
+                            (canDelete ? (
+                              <OrderManagerSelect orderId={order.id} managerId={order.managerId} employees={employees} />
+                            ) : (
+                              <div className="mt-1 text-xs text-foreground/50">
+                                Менеджер: {employees.find((employee) => employee.id === order.managerId)?.name ?? "не назначен"}
+                              </div>
+                            ))}
                         </td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.nameSnapshot}</td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
@@ -595,10 +564,12 @@ const [addingProduct, setAddingProduct] = useState(false);
                           {item.product?.stock ?? "—"}
                         </td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
-                          {manual && !item.cancelled ? (
+                          {order.canEdit && manual && !item.cancelled ? (
                             <LinePriceCell itemId={item.id} current={item.priceSnapshot - item.surcharge} />
-                          ) : item.priceSnapshot <= 0 && !item.cancelled ? (
+                          ) : order.canEdit && item.priceSnapshot <= 0 && !item.cancelled ? (
                             <LinePriceCell itemId={item.id} />
+                          ) : item.bonus > 0 ? (
+                            formatOrderLineUnitPrice(item)
                           ) : (
                             formatRub(item.priceSnapshot)
                           )}
@@ -612,8 +583,7 @@ const [addingProduct, setAddingProduct] = useState(false);
                           )}
                         </td>
                         <td className={`whitespace-nowrap py-2 pr-4 ${cancelledCellClass}`}>
-                          {/* Всего = Количество × Цена */}
-                          {formatRub(item.priceSnapshot * item.quantity)}
+                          {formatRub(orderLineTotal(item))}
                         </td>
                         <td className="whitespace-nowrap py-2 pr-4">
                           <ExtraCostsButton
@@ -626,36 +596,60 @@ const [addingProduct, setAddingProduct] = useState(false);
                           {formatRub(order.totalAmount + extra)}
                         </td>
                         <td className="py-2 pr-4">
-                          <OrderStatusSelect
-                            itemId={item.id}
-                            status={item.status}
-                            activeLines={activeLines}
-                          />
+                          {order.canEdit ? (
+                            <OrderStatusSelect
+                              itemId={item.id}
+                              status={item.status}
+                              activeLines={activeLines}
+                            />
+                          ) : (
+                            ORDER_STATUS_LABELS[item.status]
+                          )}
                         </td>
                         <td className="py-2 pr-4">
-                          <DeliveryMethodCell
-                            itemId={item.id}
-                            method={item.deliveryMethod}
-                            confirmPending={item.deliveryConfirmPending}
-                            activeLines={activeLines}
-                          />
+                          {order.canEdit ? (
+                            <DeliveryMethodCell
+                              itemId={item.id}
+                              method={item.deliveryMethod}
+                              confirmPending={item.deliveryConfirmPending}
+                              activeLines={activeLines}
+                            />
+                          ) : (
+                            <>
+                              {item.deliveryMethod ? DELIVERY_METHOD_LABELS[item.deliveryMethod] : "—"}
+                              {item.deliveryConfirmPending && <div className="mt-1 text-xs text-amber-700">Ждёт подтверждения</div>}
+                            </>
+                          )}
                         </td>
                         <td className="py-2 pr-4">
-                          <DeliveryDateInput
-                            itemId={item.id}
-                            deliveryDate={item.deliveryDate}
-                            activeLines={activeLines}
-                          />
+                          {order.canEdit ? (
+                            <DeliveryDateInput
+                              itemId={item.id}
+                              deliveryDate={item.deliveryDate}
+                              activeLines={activeLines}
+                            />
+                          ) : (
+                            item.deliveryDate ? new Date(item.deliveryDate).toLocaleDateString("ru-RU") : "—"
+                          )}
                         </td>
                         <td className="py-2 pr-4">
-                          <PaidToggle
-                            itemId={item.id}
-                            state={paymentStateOf(item)}
-                            activeLines={activeLines}
-                          />
+                          {order.canEdit ? (
+                            <PaidToggle
+                              itemId={item.id}
+                              state={paymentStateOf(item)}
+                              activeLines={activeLines}
+                            />
+                          ) : (
+                            PAYMENT_STATE_LABELS[paymentStateOf(item)]
+                          )}
                         </td>
+                        {manual && (
+                          <td className="py-2 pr-4">
+                            {!item.cancelled && <LineBonusCell itemId={item.id} bonus={item.bonus} />}
+                          </td>
+                        )}
                         <td className="py-2 pr-4">
-                          <OrderFilesMenu orderId={order.id} />
+                          <OrderFilesMenu orderId={order.id} canEdit={order.canEdit} />
                         </td>
                         {canDelete && (
                           <td className="py-2">

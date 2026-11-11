@@ -188,7 +188,7 @@ export async function sendSupplierClaim(id: string): Promise<string> {
   if (!productId) throw new Error("У позиции нет товара в каталоге");
   const [pricing, offer] = await Promise.all([
     prisma.productPricing.findUnique({ where: { productId }, select: { supplier: true } }),
-    prisma.supplierOffer.findFirst({ where: { productId, selected: true, supplierId: { not: null } }, select: { supplier: true } }),
+    prisma.supplierOffer.findFirst({ where: { productId, selected: true, noOffer: false, supplierId: { not: null } }, select: { supplier: true } }),
   ]);
   const supplier = pricing?.supplier ?? offer?.supplier;
   if (!supplier) throw new Error("Неизвестно, у какого поставщика куплен товар");

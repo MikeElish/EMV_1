@@ -2,11 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { ProductsTable } from "@/components/admin/ProductsTable";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { RESERVE_STATUSES } from "@/lib/validators/orders";
+import { getMyAccess } from "@/lib/access-server";
 
 export default async function AdminProductsPage() {
-  const [products, reserved] = await Promise.all([
+  const [products, reserved, me] = await Promise.all([
     prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ pendingRegistration: "desc" }, { createdAt: "desc" }],
       include: { category: true, pricing: { include: { supplier: { select: { name: true } } } } },
     }),
     prisma.orderItem.groupBy({
@@ -14,6 +15,7 @@ export default async function AdminProductsPage() {
       where: { status: { in: RESERVE_STATUSES } },
       _sum: { quantity: true },
     }),
+    getMyAccess(),
   ]);
 
   // Incoming (supplier orders) arrives with "Заказ поставщику"; zero until then.
@@ -21,7 +23,7 @@ export default async function AdminProductsPage() {
 
   return (
     <CrmPage>
-      <ProductsTable products={products} reserve={reserve} />
+      <ProductsTable products={products} reserve={reserve} canEditPendingRegistration={me?.role === "OWNER"} />
     </CrmPage>
   );
 }

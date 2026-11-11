@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { atolReport, atolSell, type AtolItem } from "@/lib/atol";
+import { expandLineBonus, orderLineTotal } from "@/lib/order-pricing";
 
 // Чеки (54-ФЗ) of the online payments of private customers, by АТОЛ Онлайн:
 //  - PREPAYMENT, «Предоплата 100%», when an СБП payment comes (src/lib/sbp.ts);
@@ -21,7 +22,7 @@ export async function issueReceipt(orderId: string, kind: ReceiptKind, lineIds: 
   if (!settings?.receiptsEnabled) return null;
   const lines = await prisma.orderItem.findMany({ where: { id: { in: lineIds }, orderId }, orderBy: { id: "asc" } });
   if (!lines.length) return null;
-  const amount = lines.reduce((s, l) => s + l.priceSnapshot * l.quantity, 0);
+  const amount = lines.reduce((s, l) => s + orderLineTotal(l), 0);
   const receipt = await prisma.cashReceipt.create({ data: { orderId, paymentId, kind, lineIds: lines.map((l) => l.id), amount } });
   await sendReceipt(receipt.id);
   return receipt.id;
@@ -35,14 +36,21 @@ export async function sendReceipt(receiptId: string) {
   const lines = await prisma.orderItem.findMany({ where: { id: { in: receipt.lineIds } }, orderBy: { id: "asc" } });
   const prepayment = receipt.kind === "PREPAYMENT";
   const vat = prepayment ? (CALCULATED[settings.vat] ?? settings.vat) : settings.vat;
-  const items: AtolItem[] = lines.map((l) => ({
-    name: l.nameSnapshot.slice(0, 128),
-    price: rub(l.priceSnapshot),
-    quantity: l.quantity,
-    sum: rub(l.priceSnapshot * l.quantity),
-    payment_method: prepayment ? "full_prepayment" : "full_payment",
-    vat: { type: vat },
-  }));
+  const items: AtolItem[] = lines.flatMap((l) =>
+    expandLineBonus({
+      name: l.nameSnapshot.slice(0, 128),
+      price: l.priceSnapshot,
+      quantity: l.quantity,
+      bonus: l.bonus,
+    }).map((part) => ({
+      name: part.name,
+      price: rub(part.price),
+      quantity: part.quantity,
+      sum: rub(part.price * part.quantity),
+      payment_method: prepayment ? "full_prepayment" : "full_payment",
+      vat: { type: vat },
+    }))
+  );
   const total = rub(receipt.amount);
   const phone = receipt.order.customerPhone.replace(/\D/g, "").replace(/^8/, "7");
   try {

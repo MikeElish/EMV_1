@@ -65,6 +65,7 @@ export default async function EditProductPage({
           price: o.price,
           deliveryDays: o.deliveryDays,
           quality: o.quality,
+          noOffer: o.noOffer,
           selected: o.selected,
           updatedAt: o.priceUpdatedAt,
         }))}

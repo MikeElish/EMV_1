@@ -176,10 +176,12 @@ const filterInputClassName =
 export function ProductsTable({
   products,
   reserve,
+  canEditPendingRegistration,
 }: {
   products: ProductRow[];
   /** productId -> quantity reserved in customer orders. */
   reserve: Record<string, number>;
+  canEditPendingRegistration: boolean;
 }) {
   const router = useRouter();
   const [filters, setFilters] = useRememberedState<Filters>("filters", EMPTY_FILTERS);
@@ -386,7 +388,14 @@ export function ProductsTable({
                   className="cursor-pointer border-b border-foreground/10 transition-colors hover:bg-foreground/5"
                 >
                   <td className="py-2 pr-3">
-                    <div>{product.name}</div>
+                    <div className="flex items-center gap-2">
+                      {product.name}
+                      {product.pendingRegistration && (
+                        <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                          Регистрация номенклатуры
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-foreground/40">{product.sku}</div>
                   </td>
                   <td className="py-2 pr-3 text-foreground/60">{product.category.name}</td>
@@ -407,17 +416,21 @@ export function ProductsTable({
                   </td>
                   <td className="py-2 pr-2 text-right">
                     <div className="flex justify-end gap-4">
-                      <Link
-                        href={`/admin/crm/products/${product.id}/edit`}
-                        onClick={rememberPlace}
-                        className="hover:underline"
-                      >
-                        Изменить
-                      </Link>
-                      <DeleteButton
-                        action={deleteProduct.bind(null, product.id)}
-                        confirmText={`Удалить товар «${product.name}»?`}
-                      />
+                      {(!product.pendingRegistration || canEditPendingRegistration) && (
+                        <Link
+                          href={`/admin/crm/products/${product.id}/edit`}
+                          onClick={rememberPlace}
+                          className="hover:underline"
+                        >
+                          Изменить
+                        </Link>
+                      )}
+                      {(!product.pendingRegistration || canEditPendingRegistration) && (
+                        <DeleteButton
+                          action={deleteProduct.bind(null, product.id)}
+                          confirmText={`Удалить товар «${product.name}»?`}
+                        />
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -4,8 +4,10 @@ import { OneCError } from "@/lib/onec";
 import { balances, getWarehouseData } from "@/lib/onec-warehouse";
 import { CrmPage } from "@/components/admin/CrmTableFrame";
 import { WarehouseTable } from "@/components/admin/WarehouseTable";
+import { requireSection } from "@/lib/access-server";
 
 export default async function WarehousePage({ params }: PageProps<"/admin/warehouse/[ref]">) {
+  await requireSection("warehouse.stock", "view");
   const { ref } = await params;
   let data: Awaited<ReturnType<typeof getWarehouseData>>;
   try {

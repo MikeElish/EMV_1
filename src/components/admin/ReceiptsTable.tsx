@@ -130,13 +130,12 @@ function ReceiptCard({ warehouses, onClose, onDone }: { warehouses: { ref: strin
             </div>
             <div>
               <label className="text-sm text-foreground/60">Склад *</label>
-              <select value={warehouseRef} onChange={(e) => setWarehouseRef(e.target.value)} className={inputClass}>
-                {warehouses.map((w) => (
-                  <option key={w.ref} value={w.ref}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
+              <SearchSelect
+                value={warehouseRef}
+                onChange={setWarehouseRef}
+                options={warehouses.map((warehouse) => ({ value: warehouse.ref, label: warehouse.name }))}
+                className="mt-1"
+              />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-4">
@@ -150,13 +149,12 @@ function ReceiptCard({ warehouses, onClose, onDone }: { warehouses: { ref: strin
             </div>
             <div>
               <label className="text-sm text-foreground/60">НДС</label>
-              <select value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={inputClass}>
-                {Object.entries(VAT_RATES).map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <SearchSelect
+                value={vatRate}
+                onChange={setVatRate}
+                options={Object.entries(VAT_RATES).map(([value, label]) => ({ value, label }))}
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="text-sm text-foreground/60">Файл УПД</label>

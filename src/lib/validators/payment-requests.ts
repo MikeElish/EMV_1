@@ -1,3 +1,5 @@
+import type { PaymentPurposeCategory } from "@prisma/client";
+
 export const PAYMENT_REQUEST_STATUSES = ["Требуется оплата", "Оплачено", "Отменено"] as const;
 export type PaymentRequestStatus = (typeof PAYMENT_REQUEST_STATUSES)[number];
 
@@ -8,6 +10,7 @@ export type PaymentRequestInput = {
   /** kopecks */
   amount: number;
   purpose: string;
+  purposeCategory: PaymentPurposeCategory;
   /** Финансы → Фонды: the fund it is paid from. */
   fund: string;
 };

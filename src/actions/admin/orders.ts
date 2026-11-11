@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { accessDenied, ownerOnly, requireSection } from "@/lib/access-server";
+import { accessDenied, assignedOrderDenied, ownerOnly, requireSection } from "@/lib/access-server";
 import { OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
 import {
   uploadOrderDocumentFile,
@@ -12,6 +12,7 @@ import { applyPaymentTerms, refreshOrder, releaseAwaitingSupply, setLineStatuses
 import { sendDeliveryChangeLetter } from "@/lib/order-notifications";
 import { issueOrderInvoice } from "@/lib/order-invoice";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
+import { ownerManualInputEnabled } from "@/lib/manual-input";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -39,6 +40,8 @@ export async function updateOrderItemStatus(
   }
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(target.orderId);
+  if (assignmentDenied) return assignmentDenied;
   await setLineStatuses(
     target.orderId,
     target.ids.map((id) => ({ itemId: id, status })),
@@ -64,6 +67,8 @@ export async function updateLinePayment(
   if (!["paid", "unpaid", "deferred"].includes(state)) return { ok: false, error: "Некорректный статус оплаты" };
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(target.orderId);
+  if (assignmentDenied) return assignmentDenied;
 
   await prisma.orderItem.updateMany({
     where: { id: { in: target.ids } },
@@ -84,8 +89,13 @@ export async function updateLinePrice(itemId: string, price: number): Promise<Ac
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
   if (!Number.isInteger(price) || price <= 0 || price > 1_000_000_000) return { ok: false, error: "Укажите цену больше нуля" };
-  const item = await prisma.orderItem.findUnique({ where: { id: itemId }, select: { orderId: true, paid: true } });
+  const item = await prisma.orderItem.findUnique({ where: { id: itemId }, select: { orderId: true, paid: true, priceSnapshot: true } });
   if (!item) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(item.orderId);
+  if (assignmentDenied) return assignmentDenied;
+  if (item.priceSnapshot > 0 && !(await ownerManualInputEnabled())) {
+    return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
+  }
   // The owner corrects any line («Ручное редактирование»); others only unpaid ones.
   if (item.paid && (await ownerOnly())) return { ok: false, error: "Позиция уже оплачена — цену не меняем" };
   await prisma.orderItem.update({ where: { id: itemId }, data: { priceSnapshot: price, surcharge: 0 } });
@@ -98,6 +108,7 @@ export async function updateLinePrice(itemId: string, price: number): Promise<Ac
 export async function updateLineQuantity(itemId: string, quantity: number): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
+  if (!(await ownerManualInputEnabled())) return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return { ok: false, error: "Укажите количество" };
 
   const item = await prisma.orderItem.findUnique({
@@ -105,6 +116,8 @@ export async function updateLineQuantity(itemId: string, quantity: number): Prom
     select: { orderId: true, productId: true, quantity: true, stockWrittenOff: true, paid: true },
   });
   if (!item) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(item.orderId);
+  if (assignmentDenied) return assignmentDenied;
   if (item.paid && (await ownerOnly())) return { ok: false, error: "Позиция уже оплачена — количество не меняем" };
 
   const delta = quantity - item.quantity;
@@ -132,7 +145,9 @@ export async function addOrderItem(
 ): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
-  if (await ownerOnly()) return { ok: false, error: "Добавлять товар в заказ может только владелец" };
+  if (!(await ownerManualInputEnabled())) return { ok: false, error: "Добавлять товар может владелец при включённом ручном вводе" };
+  const assignmentDenied = await assignedOrderDenied(orderId);
+  if (assignmentDenied) return assignmentDenied;
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return { ok: false, error: "Укажите количество" };
   if (!Number.isInteger(price) || price <= 0 || price > 1_000_000_000) return { ok: false, error: "Укажите цену" };
 
@@ -165,6 +180,36 @@ export async function addOrderItem(
   return { ok: true };
 }
 
+/** Owner-only manual bonus for a line; never changes an issued document. */
+export async function updateLineBonus(itemId: string, bonus: number): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  const ownerDenied = await ownerOnly();
+  if (ownerDenied) return ownerDenied;
+  if (!(await ownerManualInputEnabled())) return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
+  if (!Number.isInteger(bonus) || bonus < 0 || bonus > 1_000_000_000_000) {
+    return { ok: false, error: "Укажите бонус в копейках, не меньше нуля" };
+  }
+
+  const item = await prisma.orderItem.findUnique({
+    where: { id: itemId },
+    select: { id: true, orderId: true, saleRef: true, status: true, paid: true, priceSnapshot: true, order: { select: { invoiceRef: true } } },
+  });
+  if (!item) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(item.orderId);
+  if (assignmentDenied) return assignmentDenied;
+  if (item.status === "CANCELLED") return { ok: false, error: "У отменённой позиции нельзя изменить бонус" };
+  if (bonus > 0 && item.priceSnapshot <= 0) return { ok: false, error: "Сначала укажите цену позиции" };
+  if (item.paid || item.saleRef || item.order.invoiceRef) {
+    return { ok: false, error: "Бонус нельзя изменить после оплаты, оформления счёта или УПД" };
+  }
+
+  await prisma.orderItem.update({ where: { id: item.id }, data: { bonus } });
+  await refreshOrder(prisma, item.orderId);
+  revalidateOrders();
+  return { ok: true };
+}
+
 
 
 export async function updateLineDeliveryDate(
@@ -176,6 +221,8 @@ export async function updateLineDeliveryDate(
   if (denied) return denied;
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(target.orderId);
+  if (assignmentDenied) return assignmentDenied;
   await prisma.orderItem.updateMany({
     where: { id: { in: target.ids } },
     data: { deliveryDate: deliveryDate ? new Date(deliveryDate) : null },
@@ -200,6 +247,8 @@ export async function updateLineDelivery(
   if (!Object.values(DeliveryMethod).includes(method)) return { ok: false, error: "Некорректный тип доставки" };
   const target = await targetLines(itemId, scope);
   if (!target) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(target.orderId);
+  if (assignmentDenied) return assignmentDenied;
 
   const lines = await prisma.orderItem.findMany({ where: { id: { in: target.ids } } });
   const asked: string[] = [];
@@ -230,6 +279,8 @@ export async function updateLineDelivery(
 export async function cancelOrderAsStaff(id: string): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
+  const assignmentDenied = await assignedOrderDenied(id);
+  if (assignmentDenied) return assignmentDenied;
   const items = await prisma.orderItem.findMany({ where: { orderId: id }, select: { id: true } });
   await setLineStatuses(
     id,
@@ -257,6 +308,8 @@ export async function uploadOrderDocument(formData: FormData): Promise<ActionRes
   const file = formData.get("file");
 
   if (!orderId) return { ok: false, error: "Не указан заказ" };
+  const assignmentDenied = await assignedOrderDenied(orderId);
+  if (assignmentDenied) return assignmentDenied;
   if (!Object.values(OrderDocumentCategory).includes(category as OrderDocumentCategory)) {
     return { ok: false, error: "Некорректная категория" };
   }
@@ -282,6 +335,8 @@ export async function uploadOrderDocument(formData: FormData): Promise<ActionRes
 export async function issueInvoice(orderId: string): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
+  const assignmentDenied = await assignedOrderDenied(orderId);
+  if (assignmentDenied) return assignmentDenied;
   try {
     const issued = await issueOrderInvoice(String(orderId));
     return { ok: true, message: `Счёт № ${issued.number} записан в 1С и вложен в заказ` };
@@ -297,6 +352,8 @@ export async function deleteOrderDocument(id: string): Promise<ActionResult> {
 
   const doc = await prisma.orderDocument.findUnique({ where: { id } });
   if (!doc) return { ok: false, error: "Файл не найден" };
+  const assignmentDenied = await assignedOrderDenied(doc.orderId);
+  if (assignmentDenied) return assignmentDenied;
 
   await deleteOrderDocumentFile(doc.fileUrl);
   await prisma.orderDocument.delete({ where: { id } });
@@ -367,6 +424,8 @@ export async function deleteOrderLineAsOwner(itemId: string): Promise<ActionResu
 export async function updateOrderManager(orderId: string, managerId: string | null): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
+  const ownerDenied = await ownerOnly();
+  if (ownerDenied) return ownerDenied;
   if (managerId) {
     const employee = await prisma.user.findUnique({ where: { id: managerId }, select: { role: true } });
     if (!employee || employee.role === "CUSTOMER" || employee.role === "DRIVER") return { ok: false, error: "Сотрудник не найден" };

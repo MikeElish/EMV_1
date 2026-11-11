@@ -34,7 +34,10 @@ export default async function CrmOrdersPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const me = await getMyAccess();
+  const [me, siteSettings] = await Promise.all([
+    getMyAccess(),
+    prisma.siteSettings.findUnique({ where: { id: 1 }, select: { manualInputEnabled: true } }),
+  ]);
   const staff = await prisma.user.findMany({
     where: { role: { notIn: ["CUSTOMER", "DRIVER"] } },
     select: { id: true, lastName: true, firstName: true, login: true },
@@ -44,7 +47,16 @@ export default async function CrmOrdersPage({
 
   return (
     <CrmPage>
-      <OrdersTable orders={orders} initialOrderNumber={orderNumber} canDelete={me?.role === "OWNER"} employees={employees} />
+      <OrdersTable
+        orders={orders.map((order) => ({
+          ...order,
+          canEdit: me?.role === "OWNER" || order.managerId === me?.userId,
+        }))}
+        initialOrderNumber={orderNumber}
+        canDelete={me?.role === "OWNER"}
+        employees={employees}
+        manualInputEnabled={me?.role === "OWNER" && siteSettings?.manualInputEnabled === true}
+      />
     </CrmPage>
   );
 }

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnchoredDropdown } from "@/components/AnchoredDropdown";
 import { Modal } from "@/components/Modal";
+import { SearchSelect } from "@/components/SearchSelect";
 import { SuggestField } from "@/components/SuggestField";
 import {
   DeliveryMethodSelect,
@@ -16,18 +18,20 @@ import {
   getManualOrderFormData,
   createManualOrder,
   createReplenishmentOrder,
+  registerPendingProduct,
   type ManualOrderFormData,
   type ManualOrderFormMode,
 } from "@/actions/admin/manual-order";
 import { PRICE_TYPES, PRICE_TYPE_LABELS, type PriceType } from "@/lib/validators/manual-order";
 import { applyMarkup } from "@/lib/pricing";
+import { formatSupplierCurrency, parseSupplierCurrency } from "@/lib/supplier-currency";
 
 type Customer = ManualOrderFormData["customers"][number];
 type Company = ManualOrderFormData["companies"][number];
 // The «Покупатель» search finds people with an account and client companies.
 type Buyer = { id: string; customer: Customer; company?: undefined } | { id: string; company: Company; customer?: undefined };
 type Product = ManualOrderFormData["products"][number];
-type Line = { key: number; productId: string; quantity: string; priceRub: string };
+type Line = { key: number; productId: string; offerId: string; quantity: string; priceRub: string };
 type Tab = "items" | "delivery";
 
 const inputClassName =
@@ -51,20 +55,24 @@ function SearchPicker<T extends { id: string }>({
   filter,
   renderItem,
   onPick,
+  onAdd,
 }: {
   placeholder: string;
   items: T[];
   filter: (item: T, query: string) => boolean;
   renderItem: (item: T) => React.ReactNode;
   onPick: (item: T) => void;
+  onAdd?: (query: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const results = useMemo(() => items.filter((i) => filter(i, query)).slice(0, 20), [items, query, filter]);
 
   return (
-    <div className="relative">
+    <div>
       <input
+        ref={inputRef}
         value={query}
         placeholder={placeholder}
         onChange={(e) => {
@@ -75,29 +83,55 @@ function SearchPicker<T extends { id: string }>({
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className={inputClassName}
       />
-      {open && (
-        <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-md border border-foreground/10 bg-background text-sm shadow-lg">
-          {results.length === 0 ? (
+      <AnchoredDropdown
+        anchorRef={inputRef}
+        open={open}
+        className="rounded-md border border-foreground/10 bg-background text-sm shadow-lg"
+      >
+          {results.length === 0 && !onAdd ? (
             <p className="px-3 py-2 text-foreground/40">Ничего не найдено</p>
           ) : (
-            results.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onPick(item);
-                  setQuery("");
-                  setOpen(false);
-                }}
-                className="block w-full px-3 py-2 text-left hover:bg-foreground/5"
-              >
-                {renderItem(item)}
-              </button>
-            ))
+            <>
+              {results.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onPick(item);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                  className="block w-full px-3 py-1.5 text-left hover:bg-foreground/5"
+                >
+                  {renderItem(item)}
+                </button>
+              ))}
+              {onAdd &&
+                query.trim() &&
+                !items.some(
+                  (item) =>
+                    "sku" in item &&
+                    typeof item.sku === "string" &&
+                    item.sku.toLocaleLowerCase() === query.trim().toLocaleLowerCase(),
+                ) && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onAdd(query.trim());
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                  className="block w-full border-t border-foreground/10 px-3 py-1.5 text-left font-medium text-blue-600 hover:bg-foreground/5 dark:text-blue-400"
+                >
+                  <span>Добавить</span>
+                  <span className="text-xs font-normal text-foreground/50">{query.trim()}</span>
+                </button>
+              )}
+            </>
           )}
-        </div>
-      )}
+      </AnchoredDropdown>
     </div>
   );
 }
@@ -115,7 +149,7 @@ function priceOf(p: Product, type: PriceType, markup: number | null): number {
 }
 
 let nextKey = 1;
-const emptyLine = (): Line => ({ key: nextKey++, productId: "", quantity: "1", priceRub: "" });
+const emptyLine = (): Line => ({ key: nextKey++, productId: "", offerId: "", quantity: "1", priceRub: "" });
 
 export function NewOrderModal({
   onClose,
@@ -226,6 +260,20 @@ export function NewOrderModal({
   });
   const total = lineTotals.reduce((a, b) => a + b, 0);
 
+  async function addUnknownSku(rawSku: string, lineKey: number) {
+    setError(null);
+    const result = await registerPendingProduct(rawSku);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setData((current) => current && {
+      ...current,
+      products: [result.product, ...current.products],
+    });
+    updateLine(lineKey, { productId: result.product.id, priceRub: "0" });
+  }
+
   function buildDeliveryNote(): string | undefined {
     if (!deliveryMethod) return undefined;
     const noteLines = [`Способ доставки: ${DELIVERY_LABELS[deliveryMethod]}`];
@@ -247,6 +295,7 @@ export function NewOrderModal({
         setTab("items");
         return setError(`Укажите цену: ${productById.get(line.productId)?.name}`);
       }
+
     }
     setSubmitting(true);
     const input = {
@@ -258,6 +307,7 @@ export function NewOrderModal({
       deliveryNote: buildDeliveryNote(),
       items: filled.map((l) => ({
         productId: l.productId,
+        offerId: l.offerId || undefined,
         quantity: parseInt(l.quantity, 10) || 0,
         price: parseRub(l.priceRub) ?? 0,
       })),
@@ -364,19 +414,16 @@ export function NewOrderModal({
                 <label htmlFor="priceType" className="text-sm text-foreground/60">
                   Тип цены
                 </label>
-                <select
+                <SearchSelect
                   id="priceType"
                   value={priceType}
-                  onChange={(e) => changePriceType(e.target.value as PriceType)}
-                  className={`mt-1 ${inputClassName}`}
-                >
-                  {PRICE_TYPES.filter((t) => t !== "individual" || markup !== null).map((t) => (
-                    <option key={t} value={t}>
-                      {PRICE_TYPE_LABELS[t]}
-                      {t === "individual" ? ` (+${markup}% к закупке)` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(next) => changePriceType(next as PriceType)}
+                  options={PRICE_TYPES.filter((t) => t !== "individual" || markup !== null).map((t) => ({
+                    value: t,
+                    label: `${PRICE_TYPE_LABELS[t]}${t === "individual" ? ` (+${markup}% к закупке)` : ""}`,
+                  }))}
+                  className="mt-1"
+                />
               </div>
             </div>
           </div>
@@ -425,7 +472,7 @@ export function NewOrderModal({
                               </span>
                               <button
                                 type="button"
-                                onClick={() => updateLine(line.key, { productId: "", priceRub: "" })}
+                                onClick={() => updateLine(line.key, { productId: "", offerId: "", priceRub: "" })}
                                 className="text-foreground/40 hover:text-foreground"
                                 aria-label="Сменить товар"
                               >
@@ -437,13 +484,51 @@ export function NewOrderModal({
                               placeholder="Артикул, наименование или бренд"
                               items={data.products}
                               filter={filterProduct}
-                              onPick={(p) => updateLine(line.key, { productId: p.id, priceRub: kopecksToRub(priceOf(p, priceType, markup)) })}
+                              onPick={(p) => updateLine(line.key, {
+                                productId: p.id,
+                                offerId: p.supplierOffers.find((offer) => offer.selected)?.id ?? p.supplierOffers[0]?.id ?? "",
+                                priceRub: kopecksToRub(priceOf(p, priceType, markup)),
+                              })}
+                              onAdd={mode === "crm" ? (sku) => void addUnknownSku(sku, line.key) : undefined}
                               renderItem={(p) => (
                                 <>
                                   {p.name} <span className="text-foreground/50">· {p.sku} · {formatRub(priceOf(p, priceType, markup))}</span>
+                                  {p.supplierOffers.length > 0 && (
+                                    <span className="mt-1 block text-xs text-foreground/50">
+                                      {p.supplierOffers.map((offer) => (
+                                        <span key={offer.id} className="block">
+                                          {offer.supplier?.name ?? "Поставщик"} · {formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}
+                                          {" · "}{offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  )}
                                 </>
                               )}
                             />
+                          )}
+                          {product && (
+                            <div className="mt-1">
+                              <label htmlFor={`supplier-offer-${line.key}`} className="mb-1 block text-xs text-foreground/50">
+                                Вариант поставки
+                              </label>
+                              <SearchSelect
+                                id={`supplier-offer-${line.key}`}
+                                value={line.offerId}
+                                onChange={(offerId) => updateLine(line.key, { offerId })}
+                                emptyLabel="Поставщик не выбран"
+                                options={product.supplierOffers.map((offer) => ({
+                                  value: offer.id,
+                                  label: `${offer.supplier?.name ?? "Поставщик"} · ${formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}`,
+                                  hint: `${offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`} · ${formatRub(offer.price)}`,
+                                }))}
+                                placeholder="Выберите поставщика и срок"
+                                className="text-xs"
+                              />
+                              {product.supplierOffers.length === 0 && (
+                                <p className="mt-1 text-xs text-foreground/50">Предложений поставщиков пока нет.</p>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="py-1 pr-3">

@@ -28,7 +28,7 @@ async function loadReceipts() {
 }
 
 export default async function ReceiptsPage() {
-  await requireSection("warehouse", "view");
+  await requireSection("warehouse.receipts", "view");
   const loaded = await loadReceipts();
   if (!loaded.ok) return <p className="text-sm text-red-600">{loaded.error}</p>;
   const { warehouses, receipts } = loaded;

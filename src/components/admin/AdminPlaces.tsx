@@ -13,6 +13,11 @@ import { usePathname, useSearchParams } from "next/navigation";
 const PLACES_KEY = "emv-admin-places";
 const listeners = new Set<() => void>();
 
+function isTemporaryPage(pathname: string): boolean {
+  return pathname === "/admin/crm/supplier-orders/quote-preview" ||
+    pathname.startsWith("/admin/crm/supplier-orders/quote-preview/");
+}
+
 function readPlaces(): string {
   try {
     return localStorage.getItem(PLACES_KEY) ?? "{}";
@@ -33,7 +38,7 @@ function subscribe(listener: () => void) {
 
 function savePlace(url: string) {
   const path = url.split("?")[0];
-  if (path.startsWith("/admin/mail")) return;
+  if (path.startsWith("/admin/mail") || isTemporaryPage(path)) return;
   let placeUrl = url;
   const [pathname, query] = url.split("?", 2);
   if (pathname === "/admin/crm/orders" && query) {
@@ -71,7 +76,10 @@ export function useAdminPlaces(): (href: string) => string {
     }
     return (href: string) => {
       const saved = places[href];
-      return saved && (saved === href || saved.startsWith(href + "/") || saved.startsWith(href + "?")) ? saved : href;
+      return saved && !isTemporaryPage(saved.split("?")[0]) &&
+        (saved === href || saved.startsWith(href + "/") || saved.startsWith(href + "?"))
+        ? saved
+        : href;
     };
   }, [raw]);
 }

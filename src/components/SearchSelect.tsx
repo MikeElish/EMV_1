@@ -1,7 +1,8 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
-import { useOutsideClose } from "@/lib/use-outside-close";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { AnchoredDropdown } from "@/components/AnchoredDropdown";
+import { useEscape } from "@/lib/use-escape";
 
 export type SearchSelectOption = { value: string; label: string; /** Also searched, shown in grey. */ hint?: string };
 
@@ -38,14 +39,26 @@ export function SearchSelect({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const selected = options.find((o) => o.value === value);
 
-  function close() {
+  const close = useCallback(() => {
     setOpen(false);
     setQuery("");
-  }
-  // Also Esc: only the list closes, not the window the field sits in.
-  const wrapperRef = useOutsideClose(open, close);
+  }, []);
+  useEscape(close, open);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (wrapperRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      close();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [close, open]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -78,6 +91,7 @@ export function SearchSelect({
     <div ref={wrapperRef} className={`relative ${className}`}>
       {name && <input type="hidden" name={name} value={value} />}
       <input
+        ref={inputRef}
         id={id}
         type="text"
         role="combobox"
@@ -116,12 +130,16 @@ export function SearchSelect({
       <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-foreground/40">
         ▾
       </span>
-      {open && (
+      <AnchoredDropdown
+        anchorRef={inputRef}
+        open={open}
+        className="rounded-md border border-foreground/15 bg-background py-1 text-sm shadow-lg"
+      >
         <ul
           id={listId}
           ref={listRef}
           role="listbox"
-          className="absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-auto rounded-md border border-foreground/15 bg-background py-1 text-sm shadow-lg"
+          className="w-full"
         >
           {items.length === 0 ? (
             <li className="px-3 py-2 text-foreground/40">Ничего не найдено</li>
@@ -134,7 +152,7 @@ export function SearchSelect({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => pick(o)}
-                className={`flex cursor-pointer items-baseline gap-2 px-3 py-1.5 ${i === active ? "bg-foreground/10" : ""} ${
+                className={`flex min-h-8 cursor-pointer items-baseline gap-2 px-3 py-1 ${i === active ? "bg-foreground/10" : ""} ${
                   o.value === value ? "font-medium" : ""
                 } ${o.value === "" ? "text-foreground/50" : ""}`}
               >
@@ -149,7 +167,7 @@ export function SearchSelect({
             </li>
           )}
         </ul>
-      )}
+      </AnchoredDropdown>
     </div>
   );
 }

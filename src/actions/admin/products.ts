@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { Prisma, type OrderStatus } from "@prisma/client";
 import { RESERVE_STATUSES } from "@/lib/validators/orders";
 import { prisma } from "@/lib/prisma";
-import { accessDenied, requireSection } from "@/lib/access-server";
-import { releaseAwaitingSupply } from "@/lib/order-status";
+import { accessDenied, getMyAccess, requireSection } from "@/lib/access-server";
+import { orderMissingFromSuppliers, releaseAwaitingSupply } from "@/lib/order-status";
 import { selectOffer } from "@/lib/supplier-offers";
 import { productSchema, type ProductInput } from "@/lib/validators/product";
 import { buildProductSlug } from "@/lib/slug";
@@ -43,7 +43,8 @@ function firstOffer(data: ProductInput) {
     price: data.purchasePrice,
     deliveryDays: data.deliveryDays ?? null,
     quality: data.quality || null,
-    selected: true,
+    selected: !data.noOffer,
+    noOffer: data.noOffer,
   };
 }
 
@@ -65,13 +66,18 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   }
 
-  if (!parsed.data.supplierId) {
+  if (!parsed.data.noOffer && !parsed.data.supplierId) {
     return { ok: false, error: "Укажите поставщика (вкладка «Цены»)" };
   }
-  if (parsed.data.purchasePrice <= 0) {
+  if (!parsed.data.noOffer && parsed.data.purchasePrice <= 0) {
     return { ok: false, error: "Укажите закупочную цену (вкладка «Цены»)" };
   }
-
+  if (parsed.data.noOffer) {
+    parsed.data.price = 0;
+    parsed.data.purchasePrice = 0;
+    parsed.data.retailPrice = 0;
+    parsed.data.dealerPrice = 0;
+  }
   const slug = buildProductSlug(parsed.data.brand, parsed.data.sku);
   const existing = await prisma.product.findFirst({
     where: { OR: [{ sku: parsed.data.sku }, { slug }] },
@@ -100,23 +106,50 @@ export async function updateProduct(
 ): Promise<ActionResult> {
   const denied = await accessDenied("crm.products");
   if (denied) return denied;
+  const current = await prisma.product.findUnique({
+    where: { id },
+    select: { stock: true, pendingRegistration: true },
+  });
+  if (!current) return { ok: false, error: "Товар не найден" };
+  if (current.pendingRegistration && (await getMyAccess())?.role !== "OWNER") {
+    return { ok: false, error: "Зарегистрировать номенклатуру может только владелец" };
+  }
 
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
+  }
+  if (current.pendingRegistration && parsed.data.name === "Регистрация номенклатуры") {
+    return { ok: false, error: "Укажите наименование зарегистрированного товара" };
   }
 
   // With supplier offers, the purchase price is the selected offer's -- not
   // whatever the form sent.
   const offers = await prisma.supplierOffer.findMany({ where: { productId: id } });
   const chosen =
-    offers.find((o) => o.id === parsed.data.selectedOfferId) ?? offers.find((o) => o.selected) ?? offers[0];
-  if (chosen) {
+    offers.find((o) => o.id === parsed.data.selectedOfferId && !o.noOffer) ??
+    offers.find((o) => o.selected && !o.noOffer) ??
+    offers.find((o) => !o.noOffer);
+  if (parsed.data.noOffer && offers.some((offer) => !offer.noOffer)) {
+    return { ok: false, error: "Выберите предложение с ценой или отметьте все предложения как отсутствующие в разделе «Проценка»" };
+  }
+  if (parsed.data.noOffer) {
+    parsed.data.price = 0;
+    parsed.data.purchasePrice = 0;
+    parsed.data.retailPrice = 0;
+    parsed.data.dealerPrice = 0;
+    parsed.data.supplierId = undefined;
+  } else if (chosen) {
     parsed.data.purchasePrice = chosen.price;
     parsed.data.supplierId = chosen.supplierId ?? undefined;
+  } else if (offers.length > 0) {
+    return { ok: false, error: "Сначала укажите предложение с ценой в разделе «Проценка»" };
   }
 
-  if (parsed.data.isActive && (parsed.data.purchasePrice <= 0 || parsed.data.price <= 0)) {
+  if (current.pendingRegistration && !parsed.data.noOffer && (!parsed.data.supplierId || parsed.data.purchasePrice <= 0)) {
+    return { ok: false, error: "Для регистрации укажите поставщика и закупочную цену" };
+  }
+  if (!parsed.data.noOffer && parsed.data.isActive && (parsed.data.purchasePrice <= 0 || parsed.data.price <= 0)) {
     return { ok: false, error: "Чтобы товар был активен, укажите закупочную и оптовую цену (вкладка «Цены»)" };
   }
 
@@ -131,24 +164,42 @@ export async function updateProduct(
     return { ok: false, error: "Товар с таким артикулом уже существует" };
   }
 
-  const current = await prisma.product.findUnique({ where: { id }, select: { stock: true } });
-  const restocked = current !== null && parsed.data.stock > current.stock;
+  const restocked = parsed.data.stock > current.stock;
 
   await prisma.product.update({
     where: { id },
     data: {
       ...toProductData(parsed.data),
+      pendingRegistration: false,
       ...(restocked ? { newArrivalAt: new Date() } : {}),
       pricing: {
         upsert: { create: toPricingData(parsed.data), update: toPricingData(parsed.data) },
       },
     },
   });
-  if (chosen && !chosen.selected) await selectOffer(prisma, id, chosen.id);
-  if (!chosen && (parsed.data.supplierId || parsed.data.purchasePrice > 0)) {
+  if (parsed.data.noOffer) {
+    await prisma.supplierOffer.updateMany({ where: { productId: id }, data: { selected: false } });
+    if (!offers.length) {
+      await prisma.supplierOffer.create({ data: { productId: id, ...firstOffer(parsed.data) } });
+    }
+  } else if (chosen && !chosen.selected) {
+    await selectOffer(prisma, id, chosen.id);
+  } else if (!chosen && (parsed.data.supplierId || parsed.data.purchasePrice > 0)) {
     await prisma.supplierOffer.create({ data: { productId: id, ...firstOffer(parsed.data) } });
   }
   if (restocked) await releaseAwaitingSupply([id]);
+  if (current.pendingRegistration) {
+    const affectedOrders = await prisma.orderItem.findMany({
+      where: { productId: id, status: { in: ["CHECKING", "IN_PROGRESS"] } },
+      select: { orderId: true },
+      distinct: ["orderId"],
+    });
+    await prisma.orderItem.updateMany({
+      where: { productId: id, nameSnapshot: "Регистрация номенклатуры" },
+      data: { nameSnapshot: parsed.data.name },
+    });
+    await Promise.all(affectedOrders.map(({ orderId }) => orderMissingFromSuppliers(orderId, [id])));
+  }
 
   revalidatePath("/admin/crm/products");
   revalidatePath("/admin/crm/orders");
@@ -167,9 +218,13 @@ export async function toggleProductActive(
     // Products imported from 1С arrive with price 0 -- they must not go on sale for free.
     const product = await prisma.product.findUnique({
       where: { id },
-      select: { price: true, category: { select: { name: true, isActive: true } } },
+      select: { price: true, pendingRegistration: true, category: { select: { name: true, isActive: true } }, offers: { select: { noOffer: true } } },
     });
-    if (!product || product.price <= 0) {
+    if (product?.pendingRegistration) {
+      return { ok: false, error: "Сначала зарегистрируйте номенклатуру в карточке товара" };
+    }
+    const noOffer = product?.offers.length && product.offers.every((offer) => offer.noOffer);
+    if (!product || (product.price <= 0 && !noOffer)) {
       return { ok: false, error: "Сначала укажите цены в карточке товара" };
     }
     if (!product.category.isActive) {
@@ -209,6 +264,14 @@ export async function listProductReserve(productId: string): Promise<ProductDocu
 export async function deleteProduct(id: string): Promise<ActionResult> {
   const denied = await accessDenied("crm.products");
   if (denied) return denied;
+  const product = await prisma.product.findUnique({
+    where: { id },
+    select: { pendingRegistration: true },
+  });
+  if (!product) return { ok: false, error: "Товар не найден" };
+  if (product.pendingRegistration && (await getMyAccess())?.role !== "OWNER") {
+    return { ok: false, error: "Удалять заявки на регистрацию может только владелец" };
+  }
 
   const orderItemCount = await prisma.orderItem.count({ where: { productId: id } });
   if (orderItemCount > 0) {

@@ -5,7 +5,10 @@ import { getWarehouseData } from "@/lib/onec-warehouse";
 
 // Склад: one tab per warehouse of 1С.
 export default async function WarehouseLayout({ children }: { children: React.ReactNode }) {
-  await requireSection("warehouse");
+  await requireSection(
+    ["warehouse.stock", "warehouse.receipts", "warehouse.handover", "warehouse.adjustments", "warehouse.replenishment"],
+    "view"
+  );
   let warehouses: Awaited<ReturnType<typeof getWarehouseData>>["warehouses"] = [];
   try {
     ({ warehouses } = await getWarehouseData());

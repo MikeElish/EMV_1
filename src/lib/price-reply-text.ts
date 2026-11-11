@@ -12,6 +12,9 @@ export type PriceReplyCandidate = {
   deliveryDays: number | null;
 };
 
+const NO_OFFER = /(?<![\p{L}\p{N}])(?:нет\s+(?:в\s+наличии|на\s+складе|предложени\p{L}*|возможности\s+(?:поставки|поставить))|не\s+(?:можем|сможем)\s+(?:поставить|предложить|обеспечить)|(?:поставить|предложить)\s+не\s+(?:можем|сможем)|не\s+(?:поставля\p{L}*|прода[её]м)|отсутству\p{L}*|снят\p{L}*\s+с\s+производства)/iu;
+const NO_OFFER_FOR_ALL = /(?<![\p{L}\p{N}])(?:по\s+(?:вашему\s+)?запросу\s+(?:предложени\p{L}*\s+)?нет|по\s+запрошенн\p{L}*\s+позици\p{L}*\s+предложени\p{L}*\s+нет|не\s+(?:можем|сможем)\s+(?:поставить|предложить)\s+(?:запрошенн\p{L}*\s+)?(?:позици\p{L}*|товар\p{L}*|ничего)|нет\s+возможности\s+поставить\s+запрошенн\p{L}*)/iu;
+
 export function requestedPriceProductIds(items: unknown): string[] {
   if (!Array.isArray(items)) return [];
   return [
@@ -29,6 +32,31 @@ export function requestedPriceProductIds(items: unknown): string[] {
 }
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Returns requested products explicitly refused by SKU, or all on a clear blanket refusal. */
+export function noOfferPriceProductIds(
+  text: string,
+  products: RequestedPriceProduct[],
+): string[] {
+  const lines = text
+    .split(/\r?\n|[.!?]\s+(?=[\p{L}\p{N}])/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.some((line) => NO_OFFER_FOR_ALL.test(line))) {
+    return products.map((product) => product.id);
+  }
+
+  return products
+    .filter((product) => {
+      const sku = skuPattern(product.sku);
+      return lines.some((line) => {
+        sku.lastIndex = 0;
+        return sku.test(line) && NO_OFFER.test(line);
+      });
+    })
+    .map((product) => product.id);
+}
+
 const PRICE_NUMBER = String.raw`(?:\d{1,3}(?:[\s\u00a0]\d{3})+(?:[,.]\d{1,2})?|\d+(?:[,.]\d{1,2})?)`;
 const RUB = String.raw`(?:₽|руб(?:ля|лей)?\.?|р\.?|RUB)`;
 const PRICE = new RegExp(

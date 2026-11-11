@@ -37,6 +37,7 @@ export function ProductForm({
   initialPricing,
   offers = [],
   onSubmit,
+  onChanges,
 }: {
   categories: Category[];
   suppliers: Supplier[];
@@ -49,6 +50,8 @@ export function ProductForm({
   /** Supplier offers of an existing card (view only, one is picked for the site). */
   offers?: OfferRow[];
   onSubmit: (input: ProductInput) => Promise<ActionResult>;
+  /** Called with true when any field is filled or edited (new product only). */
+  onChanges?: (hasChanges: boolean) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +61,7 @@ export function ProductForm({
   const [brand, setBrand] = useState(initial?.brand ?? "");
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
+
   // The brand directory, plus the card's own brand if it isn't in it.
   const initialBrand = initial?.brand;
   const brandOptions = useMemo(() => {
@@ -84,11 +88,11 @@ export function ProductForm({
     // be saved without prices; they are required once it goes on sale.
     const active = formData.get("isActive") === "on";
 
-    const purchasePrice = toKopecks(prices.purchaseRub) ?? (active ? null : 0);
-    if (purchasePrice === null || (active && purchasePrice <= 0)) return failOnPrices("Укажите закупочную цену");
+    const purchasePrice = prices.noOffer ? 0 : (toKopecks(prices.purchaseRub) ?? (active ? null : 0));
+    if (purchasePrice === null || (!prices.noOffer && active && purchasePrice <= 0)) return failOnPrices("Укажите закупочную цену");
     const sale = {} as Record<(typeof SALE_KINDS)[number]["kind"], number>;
     for (const { kind, label } of SALE_KINDS) {
-      const value = toKopecks(prices.sale[kind].rub) ?? (active ? null : 0);
+      const value = prices.noOffer ? 0 : (toKopecks(prices.sale[kind].rub) ?? (active ? null : 0));
       if (value === null) return failOnPrices(`Укажите цену: ${label.toLowerCase()}`);
       sale[kind] = value;
     }
@@ -104,6 +108,7 @@ export function ProductForm({
       retailPrice: sale.retail,
       dealerPrice: sale.dealer,
       supplierId: prices.supplierId || undefined,
+      noOffer: prices.noOffer,
       deliveryDays: prices.deliveryDays ? Number(prices.deliveryDays) : undefined,
       quality: prices.quality.trim() || undefined,
       selectedOfferId: prices.selectedOfferId || undefined,
@@ -129,6 +134,7 @@ export function ProductForm({
   return (
     <form
       onSubmit={handleSubmit}
+      onChange={() => onChanges?.(true)}
       // A required field on the hidden tab would otherwise block submit
       // silently -- jump to the tab that holds it.
       onInvalidCapture={(e) => {
@@ -153,7 +159,15 @@ export function ProductForm({
       </div>
 
       <div data-tab="prices" className={tab === "prices" ? "mt-4" : "hidden"}>
-        <ProductPricesPanel value={prices} onChange={setPrices} suppliers={suppliers} offers={offers} />
+        <ProductPricesPanel
+          value={prices}
+          onChange={(value) => {
+            setPrices(value);
+            onChanges?.(true);
+          }}
+          suppliers={suppliers}
+          offers={offers}
+        />
       </div>
 
       <div data-tab="main" className={tab === "main" ? "mt-4 space-y-4" : "hidden"}>
@@ -218,7 +232,10 @@ export function ProductForm({
           <SearchSelect
             id="categoryId"
             value={categoryId}
-            onChange={setCategoryId}
+            onChange={(value) => {
+              setCategoryId(value);
+              onChanges?.(true);
+            }}
             options={categoryOptions}
             placeholder="Начните вводить категорию"
             className="mt-1"
@@ -234,7 +251,10 @@ export function ProductForm({
           <SearchSelect
             id="brand"
             value={brand}
-            onChange={setBrand}
+            onChange={(value) => {
+              setBrand(value);
+              onChanges?.(true);
+            }}
             options={brandOptions}
             emptyLabel="— не указан —"
             placeholder="Начните вводить бренд"
@@ -267,7 +287,13 @@ export function ProductForm({
         />
       </div>
 
-      <ProductImagesField images={images} onChange={setImages} />
+      <ProductImagesField
+        images={images}
+        onChange={(value) => {
+          setImages(value);
+          onChanges?.(true);
+        }}
+      />
 
       <label className="flex items-center gap-2 text-sm">
         <input

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/session";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
+import { orderLineTotal } from "@/lib/order-pricing";
 
 /**
  * The signed-in customer's «Баланс» for the shop header: what is paid less
@@ -24,7 +25,7 @@ export async function getMyBalance(): Promise<number | null> {
   });
   let balance = 0;
   for (const l of lines) {
-    const sum = l.priceSnapshot * l.quantity;
+    const sum = orderLineTotal(l);
     if (l.paid) balance += sum;
     if (SHIPPED_STATUSES.includes(l.status)) balance -= sum;
   }

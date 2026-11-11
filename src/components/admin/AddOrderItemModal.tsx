@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getManualOrderFormData, type ManualOrderFormData } from "@/actions/admin/manual-order";
 import { addOrderItem } from "@/actions/admin/orders";
 import { Modal } from "@/components/Modal";
+import { SearchSelect } from "@/components/SearchSelect";
 import { rublesToKopecksRoundedUp, formatRub } from "@/lib/money";
 
 type Order = { id: string; orderNumber: string };
@@ -55,13 +56,12 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div>
           <label className="text-sm text-foreground/60">Заказ</label>
-          <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2">
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                № {o.orderNumber}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            value={orderId}
+            onChange={setOrderId}
+            options={orders.map((order) => ({ value: order.id, label: `№ ${order.orderNumber}` }))}
+            className="mt-1"
+          />
         </div>
         <div>
           <label className="text-sm text-foreground/60">Товар</label>

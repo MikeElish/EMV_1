@@ -1,9 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, requireSection } from "@/lib/access-server";
 import { getAdminSession } from "@/lib/session";
 import { createManualOrderRecord, type ManualOrderResult } from "@/lib/manual-order";
+import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 import {
   COMPANY_PRICE_TYPE,
   type ManualOrderRecordInput,
@@ -15,7 +18,7 @@ export type ManualOrderFormMode = "crm" | "replenishment";
 
 /** Loaded when the "Новый заказ" window opens, not with the orders page itself. */
 export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") {
-  await requireSection(mode === "replenishment" ? "warehouse" : "crm.orders", "view");
+  await requireSection(mode === "replenishment" ? "warehouse.replenishment" : "crm.orders", "view");
 
   const [customers, companies, products] = await Promise.all([
     mode === "crm"
@@ -72,6 +75,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
         brand: true,
         stock: true,
         isActive: true,
+        pendingRegistration: true,
         price: true,
         pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } },
       },
@@ -82,6 +86,30 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
   const ownCompany = companies.find((company) => company.isOwn);
   if (mode === "replenishment" && !ownCompany) {
     throw new Error("Не найдена компания EMV для заказа пополнения");
+  }
+  const offers = await prisma.supplierOffer.findMany({
+    where: {
+      productId: { in: mode === "crm" ? products.map((product) => product.id) : [] },
+      supplierId: { not: null },
+      noOffer: false,
+      price: { gt: 0 },
+      supplier: { is: { isOwn: false } },
+    },
+    select: {
+      id: true,
+      productId: true,
+      price: true,
+      quotedPrice: true,
+      currency: true,
+      deliveryDays: true,
+      selected: true,
+      supplier: { select: { name: true } },
+    },
+    orderBy: [{ selected: "desc" }, { priceUpdatedAt: "desc" }],
+  });
+  const offersByProduct = new Map<string, typeof offers>();
+  for (const offer of offers) {
+    offersByProduct.set(offer.productId, [...(offersByProduct.get(offer.productId) ?? []), offer]);
   }
 
   return {
@@ -119,6 +147,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
       brand: p.brand,
       stock: p.stock,
       isActive: p.isActive,
+      pendingRegistration: p.pendingRegistration,
       // For «Индивидуальный»: the company's markup over it.
       purchase: p.pricing?.purchasePrice ?? 0,
       prices: {
@@ -126,11 +155,91 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
         wholesale: p.price,
         dealer: p.pricing?.dealerPrice ?? p.price,
       },
+      supplierOffers: offersByProduct.get(p.id) ?? [],
     })),
   };
 }
 
 export type ManualOrderFormData = Awaited<ReturnType<typeof getManualOrderFormData>>;
+
+export type PendingProductResult =
+  | { ok: true; product: ManualOrderFormData["products"][number] }
+  | { ok: false; error: string };
+
+export async function registerPendingProduct(rawSku: string): Promise<PendingProductResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  const sku = String(rawSku ?? "").trim();
+  if (!sku || sku.length > 64) return { ok: false, error: "Артикул должен содержать от 1 до 64 символов" };
+
+  const existing = await prisma.product.findFirst({
+    where: { sku: { equals: sku, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (existing) return { ok: false, error: "Товар с таким артикулом уже есть — обновите список и выберите его" };
+
+  const category = await prisma.category.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+    orderBy: { name: "asc" },
+  }) ?? await prisma.category.upsert({
+    where: { slug: "pending-registration" },
+    create: { name: "Регистрация номенклатуры", slug: "pending-registration", isActive: false },
+    update: {},
+    select: { id: true },
+  });
+
+  try {
+    const product = await prisma.product.create({
+      data: {
+        sku,
+        name: "Регистрация номенклатуры",
+        slug: `registration-${randomUUID()}`,
+        price: 0,
+        stock: 0,
+        images: [],
+        categoryId: category.id,
+        isActive: false,
+        pendingRegistration: true,
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        brand: true,
+        stock: true,
+        isActive: true,
+        pendingRegistration: true,
+        price: true,
+        pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } },
+      },
+    });
+    const result = {
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      brand: product.brand,
+      stock: product.stock,
+      isActive: product.isActive,
+      pendingRegistration: product.pendingRegistration,
+      purchase: product.pricing?.purchasePrice ?? 0,
+      prices: {
+        retail: product.pricing?.retailPrice ?? product.price,
+        wholesale: product.price,
+        dealer: product.pricing?.dealerPrice ?? product.price,
+      },
+      supplierOffers: [],
+    };
+    revalidatePath("/admin/crm/products");
+    revalidatePath("/admin/crm/orders");
+    return { ok: true, product: result };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { ok: false, error: "Товар с таким артикулом уже добавлен — обновите список и выберите его" };
+    }
+    throw error;
+  }
+}
 
 export async function createManualOrder(input: ManualOrderRecordInput): Promise<ManualOrderResult> {
   const denied = await accessDenied("crm.orders");
@@ -140,7 +249,7 @@ export async function createManualOrder(input: ManualOrderRecordInput): Promise<
 }
 
 export async function createReplenishmentOrder(input: ManualOrderRecordInput): Promise<ManualOrderResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.replenishment");
   if (denied) return denied;
   const ownCompany = await prisma.company.findFirst({
     where: { isOwn: true },

@@ -46,7 +46,7 @@ function done(docs: CreatedDoc[]): DocsResult {
 
 /** Создать перемещение: from one 1С warehouse to another, posted in 1С. */
 export async function createTransferDoc(from: string, to: string, lines: DocLine[], comment: string): Promise<DocsResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.stock");
   if (denied) return denied;
   const rows = cleanLines(lines);
   if (!rows || !GUID.test(from) || !GUID.test(to)) return { ok: false, error: "Некорректные данные документа" };
@@ -64,7 +64,7 @@ export async function createAdjustmentDoc(
   lines: DocLine[],
   comment: string
 ): Promise<DocsResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.adjustments");
   if (denied) return denied;
   const rows = cleanLines(lines);
   if (!rows || !GUID.test(warehouse)) return { ok: false, error: "Некорректные данные документа" };
@@ -78,7 +78,7 @@ export async function createAdjustmentDoc(
 
 /** Инвентаризация: the counted quantities; shortages and surpluses become documents in 1С. */
 export async function createInventoryDoc(warehouse: string, lines: InventoryLine[], comment: string): Promise<DocsResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.stock");
   if (denied) return denied;
   if (
     !GUID.test(warehouse) ||
@@ -99,7 +99,7 @@ export type ItemHit = { ref: string; name: string; sku: string; price: number | 
 
 /** Goods of 1С for a document line: by article or name, with the site's purchase price (rubles). */
 export async function searchOneCItems(query: string): Promise<ItemHit[]> {
-  if (!(await hasAccess("warehouse", "edit"))) return [];
+  if (!(await hasAccess(["warehouse.stock", "warehouse.adjustments"], "edit"))) return [];
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return [];
   const goods = await loadOneCGoodsCached();
@@ -109,7 +109,7 @@ export async function searchOneCItems(query: string): Promise<ItemHit[]> {
 
 /** The site's purchase price of the products behind 1С cards, rubles. */
 export async function itemPrices(refs: string[]): Promise<Record<string, number>> {
-  if (!(await hasAccess("warehouse", "view")) || !Array.isArray(refs)) return {};
+  if (!(await hasAccess("warehouse.stock", "view")) || !Array.isArray(refs)) return {};
   const priced = await withPrices(refs.filter((r) => GUID.test(r)).slice(0, 5000).map((ref) => ({ ref, name: "", sku: "" })));
   return Object.fromEntries(priced.filter((p) => p.price).map((p) => [p.ref, p.price!]));
 }
@@ -156,7 +156,7 @@ export async function saveWarehouse(
 
 /** Место хранения of an item on a warehouse; empty clears it. */
 export async function setStoragePlace(warehouseRef: string, itemRef: string, place: string): Promise<WarehouseActionResult> {
-  const denied = await accessDenied("warehouse");
+  const denied = await accessDenied("warehouse.stock");
   if (denied) return denied;
   const value = place.trim().slice(0, 100);
   if (!/^[0-9a-f-]{36}$/i.test(warehouseRef) || !/^[0-9a-f-]{36}$/i.test(itemRef)) {
@@ -177,7 +177,7 @@ export async function setStoragePlace(warehouseRef: string, itemRef: string, pla
 
 /** «Обновить»: reads 1С again instead of the 5-minute copy. */
 export async function refreshWarehouseData(): Promise<WarehouseActionResult> {
-  if (!(await hasAccess(["warehouse", "reports.movements"], "view"))) return { ok: false, error: "Нет доступа" };
+  if (!(await hasAccess(["warehouse.stock", "reports.movements"], "view"))) return { ok: false, error: "Нет доступа" };
   try {
     await getWarehouseData(true);
   } catch (error) {

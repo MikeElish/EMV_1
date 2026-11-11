@@ -78,6 +78,14 @@ export async function resolveProduct(productId: string, refs: string[] | null): 
   const denied = await accessDenied("settings.1c");
   if (denied) return denied;
   try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { pendingRegistration: true },
+    });
+    if (!product) return { ok: false, error: "Товар не найден" };
+    if (product.pendingRegistration) {
+      return { ok: false, error: "Сначала владелец должен зарегистрировать номенклатуру в карточке товара" };
+    }
     if (refs?.length) {
       const known = new Set((await goods()).map((g) => g.ref));
       if (refs.some((r) => !known.has(r))) return { ok: false, error: "Карточка 1С не найдена — обновите страницу" };

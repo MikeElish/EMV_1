@@ -9,6 +9,7 @@ export type SaleKind = "retail" | "wholesale" | "dealer";
 export type PriceField = { pct: string; rub: string };
 export type PricesState = {
   supplierId: string;
+  noOffer: boolean;
   purchaseRub: string;
   sale: Record<SaleKind, PriceField>;
   // First supplier offer (new product / no offers yet).
@@ -25,11 +26,12 @@ export type OfferRow = {
   price: number;
   deliveryDays: number | null;
   quality: string | null;
+  noOffer: boolean;
   selected: boolean;
   updatedAt: Date;
 };
 
-export const QUALITY_SUGGESTIONS = ["Оригинал", "Аналог (OEM)", "Аналог", "Б/у"];
+export const QUALITY_SUGGESTIONS = ["Оригинал", "Аналог (OEM)", "Аналог", "Б/у", "TVH"];
 
 export const SALE_KINDS: { kind: SaleKind; label: string; hint?: string }[] = [
   { kind: "retail", label: "Розничная" },
@@ -61,10 +63,12 @@ export function initialPrices(
   existing?: { supplierId: string | null; purchase: number; retail: number; wholesale: number; dealer: number },
   offers: OfferRow[] = [],
 ): PricesState {
+  const availableOffers = offers.filter((offer) => !offer.noOffer);
   const firstOffer = {
     deliveryDays: "",
     quality: "",
-    selectedOfferId: (offers.find((o) => o.selected) ?? offers[0])?.id ?? "",
+    selectedOfferId: (availableOffers.find((o) => o.selected) ?? availableOffers[0])?.id ?? "",
+    noOffer: offers.length > 0 && availableOffers.length === 0,
   };
   if (!existing) {
     const empty = (kind: SaleKind): PriceField => ({ pct: pctToString(markups[MARKUP_KEY[kind]]), rub: "" });
@@ -106,7 +110,7 @@ function OffersTable({
   selectedId: string;
   onSelect: (offer: OfferRow) => void;
 }) {
-  const choosable = offers.length > 1;
+  const choosable = offers.filter((offer) => !offer.noOffer).length > 1;
   return (
     <div>
       <p className="text-sm text-foreground/60">Предложения поставщиков</p>
@@ -132,17 +136,19 @@ function OffersTable({
                 >
                   {choosable && (
                     <td className="py-2">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() => onSelect(o)}
-                        aria-label={`Цена на сайте от ${o.supplierName ?? "поставщика"}`}
-                        title="Эта цена будет указана на сайте"
-                      />
+                      {!o.noOffer && (
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => onSelect(o)}
+                          aria-label={`Цена на сайте от ${o.supplierName ?? "поставщика"}`}
+                          title="Эта цена будет указана на сайте"
+                        />
+                      )}
                     </td>
                   )}
                   <td className="py-2 pr-3">{o.supplierName ?? "—"}</td>
-                  <td className="whitespace-nowrap py-2 pr-3 font-medium">{formatPrice(o.price)}</td>
+                  <td className="whitespace-nowrap py-2 pr-3 font-medium">{o.noOffer ? "Нет предложения" : formatPrice(o.price)}</td>
                   <td className="whitespace-nowrap py-2 pr-3">{formatDays(o.deliveryDays)}</td>
                   <td className="py-2 pr-3">{o.quality ?? "—"}</td>
                   <td className="whitespace-nowrap py-2 text-foreground/60">{formatDay(o.updatedAt)}</td>
@@ -222,6 +228,31 @@ export function ProductPricesPanel({
         <OffersTable offers={offers} selectedId={value.selectedOfferId} onSelect={selectOffer} />
       ) : (
         <>
+          <label className="flex items-center gap-2 text-sm text-foreground/70">
+            <input
+              type="checkbox"
+              checked={value.noOffer}
+              onChange={(event) => {
+                const noOffer = event.target.checked;
+                onChange({
+                  ...value,
+                  noOffer,
+                  ...(noOffer
+                    ? {
+                        purchaseRub: "",
+                        sale: Object.fromEntries(SALE_KINDS.map(({ kind }) => [kind, { ...value.sale[kind], rub: "" }])) as PricesState["sale"],
+                      }
+                    : {}),
+                });
+              }}
+            />
+            Нет предложения
+          </label>
+          {value.noOffer && (
+            <p className="text-sm text-foreground/50">
+              Товар будет отображаться на сайте как «По запросу», пока поставщик не сообщит цену.
+            </p>
+          )}
           <div>
             <label htmlFor="supplierId" className="text-sm text-foreground/60">
               Поставщик
@@ -250,6 +281,7 @@ export function ProductPricesPanel({
               id="purchaseRub"
               inputMode="decimal"
               value={value.purchaseRub}
+              disabled={value.noOffer}
               onChange={(e) => setPurchase(e.target.value)}
               className={`mt-1 ${inputClassName}`}
             />
@@ -309,6 +341,7 @@ export function ProductPricesPanel({
                     aria-label={`${label}: наценка, %`}
                     inputMode="decimal"
                     value={value.sale[kind].pct}
+                    disabled={value.noOffer}
                     onChange={(e) => setPct(kind, e.target.value)}
                     className={inputClassName}
                   />
@@ -318,6 +351,7 @@ export function ProductPricesPanel({
                     aria-label={`${label}: цена, ₽`}
                     inputMode="decimal"
                     value={value.sale[kind].rub}
+                    disabled={value.noOffer}
                     onChange={(e) => setRub(kind, e.target.value)}
                     className={inputClassName}
                   />

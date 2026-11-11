@@ -4,6 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { useRouter } from "next/navigation";
 import { formatRubPrecise } from "@/lib/money";
 import {
+  formatSupplierCurrency,
+  quotePriceInRub,
+  SUPPLIER_CURRENCIES,
+  SUPPLIER_CURRENCY_LABELS,
+  type SupplierCurrency,
+} from "@/lib/supplier-currency";
+import {
   analyzeOfferImport,
   commitOfferImport,
   deleteOffer,
@@ -57,18 +64,31 @@ function OfferModal({
   productId,
   offer,
   suppliers,
+  canSetConversion,
   onClose,
   onSaved,
 }: {
   productId: string;
   offer: OfferView | null;
   suppliers: SupplierOption[];
+  canSetConversion: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [removeFile, setRemoveFile] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [currency, setCurrency] = useState<SupplierCurrency>(offer?.currency ?? "RUB");
+  const [exchangeRate, setExchangeRate] = useState(offer?.exchangeRate == null ? "" : String(offer.exchangeRate).replace(".", ","));
+  const [markupPercent, setMarkupPercent] = useState(String(offer?.logisticsMarkupPercent ?? 70).replace(".", ","));
+  const [quotedPrice, setQuotedPrice] = useState(offer ? String(offer.quotedPrice / 100).replace(".", ",") : "");
+  const amount = Number(quotedPrice.trim().replace(/\s/g, "").replace(",", "."));
+  const rate = Number(exchangeRate.trim().replace(/\s/g, "").replace(",", "."));
+  const markup = Number(markupPercent.trim().replace(/\s/g, "").replace(",", "."));
+  const rubPrice =
+    Number.isFinite(amount) && amount > 0
+      ? quotePriceInRub(Math.round(amount * 100), currency, currency === "RUB" ? 1 : rate, currency === "RUB" ? 0 : markup)
+      : null;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -111,20 +131,88 @@ function OfferModal({
             ))}
           </select>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label htmlFor="offer-currency" className="text-sm text-foreground/60">Валюта *</label>
+            <select
+              id="offer-currency"
+              name="currency"
+              value={currency}
+              onChange={(event) => {
+                const next = event.target.value as SupplierCurrency;
+                if (next === currency) return;
+                setCurrency(next);
+                if (next === "RUB") {
+                  setExchangeRate("1");
+                  setMarkupPercent("0");
+                } else if (next === offer?.currency) {
+                  setExchangeRate(offer.exchangeRate == null ? "" : String(offer.exchangeRate).replace(".", ","));
+                  setMarkupPercent(String(offer.logisticsMarkupPercent).replace(".", ","));
+                } else {
+                  setExchangeRate("");
+                  setMarkupPercent("70");
+                }
+              }}
+              className={inputClass}
+            >
+              {SUPPLIER_CURRENCIES.map((code) => <option key={code} value={code}>{SUPPLIER_CURRENCY_LABELS[code]}</option>)}
+            </select>
+          </div>
           <div>
             <label htmlFor="offer-price" className="text-sm text-foreground/60">
-              Цена, ₽ *
+              Цена, {currency} *
             </label>
             <input
               id="offer-price"
               name="price"
               required
               inputMode="decimal"
-              defaultValue={offer ? String(offer.price / 100).replace(".", ",") : ""}
+              value={quotedPrice}
+              onChange={(event) => setQuotedPrice(event.target.value)}
               className={inputClass}
             />
           </div>
+          {currency !== "RUB" && (
+            <div>
+              <label htmlFor="offer-exchange-rate" className="text-sm text-foreground/60">Курс, ₽ за 1 {currency}</label>
+              <input
+                id="offer-exchange-rate"
+                name="exchangeRate"
+                inputMode="decimal"
+                value={exchangeRate}
+                onChange={(event) => setExchangeRate(event.target.value)}
+                disabled={!canSetConversion}
+                className={inputClass}
+              />
+            </div>
+          )}
+          {currency !== "RUB" && (
+            <div>
+              <label htmlFor="offer-markup" className="text-sm text-foreground/60">Мультипликатор (логистика и таможня), %</label>
+              <input
+                id="offer-markup"
+                name="logisticsMarkupPercent"
+                inputMode="decimal"
+                value={markupPercent}
+                onChange={(event) => setMarkupPercent(event.target.value)}
+                disabled={!canSetConversion}
+                className={inputClass}
+              />
+            </div>
+          )}
+        </div>
+        <p className="text-sm font-medium">
+          Цена в рублях: {rubPrice === null ? "— проверьте курс, мультипликатор и цену" : formatRubPrecise(rubPrice)}
+          {currency !== "RUB" && (
+            <span className="ml-1 text-xs font-normal text-foreground/50">
+              (цена × курс × {Number.isFinite(markup) ? (1 + markup / 100).toFixed(2) : "—"})
+            </span>
+          )}
+        </p>
+        {currency !== "RUB" && !canSetConversion && (
+          <p className="text-xs text-foreground/50">Курс и мультипликатор может задать владелец.</p>
+        )}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div>
             <label htmlFor="offer-days" className="text-sm text-foreground/60">
               Срок, дн.
@@ -228,7 +316,7 @@ function OrderModal({ offer, onClose }: { offer: OfferView; onClose: () => void 
     <Modal onClose={onClose} maxWidthClassName="max-w-sm">
       <h2 className="text-lg font-semibold">Заказать у поставщика</h2>
       <p className="mt-1 text-sm text-foreground/60">
-        {offer.supplierName ?? "—"} · {formatRubPrecise(offer.price)} · {days(offer.deliveryDays)}
+        {offer.supplierName ?? "—"} · {formatSupplierCurrency(offer.quotedPrice, offer.currency)} · {formatRubPrecise(offer.price)} · {days(offer.deliveryDays)}
       </p>
       {done ? (
         <>
@@ -295,11 +383,13 @@ async function prepareDesktopImport(file: DesktopPriceFile, suppliers: SupplierO
 function ImportModal({
   suppliers,
   desktop,
+  canSetConversion,
   onClose,
   onDone,
 }: {
   suppliers: SupplierOption[];
   desktop?: DesktopImport | null;
+  canSetConversion: boolean;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -309,6 +399,9 @@ function ImportModal({
     desktop?.analysis?.ok ? desktop.analysis : null
   );
   const [createMissing, setCreateMissing] = useState(false);
+  const [currency, setCurrency] = useState<SupplierCurrency>("RUB");
+  const [exchangeRate, setExchangeRate] = useState("");
+  const [markupPercent, setMarkupPercent] = useState("70");
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(
     desktop?.analysis && !desktop.analysis.ok ? desktop.analysis.error : null
@@ -323,14 +416,26 @@ function ImportModal({
     startTransition(async () => {
       const r = await analyzeOfferImport(form);
       if (!r.ok) setError(r.error);
-      else setAnalysis(r);
+      else {
+        setAnalysis(r);
+        const fileCurrencies = new Set(r.rows.flatMap((row) => row.currency ? [row.currency] : []));
+        if (fileCurrencies.size === 1) setCurrency([...fileCurrencies][0]);
+        if (fileCurrencies.size > 1) setError("В файле несколько валют. Разделите его на отдельные файлы по валюте.");
+      }
     });
   }
 
   function commit() {
     if (!analysis) return;
     startTransition(async () => {
-      const r = await commitOfferImport({ supplierId, rows: analysis.rows, createMissing });
+      const r = await commitOfferImport({
+        supplierId,
+        rows: analysis.rows,
+        createMissing,
+        currency,
+        exchangeRate: currency === "RUB" ? 1 : canSetConversion ? Number(exchangeRate.replace(",", ".")) : null,
+        logisticsMarkupPercent: currency === "RUB" ? 0 : canSetConversion ? Number(markupPercent.replace(",", ".")) : 70,
+      });
       if (!r.ok) {
         setError(r.error);
         return;
@@ -347,6 +452,38 @@ function ImportModal({
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-4xl">
       <h2 className="text-lg font-semibold">Загрузка предложений из Excel</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <label className="text-sm text-foreground/60">
+          Валюта
+          <select
+            value={currency}
+            onChange={(event) => {
+              const next = event.target.value as SupplierCurrency;
+              setCurrency(next);
+              if (next !== "RUB") {
+                setExchangeRate("");
+                setMarkupPercent("70");
+              }
+            }}
+            className={inputClass}
+          >
+            {SUPPLIER_CURRENCIES.map((code) => <option key={code} value={code}>{SUPPLIER_CURRENCY_LABELS[code]}</option>)}
+          </select>
+        </label>
+        {currency !== "RUB" && (
+          <>
+            <label className="text-sm text-foreground/60">
+              Курс, ₽ за 1 {currency}
+              <input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} disabled={!canSetConversion} inputMode="decimal" className={inputClass} />
+            </label>
+            <label className="text-sm text-foreground/60">
+              Мультипликатор (логистика и таможня), %
+              <input value={markupPercent} onChange={(event) => setMarkupPercent(event.target.value)} disabled={!canSetConversion} inputMode="decimal" className={inputClass} />
+            </label>
+          </>
+        )}
+      </div>
+      {currency !== "RUB" && !canSetConversion && <p className="text-xs text-foreground/50">Курс и мультипликатор может задать только владелец.</p>}
       {result ? (
         <>
           <p className="mt-4 text-sm">{result}</p>
@@ -446,7 +583,7 @@ function ImportModal({
                   <th className="px-2 py-1.5">Стр.</th>
                   <th className="px-2 py-1.5">Артикул</th>
                   <th className="px-2 py-1.5">Наименование</th>
-                  <th className="px-2 py-1.5">Цена</th>
+                  <th className="px-2 py-1.5">Цена (валюта)</th>
                   <th className="px-2 py-1.5">Срок</th>
                   <th className="px-2 py-1.5">Качество</th>
                   <th className="px-2 py-1.5">Что будет</th>
@@ -454,25 +591,42 @@ function ImportModal({
               </thead>
               <tbody>
                 {analysis.rows.map((r) => (
-                  <tr key={r.row} className="border-t border-foreground/10">
-                    <td className="px-2 py-1 text-foreground/50">{r.row}</td>
-                    <td className="px-2 py-1">
-                      {r.sku}
-                      {r.brand && <span className="text-foreground/50"> · {r.brand}</span>}
-                    </td>
-                    <td className="px-2 py-1">{r.productName ?? r.name}</td>
-                    <td className="whitespace-nowrap px-2 py-1">
-                      {r.oldPrice !== null && r.oldPrice !== r.price && (
-                        <span className="text-foreground/40 line-through">{formatRubPrecise(r.oldPrice)} </span>
-                      )}
-                      {formatRubPrecise(r.price)}
-                    </td>
-                    <td className="px-2 py-1">{days(r.deliveryDays)}</td>
-                    <td className="whitespace-nowrap px-2 py-1">{r.quality ?? "—"}</td>
-                    <td className={`px-2 py-1 ${r.kind === "missing" ? "text-yellow-700 dark:text-yellow-400" : ""}`}>
-                      {KIND_LABELS[r.kind]}
-                    </td>
-                  </tr>
+                  (() => {
+                    const rowCurrency = r.currency ?? currency;
+                    const rateForRow = rowCurrency === currency ? Number(exchangeRate.replace(",", ".")) : NaN;
+                    const markupForRow = rowCurrency === currency ? Number(markupPercent.replace(",", ".")) : 70;
+                    const convertedPrice = rateForRow > 0
+                      ? quotePriceInRub(r.price, rowCurrency, rateForRow, markupForRow)
+                      : null;
+                    return (
+                      <tr key={r.row} className="border-t border-foreground/10">
+                        <td className="px-2 py-1 text-foreground/50">{r.row}</td>
+                        <td className="px-2 py-1">
+                          {r.sku}
+                          {r.brand && <span className="text-foreground/50"> · {r.brand}</span>}
+                        </td>
+                        <td className="px-2 py-1">{r.productName ?? r.name}</td>
+                        <td className="whitespace-nowrap px-2 py-1">
+                          {r.oldPrice !== null && r.oldPrice !== r.price && (
+                            <span className="text-foreground/40 line-through">{formatRubPrecise(r.oldPrice)} </span>
+                          )}
+                          {formatSupplierCurrency(r.price, rowCurrency)}
+                          {rowCurrency !== "RUB" && (
+                            <div className="text-xs text-foreground/60">
+                              {convertedPrice !== null
+                                ? formatRubPrecise(convertedPrice)
+                                : rateForRow > 0 ? "Проверьте курс и мультипликатор" : "Рублёвый курс не задан"}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-1">{days(r.deliveryDays)}</td>
+                        <td className="whitespace-nowrap px-2 py-1">{r.quality ?? "—"}</td>
+                        <td className={`px-2 py-1 ${r.kind === "missing" ? "text-yellow-700 dark:text-yellow-400" : ""}`}>
+                          {KIND_LABELS[r.kind]}
+                        </td>
+                      </tr>
+                    );
+                  })()
                 ))}
               </tbody>
             </table>
@@ -512,10 +666,12 @@ function ImportModal({
 export function PriceCheckBoard({
   products,
   suppliers,
+  canSetConversion,
   initialProductId,
 }: {
   products: PriceCheckProduct[];
   suppliers: SupplierOption[];
+  canSetConversion: boolean;
   initialProductId?: string;
 }) {
   const router = useRouter();
@@ -799,18 +955,31 @@ export function PriceCheckBoard({
                         </a>
                       )}
                     </td>
-                    <td className="whitespace-nowrap py-2 pr-4 font-medium">{formatRubPrecise(o.price)}</td>
+                    <td className="whitespace-nowrap py-2 pr-4 font-medium">
+                      {o.noOffer ? "Нет предложения" : (
+                        <>
+                          {formatSupplierCurrency(o.quotedPrice, o.currency)}
+                          <div className="text-xs font-normal text-foreground/60">
+                            {o.currency === "RUB" || o.price > 0 ? formatRubPrecise(o.price) : "Курс не задан"}
+                          </div>
+                        </>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap py-2 pr-4">{days(o.deliveryDays)}</td>
                     <td className="py-2 pr-4">{o.quality ?? "—"}</td>
                     <td className="whitespace-nowrap py-2 pr-4 text-foreground/60">{day(o.priceUpdatedAt)}</td>
                     <td className="py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setOrdering(o)}
-                        className="whitespace-nowrap rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90"
-                      >
-                        Заказать
-                      </button>
+                      {!o.noOffer && (
+                        <button
+                          type="button"
+                          onClick={() => setOrdering(o)}
+                          disabled={o.price <= 0}
+                          title={o.price <= 0 ? "Сначала укажите курс валюты" : undefined}
+                          className="whitespace-nowrap rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-40"
+                        >
+                          Заказать
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -825,6 +994,7 @@ export function PriceCheckBoard({
           productId={selected.id}
           offer={editing === "new" ? null : editing}
           suppliers={suppliers}
+          canSetConversion={canSetConversion}
           onClose={() => setEditing(null)}
           onSaved={afterChange}
         />
@@ -836,6 +1006,7 @@ export function PriceCheckBoard({
           key={desktopImport?.file.id ?? "manual"}
           suppliers={suppliers}
           desktop={desktopImport}
+          canSetConversion={canSetConversion}
           onClose={closeImport}
           onDone={() => {
             imported.current = true;

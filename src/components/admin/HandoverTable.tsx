@@ -11,8 +11,10 @@ import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 export type HandoverRow = {
   id: string;
+  canEdit: boolean;
   orderNumber: string;
   customer: string;
+  organization: string;
   phone: string;
   delivery: string | null;
   ready: { name: string; quantity: number }[];
@@ -127,7 +129,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
     const q = search.trim().toLowerCase();
     return orders
       .map((o) => ({ ...o, state: o.ready.length ? "Готов к выдаче" : (o.handover ?? "—") }))
-      .filter((o) => !q || [o.orderNumber, o.customer, o.phone, o.delivery, o.state, o.handoverNote].filter(Boolean).join(" ").toLowerCase().includes(q))
+      .filter((o) => !q || [o.orderNumber, o.customer, o.organization, o.phone, o.delivery, o.state, o.handoverNote].filter(Boolean).join(" ").toLowerCase().includes(q))
       .sort((a, b) => Number(!a.ready.length && !a.updPending) - Number(!b.ready.length && !b.updPending));
   }, [orders, search]);
 
@@ -151,6 +153,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
               <tr className="text-left text-foreground/50">
                 <th className="py-2 pr-4">Заказ</th>
                 <th className="py-2 pr-4">Клиент</th>
+                <th className="py-2 pr-4">Организация</th>
                 <th className="py-2 pr-4">Позиции</th>
                 <th className="py-2 pr-4 text-right">Сумма</th>
                 <th className="py-2 pr-4">Оплата</th>
@@ -167,6 +170,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                     <div>{o.customer}</div>
                     <div className="text-xs text-foreground/50">{[o.phone, o.delivery].filter(Boolean).join(" · ")}</div>
                   </td>
+                  <td className="py-2 pr-4">{o.organization || "—"}</td>
                   <td className="py-2 pr-4">
                     {o.ready.map((i, n) => (
                       <div key={n} className="text-xs">
@@ -198,8 +202,8 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                     ))}
                   </td>
                   <td className="whitespace-nowrap py-2">
-                    {o.updPending && <UpdButton orderId={o.id} onDone={setMessage} />}
-                    {o.ready.length > 0 &&
+                    {o.canEdit && o.updPending && <UpdButton orderId={o.id} onDone={setMessage} />}
+                    {o.canEdit && o.ready.length > 0 &&
                       HANDOVER_KINDS.map((kind) => (
                         <button
                           key={kind}

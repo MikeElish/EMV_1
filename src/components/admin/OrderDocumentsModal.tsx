@@ -16,10 +16,12 @@ import {
 export function OrderDocumentsModal({
   orderId,
   category,
+  canEdit,
   onClose,
 }: {
   orderId: string;
   category: OrderDocumentCategory;
+  canEdit: boolean;
   onClose: () => void;
 }) {
   const [documents, setDocuments] = useState<OrderDocument[] | null>(null);
@@ -87,7 +89,7 @@ export function OrderDocumentsModal({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={!canEdit || uploading}
           aria-label="Загрузить файл"
           className="flex h-8 w-8 items-center justify-center rounded-md bg-green-600 text-lg font-bold leading-none text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
@@ -96,7 +98,7 @@ export function OrderDocumentsModal({
         <h2 className="text-lg font-semibold">
           {ORDER_DOCUMENT_CATEGORY_LABELS[category]}
         </h2>
-        {category === "INVOICE" && (
+        {canEdit && category === "INVOICE" && (
           <button
             type="button"
             onClick={issue}
@@ -112,6 +114,7 @@ export function OrderDocumentsModal({
         ref={fileInputRef}
         type="file"
         onChange={handleFileChange}
+        disabled={!canEdit}
         className="hidden"
       />
 
@@ -151,15 +154,17 @@ export function OrderDocumentsModal({
                 {printing === doc.id ? "Печать..." : "Печать"}
               </button>
             )}
-            <DeleteButton
-              action={async () => {
-                const result = await deleteOrderDocument(doc.id);
-                if (result.ok) refresh();
-                return result;
-              }}
-              confirmText={`Удалить файл «${doc.fileName}»?`}
-              className="shrink-0 text-red-600 hover:underline disabled:opacity-50"
-            />
+            {canEdit && (
+              <DeleteButton
+                action={async () => {
+                  const result = await deleteOrderDocument(doc.id);
+                  if (result.ok) refresh();
+                  return result;
+                }}
+                confirmText={`Удалить файл «${doc.fileName}»?`}
+                className="shrink-0 text-red-600 hover:underline disabled:opacity-50"
+              />
+            )}
           </div>
         ))}
       </div>
