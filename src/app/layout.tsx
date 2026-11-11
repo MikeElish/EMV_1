@@ -17,7 +17,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "EMV",
-  description: "EMV — такси и запчасти для спецтехники",
+  description: "EMV — Группа компаний",
   openGraph: { siteName: "EMV", locale: "ru_RU", type: "website" },
   // Codes from Яндекс.Вебмастер / Google Search Console (public by design).
   verification: {
