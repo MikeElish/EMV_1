@@ -250,13 +250,14 @@ export async function importSupplierProposalPreview(orderNumber: string, formDat
     select: {
       items: {
         where: { cancelled: false },
-        select: { productId: true, quantity: true, product: { select: { sku: true, name: true } } },
+        select: { productId: true, quantity: true, product: { select: { brand: true, sku: true, name: true } } },
       },
     },
   });
   if (!order) return { ok: false as const, error: "Заказ не найден" };
   const rows: SupplierQuoteRow[] = order.items.map((item) => ({
     productId: item.productId,
+    brand: item.product.brand,
     sku: item.product.sku,
     name: item.product.name,
     quantity: item.quantity,

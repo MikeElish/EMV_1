@@ -17,7 +17,7 @@ const TEXT: Record<Language, Record<string, string>> = {
     import: "Загрузить Excel", hint: "Заполните поля здесь или внесите данные в Excel и загрузите файл.",
     test: "Тестовый просмотр — данные заказа настоящие, но отправка предложения и уведомление менеджера отключены.",
     currencyRUB: "Рубли", currencyUSD: "Доллар США", currencyEUR: "Евро", currencyCNY: "Юань",
-    number: "№", name: "Наименование", sku: "Артикул", quantity: "Количество", price: "Цена", currency: "Валюта",
+    number: "№", brand: "Бренд", name: "Наименование", sku: "Артикул", quantity: "Количество", price: "Цена", currency: "Валюта",
     total: "Всего", noOffer: "Нет предложения", quality: "Качество", warehouse: "Склад",
     delivery: "Срок поставки (дней)", noOfferHint: "Если по позиции нет предложения, оставьте поле «Цена» пустым — для неё будет отмечено «Нет предложения».",
     send: "Направить предложение", sending: "Отправляем...", thanks: "Спасибо за ответ!",
@@ -29,7 +29,7 @@ const TEXT: Record<Language, Record<string, string>> = {
     import: "Upload Excel", hint: "Fill in the fields here or enter the data in Excel and upload the file.",
     test: "Preview only — order data is real, but submitting the quote and notifying the manager are disabled.",
     currencyRUB: "Russian ruble", currencyUSD: "US dollar", currencyEUR: "Euro", currencyCNY: "Chinese yuan",
-    number: "No.", name: "Item name", sku: "Part number", quantity: "Quantity", price: "Price", currency: "Currency",
+    number: "No.", brand: "Brand", name: "Item name", sku: "Part number", quantity: "Quantity", price: "Price", currency: "Currency",
     total: "Total", noOffer: "No offer", quality: "Quality", warehouse: "Warehouse",
     delivery: "Delivery time (days)", noOfferHint: "If you cannot offer an item, leave its price blank and select “No offer”.",
     send: "Submit quotation", sending: "Submitting...", thanks: "Thank you for your response!",
@@ -41,7 +41,7 @@ const TEXT: Record<Language, Record<string, string>> = {
     import: "上传 Excel", hint: "请在此填写，或在 Excel 中填写后上传。",
     test: "预览模式：订单数据真实，但提交报价和通知经理功能已禁用。",
     currencyRUB: "俄罗斯卢布", currencyUSD: "美元", currencyEUR: "欧元", currencyCNY: "人民币",
-    number: "序号", name: "商品名称", sku: "零件号", quantity: "数量", price: "价格", currency: "货币",
+    number: "序号", brand: "品牌", name: "商品名称", sku: "零件号", quantity: "数量", price: "价格", currency: "货币",
     total: "总计", noOffer: "无报价", quality: "质量", warehouse: "仓库",
     delivery: "交货时间（天）", noOfferHint: "无法报价时，请将价格留空并勾选“无报价”。",
     send: "提交报价", sending: "正在提交...", thanks: "感谢您的回复！",
@@ -234,7 +234,7 @@ export function SupplierProposalForm({
           <table className="w-full min-w-[1050px] text-sm">
             <thead className="bg-foreground/[0.03] text-left text-foreground/60">
               <tr>
-                {[t.number, t.name, t.sku, t.quantity, t.price, t.currency, t.total, t.noOffer, t.quality, t.warehouse, t.delivery].map((heading) => (
+                {[t.number, t.brand, t.name, t.sku, t.quantity, t.price, t.currency, t.total, t.noOffer, t.quality, t.warehouse, t.delivery].map((heading) => (
                   <th key={heading} className="px-3 py-3 font-medium">{heading}</th>
                 ))}
               </tr>
@@ -246,6 +246,7 @@ export function SupplierProposalForm({
                 return (
                   <tr key={row.productId} className="border-t border-foreground/10 align-top">
                     <td className="px-3 py-3">{index + 1}</td>
+                    <td className="max-w-40 px-3 py-3">{row.brand ?? "—"}</td>
                     <td className="max-w-64 px-3 py-3">{row.name}</td>
                     <td className="whitespace-nowrap px-3 py-3">{row.sku}</td>
                     <td className="px-3 py-3">{row.quantity}</td>

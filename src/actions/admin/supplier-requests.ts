@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { accessDenied, getMyAccess } from "@/lib/access-server";
 import { newSupplierQuoteToken, supplierQuoteTokenHash } from "@/lib/supplier-quote";
 import { newSupplierInvoiceToken, supplierInvoiceTokenHash } from "@/lib/supplier-invoice-portal";
-import { formatSupplierCurrency, MAX_MONEY_MINOR, parseSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
+import { MAX_MONEY_MINOR, parseSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
 
 export type SupplierRequestData = {
   orders: {
@@ -444,12 +444,6 @@ export async function submitSupplierRequests(input: SendInput): Promise<Supplier
       return created;
     });
     const url = absoluteUrl(`/supplier-invoice/${token}`);
-    const details = lines.map((line) => {
-      const source = line.forStock
-        ? "На склад"
-        : line.orderItem?.order.orderNumber ?? (line.buyerOrderNumber ? `Заказ покупателя № ${line.buyerOrderNumber}` : "Без привязки");
-      return `${line.product.name} (${line.product.sku}) — ${line.quantity} шт. × ${formatSupplierCurrency(line.quotedPrice ?? line.price, currency)} · ${source}`;
-    });
     let messageId: string;
     try {
       messageId = await sendSiteMail({
@@ -457,7 +451,7 @@ export async function submitSupplierRequests(input: SendInput): Promise<Supplier
         cc: "emv@emv.one",
         replyTo: "emv@emv.one",
         subject: `Заказ поставщику № ${purchase.number}${currency === "RUB" ? "" : ` (${currency})`}`,
-        text: `Добрый день${supplier.contactName ? `, ${supplier.contactName}` : ""}!\n\nПросим принять заказ:\n${details.join("\n")}\nИтого: ${formatSupplierCurrency(total, currency)}\n\nСчёт загрузите по защищённой ссылке: ${url}`,
+        text: `Добрый день${supplier.contactName ? `, ${supplier.contactName}` : ""}!\n\nПросим предоставить счёт на оплату по заказу поставщику № ${purchase.number}.\n\nБезопасная ссылка: ${url}`,
       });
     } catch (error) {
       errors.push(

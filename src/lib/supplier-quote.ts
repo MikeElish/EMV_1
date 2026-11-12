@@ -5,6 +5,7 @@ import { parseSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-cur
 
 export type SupplierQuoteRow = {
   productId: string;
+  brand: string | null;
   sku: string;
   name: string;
   quantity: number;
@@ -54,7 +55,7 @@ export async function loadSupplierQuote(token: string): Promise<SupplierQuoteCon
           },
         },
       },
-      lines: { include: { product: { select: { id: true, sku: true, name: true } } } },
+      lines: { include: { product: { select: { id: true, brand: true, sku: true, name: true } } } },
     },
   });
   if (!request) return null;
@@ -113,6 +114,7 @@ export async function loadSupplierQuote(token: string): Promise<SupplierQuoteCon
       const offer = offerByProduct.get(line.productId);
       return {
         productId: line.productId,
+        brand: line.product.brand,
         sku: line.product.sku,
         name: line.product.name,
         quantity: quantityByProduct.get(line.productId)!,

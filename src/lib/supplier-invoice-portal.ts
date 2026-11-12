@@ -21,7 +21,7 @@ export async function loadSupplierInvoice(token: string) {
       paymentRequest: { select: { id: true } },
       lines: {
         include: {
-          product: { select: { name: true, sku: true } },
+          product: { select: { brand: true, name: true, sku: true } },
           orderItem: { select: { order: { select: { orderNumber: true } } } },
         },
         orderBy: { id: "asc" },
@@ -45,10 +45,15 @@ export async function loadSupplierInvoice(token: string) {
       0,
     ),
     lines: purchase.lines.map((line) => ({
+      id: line.id,
       name: line.product.name,
+      brand: line.product.brand,
       sku: line.product.sku,
       quantity: line.quantity,
       price: currency === "RUB" ? line.price : line.quotedPrice ?? line.price,
+      deliveryDays: line.deliveryDays,
+      quality: line.quality,
+      warehouse: line.warehouse,
       source: line.forStock
         ? "На склад"
         : line.orderItem?.order.orderNumber
