@@ -5,6 +5,7 @@ import { formatRub } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import { handOver, issueUpd } from "@/actions/admin/receipts";
 import { HANDOVER_KINDS, type HandoverKind } from "@/lib/validators/receipts";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
@@ -196,9 +197,14 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                   </td>
                   <td className="max-w-48 py-2 pr-4">
                     {o.documents.map((d) => (
-                      <a key={d.id} href={d.fileUrl} download={d.fileName} title={d.fileName} className="block truncate text-blue-600 hover:underline dark:text-blue-400">
-                        {d.label}: {d.fileName}
-                      </a>
+                      <span key={d.id} className="block truncate">
+                        {d.label}:{" "}
+                        <DocumentFileLink
+                          fileUrl={d.fileUrl}
+                          fileName={d.fileName}
+                          className="text-blue-600 hover:underline dark:text-blue-400"
+                        />
+                      </span>
                     ))}
                   </td>
                   <td className="whitespace-nowrap py-2">

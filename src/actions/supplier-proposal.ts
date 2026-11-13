@@ -13,15 +13,27 @@ import {
   type SupplierCurrency,
 } from "@/lib/supplier-currency";
 import { markSupplierOfferNoOffer, syncSelectedOffer, upsertSupplierOffer } from "@/lib/supplier-offers";
+import { getExchangeRates } from "@/lib/price-settings";
 
 type QuoteEntry = {
   productId: string;
   priceRub: string;
   currency: SupplierCurrency;
   noOffer: boolean;
+  inStock: boolean;
+  stockQuantity: string;
   quality: string;
   warehouse: string;
   deliveryDays: string;
+};
+
+type ValidatedEntry = Omit<QuoteEntry, "priceRub" | "deliveryDays" | "stockQuantity"> & {
+  priceRub: string;
+  deliveryDays: string;
+  stockQuantity: string;
+  price: number | null;
+  days: number | null;
+  stockQty: number | null;
 };
 
 type QuoteActionResult =
@@ -47,15 +59,15 @@ function validateEntries(rows: SupplierQuoteRow[], entries: QuoteEntry[]) {
   if (!Array.isArray(entries) || entries.length !== rows.length) return { error: "Обновите страницу запроса и повторите отправку" };
   const allowed = new Set(rows.map((row) => row.productId));
   const seen = new Set<string>();
-  const valid: (QuoteEntry & { price: number | null; days: number | null })[] = [];
+  const valid: ValidatedEntry[] = [];
 
   for (const entry of entries) {
     if (!entry || !allowed.has(entry.productId) || seen.has(entry.productId)) {
       return { error: "Состав запроса изменился — обновите страницу" };
     }
     seen.add(entry.productId);
-    if ([entry.quality, entry.warehouse, entry.priceRub, entry.deliveryDays, entry.currency].some((value) => typeof value !== "string") ||
-        typeof entry.noOffer !== "boolean") {
+    if ([entry.quality, entry.warehouse, entry.priceRub, entry.deliveryDays, entry.stockQuantity, entry.currency].some((value) => typeof value !== "string") ||
+        typeof entry.noOffer !== "boolean" || typeof entry.inStock !== "boolean") {
       return { error: "Проверьте заполненные поля" };
     }
     const currency = parseSupplierCurrency(entry.currency);
@@ -71,7 +83,12 @@ function validateEntries(rows: SupplierQuoteRow[], entries: QuoteEntry[]) {
     if (entry.quality.length > 100 || entry.warehouse.length > 120) {
       return { error: "Слишком длинное значение качества или склада" };
     }
-    valid.push({ ...entry, currency, noOffer, price, days });
+    const stockQuantityText = entry.stockQuantity.trim();
+    const stockQty = entry.inStock && stockQuantityText ? Number(stockQuantityText) : null;
+    if (entry.inStock && stockQuantityText && stockQty !== null && (!Number.isInteger(stockQty) || stockQty < 0 || stockQty > 1_000_000)) {
+      return { error: "Количество в наличии должно быть целым числом от 0 до 1 000 000" };
+    }
+    valid.push({ ...entry, currency, noOffer, price, days, stockQty });
   }
   return { valid };
 }
@@ -84,15 +101,16 @@ export async function submitSupplierProposal(token: string, entries: QuoteEntry[
 
   const offered = checked.valid.filter((entry) => !entry.noOffer && entry.price !== null);
   const notOffered = checked.valid.filter((entry) => entry.noOffer);
+  const exchangeRates = await getExchangeRates();
   await prisma.$transaction(async (tx) => {
     for (const entry of offered) {
-      const current = quote.rows.find((row) => row.productId === entry.productId);
-      const sameCurrency = current?.currency === entry.currency;
-      const exchangeRate = entry.currency === "RUB" ? 1 : sameCurrency ? current.exchangeRate : null;
-      const logisticsMarkupPercent = entry.currency === "RUB" ? 0 : sameCurrency ? current.logisticsMarkupPercent : 70;
-      const priceRub =
-        quotePriceInRub(entry.price!, entry.currency, exchangeRate, logisticsMarkupPercent) ?? 0;
-      await upsertSupplierOffer(
+      const exchangeRate = entry.currency === "RUB" ? 1 : exchangeRates[entry.currency] || null;
+      if (entry.currency !== "RUB" && exchangeRate === null) {
+        throw new Error(`Курс ${entry.currency} не задан в настройках цен`);
+      }
+      const logisticsMarkupPercent = entry.currency === "RUB" ? 0 : 70;
+      const priceRub = quotePriceInRub(entry.price!, entry.currency, exchangeRate, logisticsMarkupPercent) ?? 0;
+      const saved = await upsertSupplierOffer(
         tx,
         entry.productId,
         {
@@ -102,6 +120,8 @@ export async function submitSupplierProposal(token: string, entries: QuoteEntry[
           currency: entry.currency,
           exchangeRate,
           logisticsMarkupPercent,
+          inStock: entry.inStock,
+          stockQuantity: entry.stockQty,
           deliveryDays: entry.days,
           quality: entry.quality.trim() || null,
           warehouse: entry.warehouse.trim() || null,
@@ -109,6 +129,33 @@ export async function submitSupplierProposal(token: string, entries: QuoteEntry[
         { selectIfNone: priceRub > 0 }
       );
       if (priceRub > 0) await syncSelectedOffer(tx, entry.productId);
+      if (entry.inStock) {
+        const row = quote.rows.find((r) => r.productId === entry.productId);
+        await tx.partnerStock.upsert({
+          where: { supplierId_sku: { supplierId: quote.supplierId, sku: row?.sku ?? "" } },
+          create: {
+            supplierId: quote.supplierId,
+            productId: entry.productId,
+            offerId: saved.id,
+            brand: row?.brand ?? null,
+            name: row?.name ?? null,
+            sku: row?.sku ?? "",
+            quantity: entry.stockQty ?? null,
+            price: entry.price!,
+            total: entry.stockQty ? entry.price! * entry.stockQty : null,
+            source: "OFFER",
+          },
+          update: {
+            offerId: saved.id,
+            brand: row?.brand ?? null,
+            name: row?.name ?? null,
+            quantity: entry.stockQty ?? null,
+            price: entry.price!,
+            total: entry.stockQty ? entry.price! * entry.stockQty : null,
+            source: "OFFER",
+          },
+        });
+      }
     }
     for (const entry of notOffered) {
       await markSupplierOfferNoOffer(tx, entry.productId, quote.supplierId);
@@ -192,6 +239,8 @@ async function parseQuoteWorkbook(file: File, rows: SupplierQuoteRow[]): Promise
   const daysColumn = header.get("срок поставки (дней)") ?? header.get("срок поставки");
   const statusColumn = header.get("статус предложения");
   const currencyColumn = header.get("валюта");
+  const inStockColumn = header.get("наличие");
+  const stockQuantityColumn = header.get("количество в наличии") ?? header.get("кол-во в наличии") ?? header.get("наличие количество");
   if (!skuColumn || !priceColumn || !qualityColumn || !warehouseColumn || !daysColumn) {
     return { ok: false, error: "В файле отсутствуют столбцы Артикул, Цена, Качество, Склад или Срок поставки" };
   }
@@ -214,6 +263,13 @@ async function parseQuoteWorkbook(file: File, rows: SupplierQuoteRow[]): Promise
       (statusColumn && cellText(row.getCell(statusColumn).value).toLocaleLowerCase("ru-RU") === "нет предложения") ||
       !priceRub
     );
+    const inStockText = inStockColumn ? cellText(row.getCell(inStockColumn).value).toLocaleLowerCase("ru-RU") : "";
+    const inStock = inStockText === "да" || inStockText === "yes" || inStockText === "是" || inStockText === "+" || inStockText === "1";
+    const stockQuantityText = stockQuantityColumn ? cellText(row.getCell(stockQuantityColumn).value) : "";
+    const stockQuantity = stockQuantityText ? Number(stockQuantityText) : null;
+    if (inStock && stockQuantity !== null && (!Number.isInteger(stockQuantity) || stockQuantity < 0 || stockQuantity > 1_000_000)) {
+      return { ok: false, error: `Проверьте количество в наличии в строке ${rowNumber}` };
+    }
     if (!noOffer && parsePrice(priceRub) === null) return { ok: false, error: `Проверьте цену в строке ${rowNumber}` };
     if (deliveryDays && (!/^\d+$/.test(deliveryDays) || Number(deliveryDays) > 365)) {
       return { ok: false, error: `Проверьте срок поставки в строке ${rowNumber}` };
@@ -223,6 +279,8 @@ async function parseQuoteWorkbook(file: File, rows: SupplierQuoteRow[]): Promise
       priceRub,
       currency,
       noOffer,
+      inStock,
+      stockQuantity: stockQuantityText,
       quality: cellText(row.getCell(qualityColumn).value),
       warehouse: cellText(row.getCell(warehouseColumn).value),
       deliveryDays,
@@ -266,6 +324,8 @@ export async function importSupplierProposalPreview(orderNumber: string, formDat
     exchangeRate: 1,
     logisticsMarkupPercent: 0,
     noOffer: false,
+    inStock: false,
+    stockQuantity: null,
     quality: "",
     warehouse: "",
     deliveryDays: "",

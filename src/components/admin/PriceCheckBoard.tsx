@@ -8,6 +8,7 @@ import {
   quotePriceInRub,
   SUPPLIER_CURRENCIES,
   SUPPLIER_CURRENCY_LABELS,
+  type ExchangeRates,
   type SupplierCurrency,
 } from "@/lib/supplier-currency";
 import {
@@ -79,16 +80,10 @@ function OfferModal({
   const [removeFile, setRemoveFile] = useState(false);
   const [pending, startTransition] = useTransition();
   const [currency, setCurrency] = useState<SupplierCurrency>(offer?.currency ?? "RUB");
-  const [exchangeRate, setExchangeRate] = useState(offer?.exchangeRate == null ? "" : String(offer.exchangeRate).replace(".", ","));
   const [markupPercent, setMarkupPercent] = useState(String(offer?.logisticsMarkupPercent ?? 70).replace(".", ","));
   const [quotedPrice, setQuotedPrice] = useState(offer ? String(offer.quotedPrice / 100).replace(".", ",") : "");
-  const amount = Number(quotedPrice.trim().replace(/\s/g, "").replace(",", "."));
-  const rate = Number(exchangeRate.trim().replace(/\s/g, "").replace(",", "."));
-  const markup = Number(markupPercent.trim().replace(/\s/g, "").replace(",", "."));
-  const rubPrice =
-    Number.isFinite(amount) && amount > 0
-      ? quotePriceInRub(Math.round(amount * 100), currency, currency === "RUB" ? 1 : rate, currency === "RUB" ? 0 : markup)
-      : null;
+  const [inStock, setInStock] = useState(offer?.inStock ?? false);
+  const [stockQuantity, setStockQuantity] = useState(offer?.stockQuantity === null ? "" : String(offer?.stockQuantity ?? ""));
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -143,13 +138,10 @@ function OfferModal({
                 if (next === currency) return;
                 setCurrency(next);
                 if (next === "RUB") {
-                  setExchangeRate("1");
                   setMarkupPercent("0");
                 } else if (next === offer?.currency) {
-                  setExchangeRate(offer.exchangeRate == null ? "" : String(offer.exchangeRate).replace(".", ","));
                   setMarkupPercent(String(offer.logisticsMarkupPercent).replace(".", ","));
                 } else {
-                  setExchangeRate("");
                   setMarkupPercent("70");
                 }
               }}
@@ -174,20 +166,6 @@ function OfferModal({
           </div>
           {currency !== "RUB" && (
             <div>
-              <label htmlFor="offer-exchange-rate" className="text-sm text-foreground/60">Курс, ₽ за 1 {currency}</label>
-              <input
-                id="offer-exchange-rate"
-                name="exchangeRate"
-                inputMode="decimal"
-                value={exchangeRate}
-                onChange={(event) => setExchangeRate(event.target.value)}
-                disabled={!canSetConversion}
-                className={inputClass}
-              />
-            </div>
-          )}
-          {currency !== "RUB" && (
-            <div>
               <label htmlFor="offer-markup" className="text-sm text-foreground/60">Мультипликатор (логистика и таможня), %</label>
               <input
                 id="offer-markup"
@@ -201,16 +179,10 @@ function OfferModal({
             </div>
           )}
         </div>
-        <p className="text-sm font-medium">
-          Цена в рублях: {rubPrice === null ? "— проверьте курс, мультипликатор и цену" : formatRubPrecise(rubPrice)}
-          {currency !== "RUB" && (
-            <span className="ml-1 text-xs font-normal text-foreground/50">
-              (цена × курс × {Number.isFinite(markup) ? (1 + markup / 100).toFixed(2) : "—"})
-            </span>
-          )}
-        </p>
-        {currency !== "RUB" && !canSetConversion && (
-          <p className="text-xs text-foreground/50">Курс и мультипликатор может задать владелец.</p>
+        {currency !== "RUB" && (
+          <p className="text-xs text-foreground/50">
+            Курс {currency} берётся из настроек цен; мультипликатор может задать владелец.
+          </p>
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div>
@@ -229,18 +201,38 @@ function OfferModal({
             <label htmlFor="offer-quality" className="text-sm text-foreground/60">
               Качество
             </label>
-            <input
-              id="offer-quality"
-              name="quality"
-              list="offer-quality-list"
-              defaultValue={offer?.quality ?? ""}
-              className={inputClass}
-            />
-            <datalist id="offer-quality-list">
+            <select id="offer-quality" name="quality" defaultValue={offer?.quality ?? ""} className={inputClass}>
+              <option value="">—</option>
               {QUALITY_SUGGESTIONS.map((q) => (
-                <option key={q} value={q} />
+                <option key={q} value={q}>{q}</option>
               ))}
-            </datalist>
+            </select>
+          </div>
+          <div className="flex items-end gap-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground/60">
+              <input
+                type="checkbox"
+                name="inStock"
+                checked={inStock}
+                onChange={(event) => setInStock(event.target.checked)}
+              />
+              Наличие
+            </label>
+            <div className="flex-1">
+              <label htmlFor="offer-stock-quantity" className="text-sm text-foreground/60">Кол-во</label>
+              <input
+                id="offer-stock-quantity"
+                name="stockQuantity"
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                disabled={!inStock}
+                value={stockQuantity}
+                onChange={(event) => setStockQuantity(event.target.value)}
+                className={inputClass}
+              />
+            </div>
           </div>
         </div>
         <div>
@@ -384,12 +376,14 @@ function ImportModal({
   suppliers,
   desktop,
   canSetConversion,
+  exchangeRates,
   onClose,
   onDone,
 }: {
   suppliers: SupplierOption[];
   desktop?: DesktopImport | null;
   canSetConversion: boolean;
+  exchangeRates: ExchangeRates;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -400,7 +394,6 @@ function ImportModal({
   );
   const [createMissing, setCreateMissing] = useState(false);
   const [currency, setCurrency] = useState<SupplierCurrency>("RUB");
-  const [exchangeRate, setExchangeRate] = useState("");
   const [markupPercent, setMarkupPercent] = useState("70");
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(
@@ -433,7 +426,6 @@ function ImportModal({
         rows: analysis.rows,
         createMissing,
         currency,
-        exchangeRate: currency === "RUB" ? 1 : canSetConversion ? Number(exchangeRate.replace(",", ".")) : null,
         logisticsMarkupPercent: currency === "RUB" ? 0 : canSetConversion ? Number(markupPercent.replace(",", ".")) : 70,
       });
       if (!r.ok) {
@@ -461,7 +453,6 @@ function ImportModal({
               const next = event.target.value as SupplierCurrency;
               setCurrency(next);
               if (next !== "RUB") {
-                setExchangeRate("");
                 setMarkupPercent("70");
               }
             }}
@@ -471,19 +462,17 @@ function ImportModal({
           </select>
         </label>
         {currency !== "RUB" && (
-          <>
-            <label className="text-sm text-foreground/60">
-              Курс, ₽ за 1 {currency}
-              <input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} disabled={!canSetConversion} inputMode="decimal" className={inputClass} />
-            </label>
-            <label className="text-sm text-foreground/60">
-              Мультипликатор (логистика и таможня), %
-              <input value={markupPercent} onChange={(event) => setMarkupPercent(event.target.value)} disabled={!canSetConversion} inputMode="decimal" className={inputClass} />
-            </label>
-          </>
+          <label className="text-sm text-foreground/60">
+            Мультипликатор (логистика и таможня), %
+            <input value={markupPercent} onChange={(event) => setMarkupPercent(event.target.value)} disabled={!canSetConversion} inputMode="decimal" className={inputClass} />
+          </label>
         )}
       </div>
-      {currency !== "RUB" && !canSetConversion && <p className="text-xs text-foreground/50">Курс и мультипликатор может задать только владелец.</p>}
+      {currency !== "RUB" && (
+        <p className="text-xs text-foreground/50">
+          Курс {currency} берётся из настроек цен; мультипликатор может задать владелец.
+        </p>
+      )}
       {result ? (
         <>
           <p className="mt-4 text-sm">{result}</p>
@@ -593,7 +582,7 @@ function ImportModal({
                 {analysis.rows.map((r) => (
                   (() => {
                     const rowCurrency = r.currency ?? currency;
-                    const rateForRow = rowCurrency === currency ? Number(exchangeRate.replace(",", ".")) : NaN;
+                    const rateForRow = rowCurrency === "RUB" ? 1 : exchangeRates[rowCurrency] || NaN;
                     const markupForRow = rowCurrency === currency ? Number(markupPercent.replace(",", ".")) : 70;
                     const convertedPrice = rateForRow > 0
                       ? quotePriceInRub(r.price, rowCurrency, rateForRow, markupForRow)
@@ -667,11 +656,13 @@ export function PriceCheckBoard({
   products,
   suppliers,
   canSetConversion,
+  exchangeRates,
   initialProductId,
 }: {
   products: PriceCheckProduct[];
   suppliers: SupplierOption[];
   canSetConversion: boolean;
+  exchangeRates: ExchangeRates;
   initialProductId?: string;
 }) {
   const router = useRouter();
@@ -1007,6 +998,7 @@ export function PriceCheckBoard({
           suppliers={suppliers}
           desktop={desktopImport}
           canSetConversion={canSetConversion}
+          exchangeRates={exchangeRates}
           onClose={closeImport}
           onDone={() => {
             imported.current = true;

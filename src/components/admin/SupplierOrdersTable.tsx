@@ -14,6 +14,7 @@ import {
 } from "@/actions/admin/supplier-orders";
 import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
 import { SupplierOrderDeleteButton } from "@/components/admin/SupplierOrderDeleteButton";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
@@ -524,9 +525,14 @@ export function SupplierOrdersTable({
                     </td>
                     <td className="py-2 pr-4">
                       {r.files.map((f) => (
-                        <a key={f.fileUrl} href={f.fileUrl} download={f.fileName} className="block max-w-40 truncate text-xs text-blue-600 hover:underline dark:text-blue-400">
-                          {FILE_KINDS[f.kind] ?? "Файл"}: {f.fileName}
-                        </a>
+                        <span key={f.fileUrl} className="block max-w-40 truncate text-xs">
+                          {FILE_KINDS[f.kind] ?? "Файл"}:{" "}
+                          <DocumentFileLink
+                            fileUrl={f.fileUrl}
+                            fileName={f.fileName}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          />
+                        </span>
                       ))}
                       {r.canEdit && r.supplier && ["TO_ORDER", "AWAITING_PAYMENT"].includes(r.status) && <InvoiceUpload id={r.id} />}
                     </td>

@@ -3,12 +3,20 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { Markups } from "@/lib/pricing";
+import type { ExchangeRates } from "@/lib/supplier-currency";
+import type { CbrRates } from "@/lib/cbr-exchange-rates";
 import { savePriceSettings, recalculateAllPrices, type ActionResult } from "@/actions/admin/price-settings";
 
-const FIELDS: { key: keyof Markups; label: string; hint?: string }[] = [
+const MARKUP_FIELDS: { key: keyof Markups; label: string; hint?: string }[] = [
   { key: "retailMarkup", label: "Розничная цена" },
   { key: "wholesaleMarkup", label: "Оптовая цена", hint: "показывается на сайте" },
   { key: "dealerMarkup", label: "Дилерская цена" },
+];
+
+const RATE_FIELDS: { key: keyof ExchangeRates; label: string; cbr: keyof CbrRates }[] = [
+  { key: "USD", label: "Доллар США", cbr: "USD" },
+  { key: "EUR", label: "Евро", cbr: "EUR" },
+  { key: "CNY", label: "Юань", cbr: "CNY" },
 ];
 
 const inputClassName =
@@ -23,7 +31,12 @@ function ResultLine({ result }: { result: ActionResult | null }) {
   );
 }
 
-export function PriceSettingsForm({ markups }: { markups: Markups }) {
+function formatRate(value: number | null): string {
+  if (value === null) return "—";
+  return value.toLocaleString("ru-RU", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+}
+
+export function PriceSettingsForm({ markups, cbrRates }: { markups: Markups; cbrRates: CbrRates }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
@@ -34,12 +47,19 @@ export function PriceSettingsForm({ markups }: { markups: Markups }) {
     setResult(null);
     setSaving(true);
     const form = new FormData(event.currentTarget);
-    const read = (key: keyof Markups) => Number(String(form.get(key) ?? "").replace(",", "."));
+    const readNum = (key: string) => Number(String(form.get(key) ?? "").replace(",", "."));
     setResult(
       await savePriceSettings({
-        retailMarkup: read("retailMarkup"),
-        wholesaleMarkup: read("wholesaleMarkup"),
-        dealerMarkup: read("dealerMarkup"),
+        markups: {
+          retailMarkup: readNum("retailMarkup"),
+          wholesaleMarkup: readNum("wholesaleMarkup"),
+          dealerMarkup: readNum("dealerMarkup"),
+        },
+        exchangeRates: {
+          USD: readNum("exchangeRateUSD"),
+          EUR: readNum("exchangeRateEUR"),
+          CNY: readNum("exchangeRateCNY"),
+        },
       })
     );
     setSaving(false);
@@ -63,13 +83,13 @@ export function PriceSettingsForm({ markups }: { markups: Markups }) {
     <div>
       <h1 className="text-lg font-semibold">Цены</h1>
       <p className="mt-1 max-w-xl text-sm text-foreground/60">
-        Базовые наценки на закупочную цену. Применяются автоматически при создании товара и при
-        загрузке из файла; у уже существующих товаров цены меняются только кнопкой «Пересчитать все
-        цены».
+        Базовые наценки на закупочную цену и пользовательские курсы валют для проценки.
+        Применяются автоматически при создании товара и при загрузке из файла; у уже существующих
+        товаров цены меняются только кнопкой «Пересчитать все цены».
       </p>
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-        {FIELDS.map(({ key, label, hint }) => (
+        {MARKUP_FIELDS.map(({ key, label, hint }) => (
           <div key={key} className="flex items-center gap-4">
             <label htmlFor={key} className="w-44 text-sm">
               {label}
@@ -84,6 +104,30 @@ export function PriceSettingsForm({ markups }: { markups: Markups }) {
               className={inputClassName}
             />
             <span className="text-sm text-foreground/50">%</span>
+          </div>
+        ))}
+
+        <div className="pt-4">
+          <h2 className="text-sm font-medium">Курсы валют ЦБ РФ (покупка) на текущую дату</h2>
+          <p className="text-xs text-foreground/50">
+            Указанные курсы используются в проценке при сохранении предложений поставщиков в валюте.
+          </p>
+        </div>
+        {RATE_FIELDS.map(({ key, label, cbr }) => (
+          <div key={key} className="flex items-center gap-4">
+            <label htmlFor={`exchangeRate${key}`} className="w-44 text-sm">
+              {label}
+            </label>
+            <input
+              id={`exchangeRate${key}`}
+              name={`exchangeRate${key}`}
+              inputMode="decimal"
+              required
+              defaultValue={cbrRates[cbr] ?? 0}
+              className={inputClassName}
+            />
+            <span className="text-sm text-foreground/50">₽</span>
+            <span className="text-xs text-foreground/40">ЦБ РФ: {formatRate(cbrRates[cbr])} ₽</span>
           </div>
         ))}
 

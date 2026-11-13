@@ -7,6 +7,7 @@ import { SearchSelect } from "@/components/SearchSelect";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import {
   deleteExtraCost,
   getExtraCostFormData,
@@ -333,9 +334,11 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
               <label className="text-sm text-foreground/60">Файл (счёт, акт, билет)</label>
               <input name="file" type="file" className="mt-2 block w-full text-sm" />
               {cost?.fileUrl && (
-                <a href={cost.fileUrl} download={cost.fileName ?? undefined} className="mt-1 block truncate text-xs text-blue-600 hover:underline dark:text-blue-400">
-                  {cost.fileName}
-                </a>
+                <DocumentFileLink
+                  fileUrl={cost.fileUrl}
+                  fileName={cost.fileName ?? "Файл"}
+                  className="mt-1 block truncate text-xs text-blue-600 hover:underline dark:text-blue-400"
+                />
               )}
             </div>
             <div>
@@ -448,9 +451,12 @@ export function ExtraCostsTable({ costs, initialNumber }: { costs: ExtraCostList
                   </td>
                   <td className="max-w-40 truncate py-2 pr-4">
                     {c.fileUrl ? (
-                      <a href={c.fileUrl} download={c.fileName ?? undefined} onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:underline dark:text-blue-400">
-                        {c.fileName}
-                      </a>
+                      <DocumentFileLink
+                        fileUrl={c.fileUrl}
+                        fileName={c.fileName ?? "Файл"}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      />
                     ) : (
                       "—"
                     )}

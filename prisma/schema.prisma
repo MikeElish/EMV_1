@@ -46,6 +46,7 @@ model Product {
   repairLines         RepairLine[]
   searchLogs          SearchLog[]
   offers              SupplierOffer[]
+  partnerStocks       PartnerStock[]
   priceRequestLines   PriceRequestLine[]
   supplierOrderLines  SupplierOrderLine[]
 
@@ -126,6 +127,8 @@ model SupplierOffer {
   warehouse              String?
   selected               Boolean             @default(false)
   noOffer                Boolean             @default(false)
+  inStock                Boolean             @default(false)
+  stockQuantity          Int?
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   fileName               String?
@@ -135,9 +138,34 @@ model SupplierOffer {
   product                Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   supplier               Company?            @relation(fields: [supplierId], references: [id])
   supplierOrderLines     SupplierOrderLine[]
+  partnerStocks          PartnerStock[]
 
   @@index([productId])
   @@index([supplierId])
+}
+
+model PartnerStock {
+  id          String        @id @default(cuid())
+  supplierId  String
+  productId   String?
+  offerId     String?
+  brand       String?
+  name        String?
+  sku         String?
+  quantity    Int?
+  price       Int?
+  total       Int?
+  source      String        @default("MANUAL")
+  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime      @default(now())
+  supplier    Company       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product     Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  offer       SupplierOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  @@unique([supplierId, sku])
+  @@index([supplierId])
+  @@index([productId])
+  @@index([offerId])
 }
 
 model SupplierOrderLine {
@@ -180,6 +208,9 @@ model PriceSettings {
   retailMarkup    Float @default(30)
   wholesaleMarkup Float @default(20)
   dealerMarkup    Float @default(15)
+  exchangeRateUsd Float @default(0)
+  exchangeRateEur Float @default(0)
+  exchangeRateCny Float @default(0)
 }
 
 model Order {
@@ -525,6 +556,7 @@ model Company {
   priceRequests               PriceRequest[]      @relation("PriceRequestSupplier")
   suppliedProducts            ProductPricing[]
   supplierOffers              SupplierOffer[]
+  partnerStocks               PartnerStock[]
   supplierOrderLines          SupplierOrderLine[]
   supplierProfile             SupplierProfile?
   supplierPurchases           SupplierPurchase[]  @relation("SupplierPurchaseSupplier")

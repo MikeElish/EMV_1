@@ -10,6 +10,8 @@ type OfferPricing = {
   quotedPrice?: number;
   exchangeRate?: number | null;
   logisticsMarkupPercent?: number;
+  inStock?: boolean;
+  stockQuantity?: number | null;
 };
 
 /** Makes `offerId` the product's selected offer (the one behind the site prices). */
@@ -62,6 +64,8 @@ export async function upsertSupplierOffer(
   const quotedPrice = offer.quotedPrice ?? offer.price;
   const exchangeRate = offer.exchangeRate === undefined ? existing?.exchangeRate ?? 1 : offer.exchangeRate;
   const logisticsMarkupPercent = offer.logisticsMarkupPercent ?? existing?.logisticsMarkupPercent ?? 0;
+  const inStock = offer.inStock === undefined ? existing?.inStock ?? false : offer.inStock;
+  const stockQuantity = offer.stockQuantity === undefined ? existing?.stockQuantity ?? null : offer.stockQuantity;
   const saved = existing
     ? await db.supplierOffer.update({
         where: { id: existing.id },
@@ -72,6 +76,8 @@ export async function upsertSupplierOffer(
           exchangeRate,
           logisticsMarkupPercent,
           noOffer: false,
+          inStock,
+          stockQuantity,
           deliveryDays,
           quality,
           warehouse,
@@ -80,7 +86,9 @@ export async function upsertSupplierOffer(
           existing.currency !== currency ||
           existing.exchangeRate !== exchangeRate ||
           existing.logisticsMarkupPercent !== logisticsMarkupPercent ||
-          existing.deliveryDays !== deliveryDays
+          existing.deliveryDays !== deliveryDays ||
+          existing.inStock !== inStock ||
+          existing.stockQuantity !== stockQuantity
             ? { priceUpdatedAt: new Date() }
             : {}),
         },
@@ -94,6 +102,8 @@ export async function upsertSupplierOffer(
           currency,
           exchangeRate,
           logisticsMarkupPercent,
+          inStock,
+          stockQuantity,
           deliveryDays,
           quality,
           warehouse,

@@ -7,6 +7,7 @@ import { uploadOfferFile, deleteOfferFile } from "@/lib/offer-file-storage";
 import { selectOffer, syncSelectedOffer, upsertSupplierOffer } from "@/lib/supplier-offers";
 import { priceWithSupplierLogistics } from "@/lib/supplier-pricing";
 import { MAX_MONEY_MINOR, parseSupplierCurrency, quotePriceInRub, type SupplierCurrency } from "@/lib/supplier-currency";
+import { getExchangeRates } from "@/lib/price-settings";
 import { analyzeOfferRows, sheetRows, writeOfferRows, type OfferImportRow, type OfferRowsAnalysis, type OfferWriteResult } from "@/lib/offer-import";
 import {
   analyzePriceReplyText,
@@ -42,6 +43,8 @@ export type OfferView = {
   deliveryDays: number | null;
   quality: string | null;
   noOffer: boolean;
+  inStock: boolean;
+  stockQuantity: number | null;
   selected: boolean;
   fileName: string | null;
   fileUrl: string | null;
@@ -68,6 +71,8 @@ export async function listProductOffers(productId: string): Promise<OfferView[]>
     deliveryDays: o.deliveryDays,
     quality: o.quality,
     noOffer: o.noOffer,
+    inStock: o.inStock,
+    stockQuantity: o.stockQuantity,
     selected: o.selected,
     fileName: o.fileName,
     fileUrl: o.fileUrl,
@@ -88,13 +93,14 @@ export async function saveOffer(formData: FormData): Promise<ActionResult> {
   const quotedPrice = num(formData.get("price"));
   const currency = parseSupplierCurrency(formData.get("currency"));
   const access = await getMyAccess();
-  const exchangeRateInput = String(formData.get("exchangeRate") ?? "").trim();
-  const exchangeRateRaw = exchangeRateInput ? num(exchangeRateInput) : NaN;
   const markupInput = String(formData.get("logisticsMarkupPercent") ?? "").trim();
   const markupRaw = markupInput ? num(markupInput) : 70;
   const daysRaw = String(formData.get("deliveryDays") ?? "").trim();
   const deliveryDays = daysRaw ? Number(daysRaw) : null;
   const quality = String(formData.get("quality") ?? "").trim() || null;
+  const inStock = formData.get("inStock") === "on";
+  const stockQuantityRaw = String(formData.get("stockQuantity") ?? "").trim();
+  const stockQuantity = inStock && stockQuantityRaw ? Number(stockQuantityRaw) : null;
   const removeFile = formData.get("removeFile") === "1";
   const file = formData.get("file");
 
@@ -103,24 +109,25 @@ export async function saveOffer(formData: FormData): Promise<ActionResult> {
   if (!(quotedPrice > 0)) return { ok: false, error: "Укажите цену" };
   const rawPrice = kopecks(quotedPrice);
   if (!Number.isSafeInteger(rawPrice) || rawPrice > MAX_MONEY_MINOR) return { ok: false, error: "Цена слишком велика" };
-  if (currency !== "RUB" && access?.role === "OWNER" && exchangeRateInput && (!(exchangeRateRaw > 0) || exchangeRateRaw > 1_000_000)) {
-    return { ok: false, error: "Курс должен быть больше нуля" };
-  }
-  if (currency !== "RUB" && access?.role === "OWNER" && (!Number.isFinite(markupRaw) || markupRaw < 0 || markupRaw > 1000)) {
+  if (currency !== "RUB" && (!Number.isFinite(markupRaw) || markupRaw < 0 || markupRaw > 1000)) {
     return { ok: false, error: "Мультипликатор должен быть от 0 до 1000%" };
   }
   if (deliveryDays !== null && (!Number.isInteger(deliveryDays) || deliveryDays < 0 || deliveryDays > 365)) {
     return { ok: false, error: "Срок поставки — целое число дней" };
   }
+  if (inStock && stockQuantityRaw && (!Number.isInteger(stockQuantity) || (stockQuantity as number) < 0 || (stockQuantity as number) > 1_000_000)) {
+    return { ok: false, error: "Количество в наличии — целое число от 0 до 1 000 000" };
+  }
   if (file instanceof File && file.size > MAX_FILE_SIZE) return { ok: false, error: "Файл больше 20 МБ" };
-  const [product, supplier] = await Promise.all([
-    prisma.product.findUnique({ where: { id: productId }, select: { id: true } }),
+  const [product, supplier, exchangeRates] = await Promise.all([
+    prisma.product.findUnique({ where: { id: productId }, select: { id: true, brand: true, name: true, sku: true } }),
     prisma.company.findUnique({ where: { id: supplierId }, select: { id: true } }),
+    getExchangeRates(),
   ]);
   if (!product) return { ok: false, error: "Товар не найден" };
   if (!supplier) return { ok: false, error: "Поставщик не найден" };
 
-  const existing = id ? await prisma.supplierOffer.findUnique({ where: { id } }) : null;
+  let existing = id ? await prisma.supplierOffer.findUnique({ where: { id } }) : null;
   if (id && (!existing || existing.productId !== productId)) return { ok: false, error: "Предложение не найдено" };
 
   let fileData: { fileName: string | null; fileUrl: string | null } | undefined;
@@ -133,12 +140,10 @@ export async function saveOffer(formData: FormData): Promise<ActionResult> {
   }
 
   const canSetConversion = access?.role === "OWNER";
-  const exchangeRate =
-    currency === "RUB"
-      ? 1
-      : canSetConversion
-        ? (Number.isFinite(exchangeRateRaw) && exchangeRateRaw > 0 ? exchangeRateRaw : null)
-        : existing?.currency === currency ? existing.exchangeRate : null;
+  const exchangeRate = currency === "RUB" ? 1 : exchangeRates[currency] || null;
+  if (currency !== "RUB" && exchangeRate === null) {
+    return { ok: false, error: `Курс ${currency} не задан в настройках цен` };
+  }
   const logisticsMarkupPercent =
     currency === "RUB"
       ? 0
@@ -153,6 +158,8 @@ export async function saveOffer(formData: FormData): Promise<ActionResult> {
     currency,
     exchangeRate,
     logisticsMarkupPercent,
+    inStock,
+    stockQuantity: inStock ? stockQuantity : null,
     deliveryDays,
     quality,
     noOffer: false,
@@ -175,9 +182,36 @@ export async function saveOffer(formData: FormData): Promise<ActionResult> {
     }
   } else {
     const created = await prisma.supplierOffer.create({ data: { productId, ...data } });
+    existing = created;
     if (priceRub !== null && !(await prisma.supplierOffer.count({ where: { productId, selected: true, noOffer: false, price: { gt: 0 } } }))) {
       await selectOffer(prisma, productId, created.id);
     }
+  }
+  if (inStock && existing && supplierId) {
+    await prisma.partnerStock.upsert({
+      where: { supplierId_sku: { supplierId, sku: product.sku } },
+      create: {
+        supplierId,
+        productId,
+        offerId: existing.id,
+        brand: product.brand,
+        name: product.name,
+        sku: product.sku,
+        quantity: stockQuantity ?? null,
+        price: rawPrice,
+        total: stockQuantity ? rawPrice * stockQuantity : null,
+        source: "OFFER",
+      },
+      update: {
+        offerId: existing.id,
+        brand: product.brand,
+        name: product.name,
+        quantity: stockQuantity ?? null,
+        price: rawPrice,
+        total: stockQuantity ? rawPrice * stockQuantity : null,
+        source: "OFFER",
+      },
+    });
   }
   if (priceRub === null && existing?.selected) {
     await prisma.supplierOffer.update({ where: { id: existing.id }, data: { selected: false } });
@@ -289,7 +323,6 @@ export async function commitOfferImport(input: {
   rows: OfferImportRow[];
   createMissing: boolean;
   currency?: string;
-  exchangeRate?: number | null;
   logisticsMarkupPercent?: number;
 }): Promise<({ ok: true } & OfferWriteResult) | { ok: false; error: string }> {
   const denied = await accessDenied("crm.price-check");
@@ -306,17 +339,15 @@ export async function commitOfferImport(input: {
     return { ok: false, error: "Выбранная валюта не совпадает с валютой файла" };
   }
   const me = await getMyAccess();
-  const requestedRate = input.exchangeRate == null ? null : Number(input.exchangeRate);
-  const exchangeRate = currency === "RUB" ? 1 : me?.role === "OWNER" ? requestedRate : null;
+  const exchangeRates = await getExchangeRates();
+  const exchangeRate = currency === "RUB" ? 1 : exchangeRates[currency] || null;
+  if (currency !== "RUB" && exchangeRate === null) {
+    return { ok: false, error: `Курс ${currency} не задан в настройках цен` };
+  }
   const requestedMarkup = input.logisticsMarkupPercent == null ? null : Number(input.logisticsMarkupPercent);
   const logisticsMarkupPercent = currency === "RUB" ? 0 : me?.role === "OWNER" ? requestedMarkup ?? 70 : 70;
-  if (currency !== "RUB" && me?.role === "OWNER" && (
-    exchangeRate === null || !Number.isFinite(exchangeRate) || exchangeRate <= 0 || exchangeRate > 1_000_000
-  )) {
-    return { ok: false, error: "Укажите корректный курс валюты" };
-  }
-  if (currency !== "RUB" && me?.role !== "OWNER" && (requestedRate !== null || (requestedMarkup !== null && requestedMarkup !== 70))) {
-    return { ok: false, error: "Курс и мультипликатор может задать только владелец" };
+  if (currency !== "RUB" && me?.role !== "OWNER" && requestedMarkup !== null && requestedMarkup !== 70) {
+    return { ok: false, error: "Мультипликатор может задать только владелец" };
   }
   if (currency !== "RUB" && (!Number.isFinite(logisticsMarkupPercent) || logisticsMarkupPercent < 0 || logisticsMarkupPercent > 1000)) {
     return { ok: false, error: "Мультипликатор должен быть от 0 до 1000%" };

@@ -5,9 +5,9 @@ import { importSupplierProposal, importSupplierProposalPreview, submitSupplierPr
 import { RU_CITIES } from "@/content/ru-cities";
 import { QUALITY_SUGGESTIONS } from "@/components/admin/ProductPricesPanel";
 import type { SupplierQuoteRow } from "@/lib/supplier-quote";
-import { SUPPLIER_CURRENCIES, SUPPLIER_CURRENCY_LABELS, type SupplierCurrency } from "@/lib/supplier-currency";
+import { SUPPLIER_CURRENCIES, SUPPLIER_CURRENCY_SYMBOLS, type SupplierCurrency } from "@/lib/supplier-currency";
 
-type Entry = { productId: string; priceRub: string; currency: SupplierCurrency; noOffer: boolean; quality: string; warehouse: string; deliveryDays: string };
+type Entry = { productId: string; priceRub: string; currency: SupplierCurrency; noOffer: boolean; inStock: boolean; stockQuantity: string; quality: string; warehouse: string; deliveryDays: string };
 type Result = { ok: true; entries: Entry[] } | { ok: false; error: string };
 type Language = "ru" | "en" | "zh";
 
@@ -18,7 +18,7 @@ const TEXT: Record<Language, Record<string, string>> = {
     test: "Тестовый просмотр — данные заказа настоящие, но отправка предложения и уведомление менеджера отключены.",
     currencyRUB: "Рубли", currencyUSD: "Доллар США", currencyEUR: "Евро", currencyCNY: "Юань",
     number: "№", brand: "Бренд", name: "Наименование", sku: "Артикул", quantity: "Количество", price: "Цена", currency: "Валюта",
-    total: "Всего", noOffer: "Нет предложения", quality: "Качество", warehouse: "Склад",
+    total: "Всего", noOffer: "Нет предложения", inStock: "Наличие", stockQuantity: "Кол-во в наличии", quality: "Качество", warehouse: "Склад",
     delivery: "Срок поставки (дней)", noOfferHint: "Если по позиции нет предложения, оставьте поле «Цена» пустым — для неё будет отмечено «Нет предложения».",
     send: "Направить предложение", sending: "Отправляем...", thanks: "Спасибо за ответ!",
     testSaved: "Это тестовый просмотр: предложение не сохранено и менеджеру не отправлено.",
@@ -30,7 +30,7 @@ const TEXT: Record<Language, Record<string, string>> = {
     test: "Preview only — order data is real, but submitting the quote and notifying the manager are disabled.",
     currencyRUB: "Russian ruble", currencyUSD: "US dollar", currencyEUR: "Euro", currencyCNY: "Chinese yuan",
     number: "No.", brand: "Brand", name: "Item name", sku: "Part number", quantity: "Quantity", price: "Price", currency: "Currency",
-    total: "Total", noOffer: "No offer", quality: "Quality", warehouse: "Warehouse",
+    total: "Total", noOffer: "No offer", inStock: "In stock", stockQuantity: "Stock qty", quality: "Quality", warehouse: "Warehouse",
     delivery: "Delivery time (days)", noOfferHint: "If you cannot offer an item, leave its price blank and select “No offer”.",
     send: "Submit quotation", sending: "Submitting...", thanks: "Thank you for your response!",
     testSaved: "Preview only: the quotation was not saved or sent to the manager.",
@@ -42,7 +42,7 @@ const TEXT: Record<Language, Record<string, string>> = {
     test: "预览模式：订单数据真实，但提交报价和通知经理功能已禁用。",
     currencyRUB: "俄罗斯卢布", currencyUSD: "美元", currencyEUR: "欧元", currencyCNY: "人民币",
     number: "序号", brand: "品牌", name: "商品名称", sku: "零件号", quantity: "数量", price: "价格", currency: "货币",
-    total: "总计", noOffer: "无报价", quality: "质量", warehouse: "仓库",
+    total: "总计", noOffer: "无报价", inStock: "有现货", stockQuantity: "现货数量", quality: "质量", warehouse: "仓库",
     delivery: "交货时间（天）", noOfferHint: "无法报价时，请将价格留空并勾选“无报价”。",
     send: "提交报价", sending: "正在提交...", thanks: "感谢您的回复！",
     testSaved: "预览模式：报价未保存，也未发送给经理。",
@@ -75,6 +75,8 @@ function initialEntries(rows: SupplierQuoteRow[]): Entry[] {
     priceRub: row.noOffer ? "" : priceRub(row.price),
     currency: row.currency,
     noOffer: row.noOffer,
+    inStock: row.inStock,
+    stockQuantity: row.stockQuantity === null ? "" : String(row.stockQuantity),
     quality: row.quality,
     warehouse: row.warehouse,
     deliveryDays: row.deliveryDays,
@@ -121,8 +123,8 @@ export function SupplierProposalForm({
     setEntries((current) => current.map((entry) => entry.productId === productId ? { ...entry, [field]: value } : entry));
   }
 
-  const currencyLabel = (currency: SupplierCurrency) =>
-    t[`currency${currency}`] ?? SUPPLIER_CURRENCY_LABELS[currency];
+  const currencySymbol = (currency: SupplierCurrency) =>
+    SUPPLIER_CURRENCY_SYMBOLS[currency];
   const formatMoney = (minor: number, currency: SupplierCurrency) =>
     new Intl.NumberFormat(language === "en" ? "en-US" : language === "zh" ? "zh-CN" : "ru-RU", {
       style: "currency",
@@ -234,7 +236,7 @@ export function SupplierProposalForm({
           <table className="w-full min-w-[1050px] text-sm">
             <thead className="bg-foreground/[0.03] text-left text-foreground/60">
               <tr>
-                {[t.number, t.brand, t.name, t.sku, t.quantity, t.price, t.currency, t.total, t.noOffer, t.quality, t.warehouse, t.delivery].map((heading) => (
+                {[t.number, t.brand, t.name, t.sku, t.quantity, t.price, t.currency, t.total, t.noOffer, t.inStock, t.stockQuantity, t.quality, t.warehouse, t.delivery].map((heading) => (
                   <th key={heading} className="px-3 py-3 font-medium">{heading}</th>
                 ))}
               </tr>
@@ -271,7 +273,7 @@ export function SupplierProposalForm({
                         onChange={(event) => update(row.productId, "currency", event.target.value as SupplierCurrency)}
                         className="w-full rounded-md border border-foreground/20 bg-transparent px-2 py-1.5 outline-none focus:border-foreground/50"
                       >
-                        {SUPPLIER_CURRENCIES.map((currency) => <option key={currency} value={currency}>{currencyLabel(currency)}</option>)}
+                        {SUPPLIER_CURRENCIES.map((currency) => <option key={currency} value={currency}>{currencySymbol(currency)}</option>)}
                       </select>
                     </td>
                     <td className="whitespace-nowrap px-3 py-3">{unitPrice ? formatMoney(Math.round(unitPrice * row.quantity * 100), entry.currency) : "—"}</td>
@@ -283,14 +285,39 @@ export function SupplierProposalForm({
                         aria-label={`${t.noOffer}, ${row.sku}`}
                       />
                     </td>
-                    <td className="min-w-40 px-3 py-2">
+                    <td className="px-3 py-3 text-center">
                       <input
-                        list="supplier-quote-quality"
-                        aria-label={`${t.quality}, ${row.sku}`}
-                        value={entry.quality}
-                        onChange={(event) => update(row.productId, "quality", event.target.value)}
+                        type="checkbox"
+                        checked={entry.inStock}
+                        disabled={entry.noOffer}
+                        onChange={(event) => update(row.productId, "inStock", event.target.checked)}
+                        aria-label={`${t.inStock}, ${row.sku}`}
+                      />
+                    </td>
+                    <td className="min-w-28 px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        inputMode="numeric"
+                        aria-label={`${t.stockQuantity}, ${row.sku}`}
+                        disabled={entry.noOffer || !entry.inStock}
+                        value={entry.stockQuantity}
+                        onChange={(event) => update(row.productId, "stockQuantity", event.target.value)}
                         className="w-full rounded-md border border-foreground/20 bg-transparent px-2 py-1.5 outline-none focus:border-foreground/50"
                       />
+                    </td>
+                    <td className="min-w-40 px-3 py-2">
+                      <select
+                        aria-label={`${t.quality}, ${row.sku}`}
+                        value={entry.quality}
+                        disabled={entry.noOffer}
+                        onChange={(event) => update(row.productId, "quality", event.target.value)}
+                        className="w-full rounded-md border border-foreground/20 bg-transparent px-2 py-1.5 outline-none focus:border-foreground/50"
+                      >
+                        <option value="">—</option>
+                        {QUALITY_SUGGESTIONS.map((quality) => <option key={quality} value={quality}>{quality}</option>)}
+                      </select>
                     </td>
                     <td className="min-w-52 px-3 py-2">
                       <input
@@ -323,9 +350,6 @@ export function SupplierProposalForm({
         <p className="mt-2 text-xs text-foreground/50">
           {t.noOfferHint}
         </p>
-        <datalist id="supplier-quote-quality">
-          {QUALITY_SUGGESTIONS.map((quality) => <option key={quality} value={quality} />)}
-        </datalist>
         <datalist id="supplier-quote-cities">
           {RU_CITIES.map((city) => <option key={city} value={city} />)}
         </datalist>

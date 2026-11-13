@@ -161,8 +161,14 @@ export function NewOrderModal({
   const router = useRouter();
   const [data, setData] = useState<ManualOrderFormData | null>(null);
   const [tab, setTab] = useState<Tab>("items");
+
+  function handleClose() {
+    if (hasChanges && !confirm("В карточке есть изменения. Выйти без сохранения?")) return;
+    onClose();
+  }
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
@@ -220,6 +226,7 @@ export function NewOrderModal({
   );
 
   function pickBuyer(b: Buyer) {
+    setHasChanges(true);
     // The company's «Тип цен» (card in CRM → Компании) becomes the order's.
     const terms = b.customer ?? b.company;
     setMarkup(terms.markup);
@@ -240,10 +247,12 @@ export function NewOrderModal({
   }
 
   function updateLine(key: number, patch: Partial<Line>) {
+    setHasChanges(true);
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
   function changePriceType(next: PriceType, withMarkup: number | null = markup) {
+    setHasChanges(true);
     setPriceType(next);
     setLines((prev) =>
       prev.map((l) => {
@@ -329,13 +338,13 @@ export function NewOrderModal({
   }
 
   return (
-    <Modal onClose={onClose} maxWidthClassName="max-w-4xl">
+    <Modal onClose={handleClose} maxWidthClassName="max-w-4xl">
       <h2 className="text-xl font-bold">{mode === "replenishment" ? "Новое пополнение остатков" : "Новый заказ"}</h2>
 
       {!data ? (
         <p className={`mt-6 text-sm ${error ? "text-red-600" : "text-foreground/40"}`}>{error ?? "Загрузка..."}</p>
       ) : (
-        <>
+        <div onChange={() => setHasChanges(true)}>
           <div className="mt-4 space-y-3">
             <div>
               <span className="text-sm text-foreground/60">Покупатель</span>
@@ -358,6 +367,7 @@ export function NewOrderModal({
                     <button
                       type="button"
                       onClick={() => {
+                        setHasChanges(true);
                         setCustomer(null);
                         setCompany(null);
                       }}
@@ -433,7 +443,7 @@ export function NewOrderModal({
               <button
                 key={t}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => { setHasChanges(true); setTab(t); }}
                 className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${
                   tab === t ? "border-foreground text-foreground" : "border-transparent text-foreground/50 hover:text-foreground"
                 }`}
@@ -577,7 +587,7 @@ export function NewOrderModal({
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-3">
                 <span className="w-32 shrink-0 text-sm text-foreground/60">Способ доставки</span>
-                <DeliveryMethodSelect value={deliveryMethod} onChange={setDeliveryMethod} />
+                <DeliveryMethodSelect value={deliveryMethod} onChange={(value) => { setHasChanges(true); setDeliveryMethod(value); }} />
               </div>
               {deliveryMethod === "terminal" && (
                 <div className="flex items-center gap-3">
@@ -616,7 +626,7 @@ export function NewOrderModal({
               {submitting ? "Создаём..." : "Создать заказ"}
             </button>
           </div>
-        </>
+        </div>
       )}
     </Modal>
   );

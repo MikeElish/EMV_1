@@ -31,6 +31,8 @@ export async function GET(request: Request) {
     exchangeRate: null,
     logisticsMarkupPercent: 0,
     noOffer: false,
+    inStock: false,
+    stockQuantity: null,
     quality: "",
     warehouse: "",
     deliveryDays: "",

@@ -56,6 +56,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "warehouse.handover", label: "Выдача", path: "/admin/warehouse/handover" },
       { key: "warehouse.adjustments", label: "Списание/Оприходование", path: "/admin/warehouse/adjustments" },
       { key: "warehouse.replenishment", label: "Пополнение остатков", path: "/admin/warehouse/replenishment" },
+      { key: "warehouse.partner-network", label: "Партнёрская сеть", path: "/admin/warehouse/partner-network" },
     ],
   },
   {

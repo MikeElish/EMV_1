@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { submitSupplierInvoice } from "@/actions/supplier-invoice";
 import { formatSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
 
@@ -17,6 +17,71 @@ export type InvoiceLine = {
   source: string;
 };
 
+type Language = "ru" | "en" | "zh";
+
+const TEXT: Record<Language, Record<string, string>> = {
+  ru: {
+    attach: "Вложить документы",
+    allowedFiles: "Допустимы PDF, Excel, Word или изображения. Максимальный размер одного файла — 20 МБ.",
+    remove: "Удалить",
+    submit: "Отправить",
+    submitting: "Отправляем...",
+    noFilesError: "Выберите хотя бы один документ",
+    number: "№",
+    brand: "Бренд",
+    name: "Наименование",
+    sku: "Артикул",
+    source: "Назначение",
+    quantity: "Количество",
+    price: "Цена",
+    cost: "Стоимость",
+    delivery: "Срок поставки",
+    total: "Итого",
+    submittedTitle: "Документы отправлены",
+    submittedText: "Спасибо! Мы проверим счёт и свяжемся при необходимости.",
+  },
+  en: {
+    attach: "Attach documents",
+    allowedFiles: "PDF, Excel, Word or images are allowed. Max 20 MB per file.",
+    remove: "Remove",
+    submit: "Submit",
+    submitting: "Submitting...",
+    noFilesError: "Please select at least one document",
+    number: "No.",
+    brand: "Brand",
+    name: "Item name",
+    sku: "Part number",
+    source: "Purpose",
+    quantity: "Quantity",
+    price: "Price",
+    cost: "Cost",
+    delivery: "Delivery time",
+    total: "Total",
+    submittedTitle: "Documents sent",
+    submittedText: "Thank you! We will review the invoice and contact you if needed.",
+  },
+  zh: {
+    attach: "上传文件",
+    allowedFiles: "允许 PDF、Excel、Word 或图片。单个文件最大 20 MB。",
+    remove: "删除",
+    submit: "提交",
+    submitting: "正在提交...",
+    noFilesError: "请至少选择一个文件",
+    number: "序号",
+    brand: "品牌",
+    name: "商品名称",
+    sku: "零件号",
+    source: "用途",
+    quantity: "数量",
+    price: "价格",
+    cost: "金额",
+    delivery: "交货时间",
+    total: "总计",
+    submittedTitle: "文件已发送",
+    submittedText: "谢谢！我们会审核发票并在需要时与您联系。",
+  },
+};
+
 export function SupplierInvoiceForm({
   token,
   currency,
@@ -28,10 +93,26 @@ export function SupplierInvoiceForm({
   total: number;
   lines: InvoiceLine[];
 }) {
+  const [language, setLanguage] = useState<Language>("ru");
+  const t = TEXT[language];
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const saved = window.localStorage.getItem("supplier-invoice-language");
+      if (saved === "ru" || saved === "en" || saved === "zh") setLanguage(saved);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  function changeLanguage(value: string) {
+    if (value !== "ru" && value !== "en" && value !== "zh") return;
+    setLanguage(value);
+    window.localStorage.setItem("supplier-invoice-language", value);
+  }
 
   function addFiles(event: FormEvent<HTMLInputElement>) {
     const selected = event.currentTarget.files;
@@ -48,7 +129,7 @@ export function SupplierInvoiceForm({
     event.preventDefault();
     setError(null);
     if (!files.length) {
-      setError("Выберите хотя бы один документ");
+      setError(t.noFilesError);
       return;
     }
     const form = new FormData();
@@ -63,17 +144,31 @@ export function SupplierInvoiceForm({
   if (submitted) {
     return (
       <div className="rounded-lg border border-green-600/20 bg-green-600/5 p-8 text-center">
-        <h2 className="text-xl font-semibold">Документы отправлены</h2>
-        <p className="mt-2 text-sm text-green-700">Спасибо! Мы проверим счёт и свяжемся при необходимости.</p>
+        <h2 className="text-xl font-semibold">{t.submittedTitle}</h2>
+        <p className="mt-2 text-sm text-green-700">{t.submittedText}</p>
       </div>
     );
   }
 
   return (
     <form onSubmit={submit} className="space-y-6">
+      <div className="flex justify-end">
+        <label className="sr-only" htmlFor="supplier-invoice-language">Language</label>
+        <select
+          id="supplier-invoice-language"
+          value={language}
+          onChange={(event) => changeLanguage(event.target.value)}
+          className="rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm"
+        >
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+
       <div className="space-y-3">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium hover:bg-foreground/5">
-          <span>Вложить документы</span>
+          <span>{t.attach}</span>
           <input
             name="files"
             type="file"
@@ -93,30 +188,28 @@ export function SupplierInvoiceForm({
                   onClick={() => removeFile(index)}
                   className="text-xs text-red-600 hover:underline"
                 >
-                  Удалить
+                  {t.remove}
                 </button>
               </li>
             ))}
           </ul>
         )}
-        <p className="text-xs text-foreground/50">
-          Допустимы PDF, Excel, Word или изображения. Максимальный размер одного файла — 20 МБ.
-        </p>
+        <p className="text-xs text-foreground/50">{t.allowedFiles}</p>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-foreground/10">
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-foreground/[0.03] text-left text-foreground/60">
             <tr>
-              <th className="px-3 py-2">№</th>
-              <th className="px-3 py-2">Бренд</th>
-              <th className="px-3 py-2">Наименование</th>
-              <th className="px-3 py-2">Артикул</th>
-              <th className="px-3 py-2">Назначение</th>
-              <th className="px-3 py-2 text-right">Количество</th>
-              <th className="px-3 py-2 text-right">Цена, {currency}</th>
-              <th className="px-3 py-2 text-right">Стоимость, {currency}</th>
-              <th className="px-3 py-2 text-right">Срок поставки</th>
+              <th className="px-3 py-2">{t.number}</th>
+              <th className="px-3 py-2">{t.brand}</th>
+              <th className="px-3 py-2">{t.name}</th>
+              <th className="px-3 py-2">{t.sku}</th>
+              <th className="px-3 py-2">{t.source}</th>
+              <th className="px-3 py-2 text-right">{t.quantity}</th>
+              <th className="px-3 py-2 text-right">{t.price}, {currency}</th>
+              <th className="px-3 py-2 text-right">{t.cost}, {currency}</th>
+              <th className="px-3 py-2 text-right">{t.delivery}</th>
             </tr>
           </thead>
           <tbody>
@@ -135,7 +228,7 @@ export function SupplierInvoiceForm({
             ))}
             <tr className="border-t border-foreground/10 font-semibold">
               <td colSpan={7} className="px-3 py-2 text-right">
-                Итого
+                {t.total}
               </td>
               <td className="px-3 py-2 text-right">{formatSupplierCurrency(total, currency)}</td>
               <td className="px-3 py-2" />
@@ -152,7 +245,7 @@ export function SupplierInvoiceForm({
           disabled={pending || !files.length}
           className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Отправляем..." : "Отправить"}
+          {pending ? t.submitting : t.submit}
         </button>
       </div>
     </form>

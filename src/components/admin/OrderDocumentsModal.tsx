@@ -6,6 +6,7 @@ import { Modal } from "@/components/Modal";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { ORDER_DOCUMENT_CATEGORY_LABELS } from "@/lib/validators/orders";
 import { useDesktop } from "@/lib/desktop";
+import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import {
   listOrderDocuments,
   uploadOrderDocument,
@@ -134,13 +135,7 @@ export function OrderDocumentsModal({
             key={doc.id}
             className="flex items-center justify-between gap-3 rounded-md border border-foreground/10 px-3 py-2 text-sm"
           >
-            <a
-              href={doc.fileUrl}
-              download={doc.fileName}
-              className="min-w-0 flex-1 truncate hover:underline"
-            >
-              {doc.fileName}
-            </a>
+            <DocumentFileLink fileUrl={doc.fileUrl} fileName={doc.fileName} />
             <span className="shrink-0 text-xs text-foreground/40">
               {new Date(doc.uploadedAt).toLocaleDateString("ru-RU")}
             </span>

@@ -9,6 +9,21 @@ export const SUPPLIER_CURRENCY_LABELS: Record<SupplierCurrency, string> = {
   CNY: "Юань",
 };
 
+export type ExchangeRates = {
+  USD: number;
+  EUR: number;
+  CNY: number;
+};
+
+export const DEFAULT_EXCHANGE_RATES: ExchangeRates = { USD: 0, EUR: 0, CNY: 0 };
+
+export const SUPPLIER_CURRENCY_SYMBOLS: Record<SupplierCurrency, string> = {
+  RUB: "₽",
+  USD: "$",
+  EUR: "€",
+  CNY: "¥",
+};
+
 export function parseSupplierCurrency(value: unknown): SupplierCurrency | null {
   return typeof value === "string" && SUPPLIER_CURRENCIES.includes(value as SupplierCurrency)
     ? (value as SupplierCurrency)

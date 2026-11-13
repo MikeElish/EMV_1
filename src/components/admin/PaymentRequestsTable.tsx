@@ -7,6 +7,7 @@ import { SearchSelect } from "@/components/SearchSelect";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import {
   deletePaymentRequest,
   getPaymentRequestFormData,
@@ -456,16 +457,15 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
                   </td>
                   <td className="max-w-56 py-2 pr-4">
                     {r.files.map((f) => (
-                      <a
-                        key={f.id}
-                        href={f.fileUrl}
-                        download={f.fileName}
-                        onClick={(e) => e.stopPropagation()}
-                        title={f.fileName}
-                        className="block truncate text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        {FILE_KINDS[f.kind] ?? "Файл"}: {f.fileName}
-                      </a>
+                      <span key={f.id} className="block truncate" onClick={(e) => e.stopPropagation()}>
+                        {FILE_KINDS[f.kind] ?? "Файл"}:{" "}
+                        <DocumentFileLink
+                          fileUrl={f.fileUrl}
+                          fileName={f.fileName}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-blue-600 hover:underline dark:text-blue-400"
+                        />
+                      </span>
                     ))}
                     <AddFile id={r.id} />
                   </td>

@@ -47,6 +47,8 @@ export default async function SupplierQuotePreviewPage({
     exchangeRate: null,
     logisticsMarkupPercent: 0,
     noOffer: false,
+    inStock: false,
+    stockQuantity: null,
     quality: "",
     warehouse: "",
     deliveryDays: "",

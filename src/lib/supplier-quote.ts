@@ -14,6 +14,8 @@ export type SupplierQuoteRow = {
   exchangeRate: number | null;
   logisticsMarkupPercent: number;
   noOffer: boolean;
+  inStock: boolean;
+  stockQuantity: number | null;
   quality: string;
   warehouse: string;
   deliveryDays: string;
@@ -91,6 +93,8 @@ export async function loadSupplierQuote(token: string): Promise<SupplierQuoteCon
       exchangeRate: true,
       logisticsMarkupPercent: true,
       noOffer: true,
+      inStock: true,
+      stockQuantity: true,
       quality: true,
       warehouse: true,
       deliveryDays: true,
@@ -123,6 +127,8 @@ export async function loadSupplierQuote(token: string): Promise<SupplierQuoteCon
         exchangeRate: offer?.exchangeRate ?? 1,
         logisticsMarkupPercent: offer?.logisticsMarkupPercent ?? 0,
         noOffer: offer?.noOffer ?? false,
+        inStock: offer?.inStock ?? false,
+        stockQuantity: offer?.stockQuantity ?? null,
         quality: offer?.quality ?? "",
         warehouse: offer?.warehouse ?? "",
         deliveryDays: offer?.deliveryDays == null ? "" : String(offer.deliveryDays),

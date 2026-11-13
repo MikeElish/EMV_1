@@ -6,6 +6,7 @@ import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
+import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import { createReceipt, getReceivableLines, receiptVatRate } from "@/actions/admin/receipts";
 import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { VAT_RATES } from "@/lib/validators/receipts";
@@ -311,9 +312,11 @@ export function ReceiptsTable({ receipts, warehouses }: { receipts: ReceiptRow[]
                   <td className="whitespace-nowrap py-2 pr-4 text-right">{formatRub(r.amount)}</td>
                   <td className="max-w-40 truncate py-2">
                     {r.fileUrl ? (
-                      <a href={r.fileUrl} download={r.fileName ?? undefined} className="text-blue-600 hover:underline dark:text-blue-400">
-                        {r.fileName}
-                      </a>
+                      <DocumentFileLink
+                        fileUrl={r.fileUrl}
+                        fileName={r.fileName ?? "Файл"}
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      />
                     ) : (
                       "—"
                     )}
