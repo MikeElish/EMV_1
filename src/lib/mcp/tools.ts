@@ -64,9 +64,12 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 /** Same as the «Новый заказ» window: «Индивидуальный» = purchase + the company's markup. */
 function priceFor(p: ProductRow, type: PriceType, markup: number | null): number {
   const prices = { retail: p.pricing?.retailPrice ?? p.price, wholesale: p.price, dealer: p.pricing?.dealerPrice ?? p.price };
-  if (type !== "individual") return prices[type];
-  const purchase = p.pricing?.purchasePrice ?? 0;
-  return purchase > 0 && markup !== null && p.price > 0 ? applyMarkup(purchase, markup) : p.price;
+  if (type === "tender") return Math.round(prices.wholesale * 0.5);
+  if (type === "individual") {
+    const purchase = p.pricing?.purchasePrice ?? 0;
+    return purchase > 0 && markup !== null && p.price > 0 ? applyMarkup(purchase, markup) : p.price;
+  }
+  return prices[type];
 }
 
 function productOut(p: ProductRow) {

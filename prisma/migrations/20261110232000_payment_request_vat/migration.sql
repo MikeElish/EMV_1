@@ -1,0 +1,3 @@
+ALTER TABLE "PaymentRequest"
+  ADD COLUMN "vatPercent" DOUBLE PRECISION DEFAULT 20,
+  ADD COLUMN "vatAmount" INTEGER;

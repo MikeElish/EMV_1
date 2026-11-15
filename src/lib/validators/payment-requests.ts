@@ -9,6 +9,8 @@ export type PaymentRequestInput = {
   orderId: string | null;
   /** kopecks */
   amount: number;
+  vatPercent: number | null;
+  vatAmount: number | null;
   purpose: string;
   purposeCategory: PaymentPurposeCategory;
   /** Финансы → Фонды: the fund it is paid from. */

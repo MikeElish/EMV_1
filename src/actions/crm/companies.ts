@@ -22,6 +22,8 @@ function toCompanyData(data: CompanyInput) {
     kpp: data.kpp || null,
     ogrn: data.ogrn || null,
     address: data.address || null,
+    country: data.country || null,
+    city: data.city || null,
     hasContract: data.hasContract,
     contract: data.hasContract ? data.contract || null : null,
     type: data.type || null,

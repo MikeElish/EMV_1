@@ -34,12 +34,14 @@ export default async function HandoverPage() {
           const ready = o.items.filter((i) => i.status === "READY_TO_SHIP");
           return {
             id: o.id,
+            orderId: o.id,
             canEdit: me?.role === "OWNER" || o.managerId === me?.userId,
             orderNumber: o.orderNumber,
             customer: o.customerName,
             organization: o.buyerCompany?.name ?? o.user?.company?.name ?? "",
             phone: o.customerPhone,
             delivery: o.deliveryNote,
+            buyerCompanyId: o.buyerCompanyId,
             ready: ready.map((i) => ({ name: [i.product.brand, i.product.name, i.product.sku].filter(Boolean).join(" "), quantity: i.quantity })),
             readySum: ready.reduce((s, i) => s + orderLineTotal(i), 0),
             linesTotal: o.items.filter((i) => i.status !== "CANCELLED").length,

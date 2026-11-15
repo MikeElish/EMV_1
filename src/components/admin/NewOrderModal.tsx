@@ -142,10 +142,11 @@ const filterBuyer = (b: Buyer, q: string) =>
     : matches(q, b.company.name, b.company.inn);
 const filterProduct = (p: Product, q: string) => matches(q, p.sku, p.name, p.brand);
 
-/** The product's price for the order's price type; «Индивидуальный» = purchase + the company's markup (the shop price without a purchase). */
+/** The product's price for the order's price type. */
 function priceOf(p: Product, type: PriceType, markup: number | null): number {
-  if (type !== "individual") return p.prices[type];
-  return p.purchase > 0 && markup !== null && p.prices.wholesale > 0 ? applyMarkup(p.purchase, markup) : p.prices.wholesale;
+  if (type === "tender") return Math.round(p.prices.wholesale * 0.5);
+  if (type === "individual") return p.purchase > 0 && markup !== null && p.prices.wholesale > 0 ? applyMarkup(p.purchase, markup) : p.prices.wholesale;
+  return p.prices[type];
 }
 
 let nextKey = 1;
@@ -314,6 +315,7 @@ export function NewOrderModal({
       customerPhone,
       customerEmail,
       deliveryNote: buildDeliveryNote(),
+      priceType,
       items: filled.map((l) => ({
         productId: l.productId,
         offerId: l.offerId || undefined,
@@ -428,13 +430,38 @@ export function NewOrderModal({
                   id="priceType"
                   value={priceType}
                   onChange={(next) => changePriceType(next as PriceType)}
-                  options={PRICE_TYPES.filter((t) => t !== "individual" || markup !== null).map((t) => ({
+                  options={PRICE_TYPES.map((t) => ({
                     value: t,
-                    label: `${PRICE_TYPE_LABELS[t]}${t === "individual" ? ` (+${markup}% к закупке)` : ""}`,
+                    label: `${PRICE_TYPE_LABELS[t]}${t === "individual" && markup !== null ? ` (+${markup}% к закупке)` : ""}`,
                   }))}
                   className="mt-1"
                 />
               </div>
+              {priceType === "individual" && (
+                <div>
+                  <label htmlFor="markup" className="text-sm text-foreground/60">
+                    Наценка к закупке, %
+                  </label>
+                  <input
+                    id="markup"
+                    inputMode="decimal"
+                    value={markup === null ? "" : String(markup)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(",", ".");
+                      const n = value === "" ? null : Number(value);
+                      setHasChanges(true);
+                      setMarkup(Number.isFinite(n) ? n : null);
+                      setLines((prev) =>
+                        prev.map((l) => {
+                          const product = productById.get(l.productId);
+                          return product ? { ...l, priceRub: kopecksToRub(priceOf(product, "individual", Number.isFinite(n) ? n : null)) } : l;
+                        })
+                      );
+                    }}
+                    className={`${inputClassName} mt-1`}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

@@ -65,6 +65,8 @@ export const companySchema = z
     kpp: z.string().trim().optional(),
     ogrn: z.string().trim().optional(),
     address: z.string().trim().optional(),
+    country: z.string().trim().max(100).optional(),
+    city: z.string().trim().max(120).optional(),
     hasContract: z.boolean().default(false),
     contract: z.string().trim().optional(),
     type: z.string().trim().optional(),

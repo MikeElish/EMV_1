@@ -15,6 +15,7 @@ import type { Party } from "@/lib/dadata";
 import type { Role } from "@prisma/client";
 import { CompanyDocumentsModal } from "@/components/admin/CompanyDocumentsModal";
 import { SearchSelect } from "@/components/SearchSelect";
+import { RU_CITIES } from "@/content/ru-cities";
 
 type Manager = { id: string; lastName: string | null; firstName: string | null; login: string; role: Role };
 
@@ -38,6 +39,8 @@ export function CompanyForm({
   const [paymentType, setPaymentType] = useState(initial?.paymentType ?? "PREPAYMENT");
   const [priceType, setPriceType] = useState(initial?.priceType ?? "WHOLESALE");
   const [managerId, setManagerId] = useState(initial?.managerId ?? "");
+  const [country, setCountry] = useState(initial?.country ?? "Россия");
+  const [city, setCity] = useState(initial?.city ?? "");
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [requisites, setRequisites] = useState({
     name: initial?.name ?? "",
@@ -99,6 +102,8 @@ export function CompanyForm({
       kpp: requisites.kpp || undefined,
       ogrn: requisites.ogrn || undefined,
       address: requisites.address || undefined,
+      country: country || undefined,
+      city: city || undefined,
       hasContract,
       contract: String(formData.get("contract") ?? "") || undefined,
       type: String(formData.get("type") ?? "") || undefined,
@@ -200,6 +205,56 @@ export function CompanyForm({
           {...field("address")}
           className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="country" className="text-sm text-foreground/60">
+            Страна
+          </label>
+          <input
+            id="country"
+            name="country"
+            list="country-suggestions"
+            value={country}
+            onChange={(event) => {
+              const value = event.target.value;
+              setCountry(value);
+              if (value !== "Россия") setCity("");
+            }}
+            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+          <datalist id="country-suggestions">
+            <option value="Россия" />
+            <option value="Китай" />
+            <option value="Германия" />
+            <option value="США" />
+            <option value="Турция" />
+            <option value="Италия" />
+            <option value="Франция" />
+            <option value="Япония" />
+            <option value="Южная Корея" />
+            <option value="Индия" />
+          </datalist>
+        </div>
+        <div>
+          <label htmlFor="city" className="text-sm text-foreground/60">
+            Город
+          </label>
+          <input
+            id="city"
+            name="city"
+            list={country === "Россия" ? "city-suggestions" : undefined}
+            value={city}
+            onChange={(event) => setCity(event.target.value)}
+            className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
+          />
+          <datalist id="city-suggestions">
+            {RU_CITIES.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -383,6 +383,15 @@ export async function submitSupplierRequests(input: SendInput): Promise<Supplier
       },
       select: { id: true },
     });
+    await prisma.supplierOrderLine.updateMany({
+      where: {
+        status: "TO_CHECK",
+        purchaseId: null,
+        orderItem: { orderId: group.orderId },
+        productId: { in: [...itemsByProduct.keys()] },
+      },
+      data: { status: "REQUESTED" },
+    });
     const url = absoluteUrl(`/supplier-proposal/${token}`);
     let messageId: string;
     try {

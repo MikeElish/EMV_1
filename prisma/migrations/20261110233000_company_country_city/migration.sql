@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "country" TEXT DEFAULT 'Россия';
+ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "city" TEXT;

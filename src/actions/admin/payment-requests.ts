@@ -52,6 +52,14 @@ export async function savePaymentRequest(formData: FormData): Promise<ActionResu
   }
   const amount = Math.round(Number(input.amount));
   if (!(amount > 0)) return { ok: false, error: "Укажите сумму" };
+  const vatPercent = input.vatPercent === null ? null : Number(input.vatPercent);
+  const vatAmount = input.vatAmount === null ? null : Math.round(Number(input.vatAmount));
+  if (vatPercent !== null && (!Number.isFinite(vatPercent) || vatPercent < 0 || vatPercent > 100)) {
+    return { ok: false, error: "НДС должен быть от 0 до 100%" };
+  }
+  if (vatAmount !== null && (!Number.isSafeInteger(vatAmount) || vatAmount < 0 || vatAmount > amount)) {
+    return { ok: false, error: "Сумма НДС некорректна" };
+  }
   const existing = input.id ? await prisma.paymentRequest.findUnique({ where: { id: input.id }, select: { id: true, managerId: true, inn: true } }) : null;
   if (input.id && !existing) return { ok: false, error: "Заявка не найдена" };
   if (existing?.managerId && input.companyId) return { ok: false, error: "Заявка менеджеру не может быть привязана к контрагенту" };
@@ -68,6 +76,8 @@ export async function savePaymentRequest(formData: FormData): Promise<ActionResu
     inn: company?.inn ?? existing?.inn ?? null,
     orderId: input.orderId || null,
     amount,
+    vatPercent,
+    vatAmount,
     purpose: String(input.purpose ?? "").trim().slice(0, 500) || null,
     purposeCategory: PAYMENT_PURPOSE_CATEGORIES.includes(input.purposeCategory) ? input.purposeCategory : "OTHER",
     fund: (FUNDS as readonly string[]).includes(input.fund) ? input.fund : "FREE",

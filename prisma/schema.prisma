@@ -213,6 +213,58 @@ model PriceSettings {
   exchangeRateCny Float @default(0)
 }
 
+model LogisticsSetting {
+  id        String   @id @default(cuid())
+  country   String   @default("Россия")
+  city      String
+  days      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([country, city])
+}
+
+enum LogisticsRequestType {
+  SEND
+  RECEIVE
+}
+
+enum LogisticsRequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model LogisticsRequest {
+  id                String                 @id @default(cuid())
+  number            Int                    @unique @default(autoincrement())
+  type              LogisticsRequestType
+  status            LogisticsRequestStatus @default(PENDING)
+  counterpartyId    String?
+  address           String?
+  fileName          String?
+  fileUrl           String?
+  documentKind      String?
+  cost              Int?
+  executorId        String?
+  orderId           String?
+  supplierPurchaseId String?
+  executedAt        DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  counterparty      Company?               @relation("LogisticsRequestCounterparty", fields: [counterpartyId], references: [id])
+  executor          User?                  @relation("LogisticsRequestExecutor", fields: [executorId], references: [id])
+  order             Order?                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierPurchase  SupplierPurchase?      @relation(fields: [supplierPurchaseId], references: [id], onDelete: Cascade)
+
+  @@index([counterpartyId])
+  @@index([executorId])
+  @@index([orderId])
+  @@index([supplierPurchaseId])
+}
+
 model Order {
   id                 String             @id @default(cuid())
   orderNumber        String             @unique
@@ -252,6 +304,7 @@ model Order {
   paymentRequests    PaymentRequest[]
   priceRequests      PriceRequest[]
   supplierPurchases  SupplierPurchase[]
+  logisticsRequests  LogisticsRequest[]
 
   @@index([status])
   @@index([userId])
@@ -466,6 +519,7 @@ model User {
   orders                Order[]
   PaymentRequest        PaymentRequest[]
   payrollRows           PayrollRow[]
+  logisticsRequests     LogisticsRequest[] @relation("LogisticsRequestExecutor")
   company               Company?          @relation("CompanyUsers", fields: [companyId], references: [id])
   invitation            UserInvitation?
 
@@ -530,6 +584,8 @@ model Company {
   inn                         String?
   ogrn                        String?
   address                     String?
+  country                     String?             @default("Россия")
+  city                        String?
   contract                    String?
   type                        String?
   createdAt                   DateTime            @default(now())
@@ -561,6 +617,7 @@ model Company {
   supplierProfile             SupplierProfile?
   supplierPurchases           SupplierPurchase[]  @relation("SupplierPurchaseSupplier")
   supplierReceipts            SupplierReceipt[]   @relation("SupplierReceiptSupplier")
+  logisticsRequests           LogisticsRequest[]  @relation("LogisticsRequestCounterparty")
   users                       User[]              @relation("CompanyUsers")
 
   @@index([managerId])
@@ -912,6 +969,7 @@ model SupplierPurchase {
   order          Order?                 @relation(fields: [orderId], references: [id])
   supplier       Company                @relation("SupplierPurchaseSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
   files          SupplierPurchaseFile[]
+  logisticsRequests LogisticsRequest[]
 
   @@index([supplierId])
   @@index([orderId])
@@ -972,6 +1030,8 @@ model PaymentRequest {
   purchaseId        String?                @unique
   extraCostId       String?                @unique
   amount            Int
+  vatPercent        Float?                 @default(20)
+  vatAmount         Int?
   currency          String                 @default("RUB")
   currencyAmount    Int?
   exchangeRate      Float?                 @default(1)

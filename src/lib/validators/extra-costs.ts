@@ -1,4 +1,4 @@
-export const EXTRA_COST_KINDS = ["Логистика", "Иные затраты", "Билеты", "Проживание"] as const;
+export const EXTRA_COST_KINDS = ["Внутренняя логистика", "Логистика", "Иные затраты", "Билеты", "Проживание"] as const;
 export const EXTRA_COST_STATUSES = ["Требуется оплата", "Оплачено", "Отменено"] as const;
 
 export type ExtraCostLineInput = {

@@ -9,9 +9,12 @@ import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import { handOver, issueUpd } from "@/actions/admin/receipts";
 import { HANDOVER_KINDS, type HandoverKind } from "@/lib/validators/receipts";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
+import { ActionMenu } from "@/components/admin/ActionMenu";
+import { LogisticsRequestModal, type LogisticsSource } from "@/components/admin/LogisticsRequestModal";
 
 export type HandoverRow = {
   id: string;
+  orderId: string;
   canEdit: boolean;
   orderNumber: string;
   customer: string;
@@ -28,6 +31,7 @@ export type HandoverRow = {
   documents: { id: string; label: string; fileName: string; fileUrl: string }[];
   /** Handed over here, its УПД not made (1С failed). */
   updPending: boolean;
+  buyerCompanyId: string | null;
 };
 
 const inputClass =
@@ -125,6 +129,25 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
   const [search, setSearch] = useRememberedState("search", "");
   const [message, setMessage] = useState<string | null>(null);
   const [acting, setActing] = useState<{ order: HandoverRow; kind: HandoverKind } | null>(null);
+  const [logisticsSource, setLogisticsSource] = useState<LogisticsSource | null>(null);
+
+  function buildHandoverLogisticsSource(order: HandoverRow): LogisticsSource {
+    return {
+      kind: "order",
+      orderId: order.orderId,
+      counterpartyId: order.buyerCompanyId,
+      address: order.delivery,
+      documentKind: "UPD",
+      lines: order.ready.map((r, index) => ({
+        productId: `handover-${order.orderId}-${index}`,
+        brand: null,
+        name: r.name,
+        sku: null,
+        quantity: r.quantity,
+        price: 0,
+      })),
+    };
+  }
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -160,6 +183,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                 <th className="py-2 pr-4">Оплата</th>
                 <th className="py-2 pr-4">Статус</th>
                 <th className="py-2 pr-4">Документы</th>
+                <th className="py-2 pr-4">Действие</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -208,6 +232,16 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                     ))}
                   </td>
                   <td className="whitespace-nowrap py-2">
+                    <ActionMenu
+                      items={[
+                        {
+                          label: "Логистика",
+                          onClick: () => setLogisticsSource(buildHandoverLogisticsSource(o)),
+                        },
+                      ]}
+                    />
+                  </td>
+                  <td className="whitespace-nowrap py-2">
                     {o.canEdit && o.updPending && <UpdButton orderId={o.id} onDone={setMessage} />}
                     {o.canEdit && o.ready.length > 0 &&
                       HANDOVER_KINDS.map((kind) => (
@@ -239,6 +273,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
           }}
         />
       )}
+      {logisticsSource && <LogisticsRequestModal source={logisticsSource} onClose={() => setLogisticsSource(null)} />}
     </>
   );
 }

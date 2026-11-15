@@ -14,6 +14,7 @@ import {
 } from "@/lib/supplier-currency";
 import { markSupplierOfferNoOffer, syncSelectedOffer, upsertSupplierOffer } from "@/lib/supplier-offers";
 import { getExchangeRates } from "@/lib/price-settings";
+import { getOrderLogisticsDays } from "@/lib/logistics";
 
 type QuoteEntry = {
   productId: string;
@@ -101,7 +102,7 @@ export async function submitSupplierProposal(token: string, entries: QuoteEntry[
 
   const offered = checked.valid.filter((entry) => !entry.noOffer && entry.price !== null);
   const notOffered = checked.valid.filter((entry) => entry.noOffer);
-  const exchangeRates = await getExchangeRates();
+  const [exchangeRates, logisticsDays] = await Promise.all([getExchangeRates(), getOrderLogisticsDays(quote.orderId)]);
   await prisma.$transaction(async (tx) => {
     for (const entry of offered) {
       const exchangeRate = entry.currency === "RUB" ? 1 : exchangeRates[entry.currency] || null;
@@ -122,7 +123,7 @@ export async function submitSupplierProposal(token: string, entries: QuoteEntry[
           logisticsMarkupPercent,
           inStock: entry.inStock,
           stockQuantity: entry.stockQty,
-          deliveryDays: entry.days,
+          deliveryDays: entry.days === null ? logisticsDays : entry.days + logisticsDays,
           quality: entry.quality.trim() || null,
           warehouse: entry.warehouse.trim() || null,
         },

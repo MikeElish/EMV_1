@@ -69,6 +69,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "taxi.glonass", label: "ГЛОНАСС", path: "/admin/taxi-fleet/glonass" },
       { key: "taxi.fuel", label: "Заправки", path: "/admin/taxi-fleet/fuel" },
       { key: "taxi.repair", label: "Ремонт", path: "/admin/taxi-fleet/repair" },
+      { key: "taxi.logistics", label: "Логистика", path: "/admin/taxi-fleet/logistics" },
     ],
   },
   {

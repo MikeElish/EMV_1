@@ -7,6 +7,7 @@ const TABS = [
   { href: "/admin/taxi-fleet/glonass", label: "ГЛОНАСС" },
   { href: "/admin/taxi-fleet/fuel", label: "Заправки" },
   { href: "/admin/taxi-fleet/repair", label: "Ремонт" },
+  { href: "/admin/taxi-fleet/logistics", label: "Логистика" },
 ];
 
 export default function TaxiFleetLayout({ children }: { children: React.ReactNode }) {

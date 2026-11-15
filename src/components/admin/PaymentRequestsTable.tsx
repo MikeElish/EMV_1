@@ -38,6 +38,8 @@ export type PaymentRequestRow = {
   /** Where it came from: a supplier order, an extra cost; null -- by hand. */
   source: string | null;
   amount: number;
+  vatPercent: number | null;
+  vatAmount: number | null;
   currency: SupplierCurrency;
   currencyAmount: number | null;
   exchangeRate: number | null;
@@ -117,6 +119,9 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
   const [orderId, setOrderId] = useState(request?.orderId ?? "");
   const [fund, setFund] = useState(request?.fund ?? "FREE");
   const [purposeCategory, setPurposeCategory] = useState(request?.purposeCategory ?? "OTHER");
+  const [vatPercent, setVatPercent] = useState<number | null>(request?.vatPercent ?? 20);
+  const [customVatPercent, setCustomVatPercent] = useState(String(request?.vatPercent ?? ""));
+  const [vatAmount, setVatAmount] = useState<number | null>(request?.vatAmount ?? null);
   const [inn, setInn] = useState("");
   const [innNote, setInnNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,11 +155,15 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
       ? request.amount
       : parseRub(String(form.get("amount") ?? ""));
     if (Number.isNaN(amount)) return setError("Укажите сумму");
+    const finalVatPercent = vatPercent;
+    const finalVatAmount = vatAmount ?? (finalVatPercent !== null && amount > 0 ? Math.round(amount * finalVatPercent / (100 + finalVatPercent)) : null);
     const input: PaymentRequestInput = {
       id: request?.id ?? null,
       companyId: companyId || null,
       orderId: orderId || null,
       amount,
+      vatPercent: finalVatPercent,
+      vatAmount: finalVatAmount,
       purpose: String(form.get("purpose") ?? ""),
       purposeCategory,
       fund,
@@ -250,6 +259,77 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
                   Эквивалент для сверки с банковской выпиской: {formatRub(request.amount)}
                 </p>
               )}
+            </div>
+            <div>
+              <label className="text-sm text-foreground/60">НДС %</label>
+              <select
+                value={vatPercent === null ? "none" : [0, 10, 20, 30].includes(vatPercent) ? String(vatPercent) : "custom"}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "none") {
+                    setVatPercent(null);
+                    setVatAmount(null);
+                  } else if (value === "custom") {
+                    setVatPercent(customVatPercent ? Number(customVatPercent.replace(",", ".")) : null);
+                  } else {
+                    const percent = Number(value);
+                    setVatPercent(percent);
+                    const amountInput = document.querySelector<HTMLInputElement>('input[name="amount"]');
+                    const amountKopecks = amountInput ? parseRub(amountInput.value) : request?.amount ?? 0;
+                    if (amountKopecks > 0) {
+                      setVatAmount(Math.round(amountKopecks * percent / (100 + percent)));
+                    }
+                  }
+                }}
+                className={inputClass}
+              >
+                <option value="none">Без НДС</option>
+                <option value="0">0%</option>
+                <option value="10">10%</option>
+                <option value="20">20%</option>
+                <option value="30">30%</option>
+                <option value="custom">Другое</option>
+              </select>
+              {vatPercent !== null && ![0, 10, 20, 30].includes(vatPercent) && (
+                <input
+                  value={customVatPercent}
+                  onChange={(event) => {
+                    setCustomVatPercent(event.target.value);
+                    const percent = Number(event.target.value.replace(",", "."));
+                    if (Number.isFinite(percent)) {
+                      setVatPercent(percent);
+                      const amountInput = document.querySelector<HTMLInputElement>('input[name="amount"]');
+                      const amountKopecks = amountInput ? parseRub(amountInput.value) : request?.amount ?? 0;
+                      if (amountKopecks > 0) {
+                        setVatAmount(Math.round(amountKopecks * percent / (100 + percent)));
+                      }
+                    }
+                  }}
+                  placeholder="%"
+                  inputMode="decimal"
+                  className={`${inputClass} mt-2`}
+                />
+              )}
+            </div>
+            <div>
+              <label className="text-sm text-foreground/60">Сумма НДС</label>
+              <input
+                value={vatAmount === null ? "" : rub(vatAmount)}
+                onChange={(event) => {
+                  const value = parseRub(event.target.value);
+                  if (!Number.isNaN(value)) {
+                    setVatAmount(value);
+                    const amountInput = document.querySelector<HTMLInputElement>('input[name="amount"]');
+                    const amountKopecks = amountInput ? parseRub(amountInput.value) : request?.amount ?? 0;
+                    if (amountKopecks > 0) {
+                      setVatPercent(Number((value * 100 / (amountKopecks - value)).toFixed(2)));
+                    }
+                  }
+                }}
+                inputMode="decimal"
+                placeholder="0,00"
+                className={inputClass}
+              />
             </div>
             <div>
               <label className="text-sm text-foreground/60">Категория *</label>
@@ -450,6 +530,11 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
                       ? formatSupplierCurrency(r.currencyAmount, r.currency)
                       : formatRub(r.amount)}
                     {r.currency !== "RUB" && <div className="text-xs text-foreground/50">{formatRub(r.amount)} экв.</div>}
+                    {r.vatAmount !== null && r.vatAmount > 0 && (
+                      <div className="text-xs text-foreground/50">
+                        НДС {r.vatPercent ?? 0}%: {formatRub(r.vatAmount)}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 pr-4">
                     <StatusSelect request={r} />

@@ -33,6 +33,8 @@ export default async function PaymentRequestsPage() {
           orderNumber: r.order?.orderNumber ?? null,
           source: r.purchase ? `Заказ поставщику № ${r.purchase.number}` : r.extraCost ? `Доп.расход: ${r.extraCost.kind}` : null,
           amount: r.amount,
+          vatPercent: r.vatPercent,
+          vatAmount: r.vatAmount,
           currency: parseSupplierCurrency(r.currency) ?? "RUB",
           currencyAmount: r.currencyAmount,
           exchangeRate: r.exchangeRate,

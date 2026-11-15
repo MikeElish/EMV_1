@@ -1,11 +1,13 @@
 import { z } from "zod";
 
-export const PRICE_TYPES = ["retail", "wholesale", "dealer", "individual"] as const;
+export const PRICE_TYPES = ["retail", "wholesale", "dealer", "tender", "individual"] as const;
+export const priceTypeSchema = z.enum(PRICE_TYPES).optional();
 export type PriceType = (typeof PRICE_TYPES)[number];
 export const PRICE_TYPE_LABELS: Record<PriceType, string> = {
   retail: "Розница",
   wholesale: "Опт",
   dealer: "Дилер",
+  tender: "Тендер (-50%)",
   individual: "Индивидуальный",
 };
 /** Company.priceType → the order window's price type. */
@@ -27,6 +29,7 @@ const manualOrderFieldsSchema = z.object({
   customerPhone: z.string().trim().min(5, "Укажите телефон покупателя").max(30),
   customerEmail: z.string().trim().email("Укажите корректный e-mail покупателя"),
   deliveryNote: z.string().trim().max(500).optional(),
+  priceType: priceTypeSchema,
   items: z
     .array(
       z.object({

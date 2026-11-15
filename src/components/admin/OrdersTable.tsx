@@ -16,6 +16,8 @@ import { LineBonusCell } from "@/components/admin/LineBonusCell";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DeliveryMethodCell } from "@/components/admin/DeliveryMethodCell";
 import { ExtraCostsButton, type ExtraCostRow } from "@/components/admin/ExtraCostsButton";
+import { ActionMenu } from "@/components/admin/ActionMenu";
+import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from "@/components/admin/LogisticsRequestModal";
 import { DELIVERY_METHOD_LABELS, DELIVERY_METHODS } from "@/lib/delivery";
 import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/client";
 import type { PaymentState } from "@/actions/admin/orders";
@@ -199,6 +201,7 @@ export function OrdersTable({
   const [unfinished, setUnfinished] = useRememberedState("unfinished", true);
   const manual = canDelete && manualInputEnabled;
   const [addingProduct, setAddingProduct] = useState(false);
+  const [logisticsSource, setLogisticsSource] = useState<LogisticsSource | null>(null);
 
   function toggleUnfinished(next: boolean) {
     setUnfinished(next);
@@ -228,6 +231,26 @@ export function OrdersTable({
     setFilters(returnTo.filters);
     setReturnTo(null);
     toggleGrouped(true);
+  }
+
+  function buildOrderLogisticsSource(order: OrderRow): LogisticsSource {
+    const activeItems = order.items.filter((i) => !i.cancelled);
+    const lines: LogisticsLine[] = activeItems.map((item) => ({
+      productId: item.productId,
+      brand: null,
+      name: item.nameSnapshot,
+      sku: item.product?.sku ?? null,
+      quantity: item.quantity,
+      price: orderLineUnitPrice(item),
+    }));
+    return {
+      kind: "order",
+      orderId: order.id,
+      counterpartyId: order.buyerCompanyId,
+      address: order.deliveryNote ?? null,
+      documentKind: "UPD",
+      lines,
+    };
   }
 
   // The frame is remounted on a mode switch -- put the list back where it was.
@@ -371,6 +394,7 @@ export function OrdersTable({
     onClose={() => setAddingProduct(false)}
   />
 )}
+      {logisticsSource && <LogisticsRequestModal source={logisticsSource} onClose={() => setLogisticsSource(null)} />}
 
       {orders.length === 0 ? (
         <p className="mt-4 text-sm text-foreground/40">Заказов пока нет.</p>
@@ -390,6 +414,7 @@ export function OrdersTable({
                 <th className="py-2 pr-4">Оплата</th>
                 {!grouped && manual && <th className="py-2 pr-4">Бонус</th>}
                 {!grouped && <th className="py-2 pr-4">Файлы</th>}
+                {!grouped && <th className="py-2 pr-4">Действие</th>}
                 {canDelete && <th className="py-2" />}
               </tr>
               <tr className="text-left">
@@ -456,6 +481,7 @@ export function OrdersTable({
                 </th>
                 {!grouped && manual && <th className="pb-2 pr-4" />}
                 {!grouped && <th className="pb-2 pr-4" />}
+                {!grouped && <th className="pb-2 pr-4" />}
                 {canDelete && <th className="pb-2" />}
               </tr>
             </thead>
@@ -506,6 +532,16 @@ export function OrdersTable({
                       </td>
                       <td className="whitespace-nowrap py-2 pr-4">{g.dates}</td>
                       <td className="py-2 pr-4">{g.payment}</td>
+                      <td className="py-2 pr-4">
+                        <ActionMenu
+                          items={[
+                            {
+                              label: "Логистика",
+                              onClick: () => setLogisticsSource(buildOrderLogisticsSource(g.order)),
+                            },
+                          ]}
+                        />
+                      </td>
                       {canDelete && (
                         <td className="py-2">
                           <OrderDeleteButton orderId={g.order.id} orderNumber={g.order.orderNumber} lines={g.order.items.length} />
@@ -651,6 +687,18 @@ export function OrdersTable({
                         <td className="py-2 pr-4">
                           <OrderFilesMenu orderId={order.id} canEdit={order.canEdit} />
                         </td>
+                        {!grouped && (
+                          <td className="py-2 pr-4">
+                            <ActionMenu
+                              items={[
+                                {
+                                  label: "Логистика",
+                                  onClick: () => setLogisticsSource(buildOrderLogisticsSource(order)),
+                                },
+                              ]}
+                            />
+                          </td>
+                        )}
                         {canDelete && (
                           <td className="py-2">
                             <OrderDeleteButton

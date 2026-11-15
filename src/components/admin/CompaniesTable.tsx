@@ -186,6 +186,8 @@ export function CompaniesTable({
                   kpp: selected.kpp ?? undefined,
                   ogrn: selected.ogrn ?? undefined,
                   address: selected.address ?? undefined,
+                  country: selected.country ?? undefined,
+                  city: selected.city ?? undefined,
                   hasContract: selected.hasContract,
                   contract: selected.contract ?? undefined,
                   type: selected.type ?? undefined,

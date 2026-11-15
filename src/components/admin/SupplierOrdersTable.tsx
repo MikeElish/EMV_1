@@ -20,6 +20,8 @@ import { SupplierOrderDeleteButton } from "@/components/admin/SupplierOrderDelet
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 import { AddSupplierOrderLineModal } from "@/components/admin/AddSupplierOrderLineModal";
 import { SupplierRequestModal } from "@/components/admin/SupplierRequestModal";
+import { ActionMenu } from "@/components/admin/ActionMenu";
+import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from "@/components/admin/LogisticsRequestModal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { formatRub } from "@/lib/money";
 import { formatSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
@@ -310,6 +312,7 @@ export function SupplierOrdersTable({
   const [grouped, setGrouped] = useState(false);
   const [addingLine, setAddingLine] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [logisticsSource, setLogisticsSource] = useState<LogisticsSource | null>(null);
 
   // Remembered per browser.
   useEffect(() => {
@@ -343,7 +346,28 @@ export function SupplierOrdersTable({
     return grouped ? [...list].sort((a, b) => (b.orderNumber ?? "").localeCompare(a.orderNumber ?? "")) : list;
   }, [rows, filters, category, unfinished, grouped]);
 
-  const requestLineIds = useMemo(() => filtered.filter((row) => row.canEdit).map((row) => row.id), [filtered]);
+  const requestLineIds = useMemo(() => filtered.filter((row) => row.canEdit && row.status === "TO_CHECK").map((row) => row.id), [filtered]);
+
+  function buildSupplierPurchaseSource(purchaseId: string): LogisticsSource {
+    const purchaseRows = rows.filter((r) => r.purchaseId === purchaseId);
+    const first = purchaseRows[0] ?? rows.find((r) => r.purchaseId === purchaseId);
+    const lines: LogisticsLine[] = purchaseRows.map((r) => ({
+      productId: r.productId,
+      brand: r.brand,
+      name: r.name,
+      sku: r.sku,
+      quantity: r.quantity,
+      price: r.price,
+    }));
+    return {
+      kind: "supplierPurchase",
+      purchaseId,
+      counterpartyId: first?.supplierId ?? null,
+      address: null,
+      documentKind: "INVOICE",
+      lines,
+    };
+  }
 
   const hasActiveFilters = !!category || Object.values(filters).some(Boolean);
 
@@ -403,6 +427,7 @@ export function SupplierOrdersTable({
 
       {addingLine && <AddSupplierOrderLineModal onClose={() => setAddingLine(false)} />}
       {requesting && <SupplierRequestModal lineIds={requestLineIds} onClose={() => setRequesting(false)} />}
+      {logisticsSource && <LogisticsRequestModal source={logisticsSource} onClose={() => setLogisticsSource(null)} />}
       {rows.length === 0 ? (
         <p className="mt-6 text-sm text-foreground/40">
           Пока пусто. Сюда попадают позиции из «Проценки» (кнопка «Заказать») и заказы покупателей на товар не из
@@ -418,10 +443,12 @@ export function SupplierOrdersTable({
                     {c.label}
                   </th>
                 ))}
+                <th className="py-2 pr-4">№ заказа поставщику</th>
                 <th className="py-2 pr-4">Дата поставки</th>
                 <th className="py-2 pr-4">Статус</th>
                 <th className="py-2 pr-4">Предложение</th>
                 <th className="py-2 pr-4">Файлы</th>
+                <th className="py-2 pr-4">Действие</th>
                 <th className="py-2" />
               </tr>
               <tr className="text-left">
@@ -435,6 +462,7 @@ export function SupplierOrdersTable({
                     />
                   </th>
                 ))}
+                <th className="pb-2 pr-4" />
                 <th className="pb-2 pr-4" />
                 <th className="pb-2 pr-4">
                   <select
@@ -459,7 +487,7 @@ export function SupplierOrdersTable({
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={TEXT_COLUMNS.length + 5} className="py-4 text-foreground/40">
+                  <td colSpan={TEXT_COLUMNS.length + 6} className="py-4 text-foreground/40">
                     Ничего не найдено.
                   </td>
                 </tr>
@@ -514,8 +542,10 @@ export function SupplierOrdersTable({
                     </td>
                     <td className="py-2 pr-4">{r.quality ?? "—"}</td>
                     <td className="whitespace-nowrap py-2 pr-4" title={r.sentAt ? `Заказ № ${r.purchaseNumber} отправлен ${new Date(r.sentAt).toLocaleDateString("ru-RU")}` : "Ещё не отправлен: от сегодняшнего дня"}>
+                      {r.purchaseNumber ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap py-2 pr-4" title={r.sentAt ? `Заказ № ${r.purchaseNumber} отправлен ${new Date(r.sentAt).toLocaleDateString("ru-RU")}` : "Ещё не отправлен: от сегодняшнего дня"}>
                       {r.deliveryDate ? new Date(r.deliveryDate).toLocaleDateString("ru-RU") : "—"}
-                      {r.sentAt && <div className="text-xs text-foreground/50">№ {r.purchaseNumber}</div>}
                     </td>
                     <td className="py-2 pr-4">
                       <StatusSelect id={r.id} status={r.status} canEdit={r.canEdit} />
@@ -535,6 +565,17 @@ export function SupplierOrdersTable({
                         </span>
                       ))}
                       {r.canEdit && r.supplier && ["TO_ORDER", "AWAITING_PAYMENT"].includes(r.status) && <InvoiceUpload id={r.id} />}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <ActionMenu
+                        items={[
+                          {
+                            label: "Логистика",
+                            onClick: () => r.purchaseId && setLogisticsSource(buildSupplierPurchaseSource(r.purchaseId)),
+                            disabled: !r.purchaseId,
+                          },
+                        ]}
+                      />
                     </td>
                     <td className="py-2 text-right">
                       {canDelete && <SupplierOrderDeleteButton id={r.id} />}

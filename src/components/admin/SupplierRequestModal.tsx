@@ -17,6 +17,7 @@ export function SupplierRequestModal({ lineIds, onClose }: { lineIds: string[]; 
   const [addedSupplierIds, setAddedSupplierIds] = useState<string[]>([]);
   const [supplierToAdd, setSupplierToAdd] = useState("");
   const [selectedQuoteKeys, setSelectedQuoteKeys] = useState<Set<string>>(new Set());
+  const [excludedSupplierIds, setExcludedSupplierIds] = useState<Set<string>>(new Set());
   const [selectedPurchaseKeys, setSelectedPurchaseKeys] = useState<Set<string>>(new Set());
   const [expandedPurchaseKeys, setExpandedPurchaseKeys] = useState<Set<string>>(new Set());
   const [links, setLinks] = useState<{ supplier: string; type: "КП" | "Счёт"; url: string }[]>([]);
@@ -63,9 +64,9 @@ export function SupplierRequestModal({ lineIds, onClose }: { lineIds: string[]; 
     },
     [data, addedSupplierIds]
   );
-  const supplierIds = useMemo(
-    () => [...new Set([...(data ? allSupplierIds(data) : []), ...addedSupplierIds])],
-    [data, addedSupplierIds]
+  const activeSupplierIds = useMemo(
+    () => [...new Set([...(data ? allSupplierIds(data) : []), ...addedSupplierIds])].filter((id) => !excludedSupplierIds.has(id)),
+    [data, addedSupplierIds, excludedSupplierIds]
   );
 
   function addSupplier() {
@@ -165,9 +166,29 @@ export function SupplierRequestModal({ lineIds, onClose }: { lineIds: string[]; 
                         <tr>
                           <th className="sticky left-0 z-20 min-w-36 bg-background px-3 py-2">Номер заказа</th>
                           <th className="sticky left-36 z-20 min-w-40 bg-background px-3 py-2">Бренд</th>
-                          {supplierIds.map((supplierId) => (
+                          {activeSupplierIds.map((supplierId) => (
                             <th key={supplierId} className="min-w-40 border-l border-foreground/10 px-3 py-2">
-                              {supplierById.get(supplierId)?.name ?? "Поставщик"}
+                              <div className="flex items-center justify-between gap-2">
+                                <span>{supplierById.get(supplierId)?.name ?? "Поставщик"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExcludedSupplierIds((current) => new Set([...current, supplierId]));
+                                    setSelectedQuoteKeys((current) => {
+                                      const next = new Set(current);
+                                      for (const key of current) {
+                                        const [, , keySupplierId] = JSON.parse(key) as [string, string, string];
+                                        if (keySupplierId === supplierId) next.delete(key);
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                  title="Исключить из запроса"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  ×
+                                </button>
+                              </div>
                               {!supplierById.get(supplierId)?.hasEmail && <div className="text-xs text-red-600">нет e-mail</div>}
                             </th>
                           ))}
@@ -201,7 +222,7 @@ export function SupplierRequestModal({ lineIds, onClose }: { lineIds: string[]; 
                               <div>{brand.brand}</div>
                               <div className="text-xs text-foreground/50">{brand.productCount} поз. · {brand.quantity} шт.</div>
                             </td>
-                            {supplierIds.map((supplierId) => {
+                            {activeSupplierIds.map((supplierId) => {
                               const requested = order.requestedSupplierIds.includes(supplierId);
                               const checked = selectedQuoteKeys.has(quoteKey(order.number, brand.brand, supplierId));
                               return (
