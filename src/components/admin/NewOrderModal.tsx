@@ -331,20 +331,26 @@ export function NewOrderModal({
         price: parseRub(l.priceRub) ?? 0,
       })),
     };
-    const result =
-      mode === "replenishment"
-        ? await createReplenishmentOrder(input)
-        : await createManualOrder(input);
-    setSubmitting(false);
-    if (!result.ok) {
-      if (/позиц|товар|Количество|Цена/.test(result.error)) setTab("items");
-      return setError(result.error);
+    try {
+      const result =
+        mode === "replenishment"
+          ? await createReplenishmentOrder(input)
+          : await createManualOrder(input);
+      if (!result.ok) {
+        setSubmitting(false);
+        if (/позиц|товар|Количество|Цена/.test(result.error)) setTab("items");
+        return setError(result.error);
+      }
+      onClose();
+      if (mode === "crm") {
+        router.push(`/admin/crm/orders?orderNumber=${encodeURIComponent(result.orderNumber)}`);
+      }
+      router.refresh();
+    } catch (err) {
+      setSubmitting(false);
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Не удалось создать заказ");
     }
-    onClose();
-    if (mode === "crm") {
-      router.push(`/admin/crm/orders?orderNumber=${encodeURIComponent(result.orderNumber)}`);
-    }
-    router.refresh();
   }
 
   return (

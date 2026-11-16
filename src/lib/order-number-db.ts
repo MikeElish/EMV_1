@@ -1,12 +1,20 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { formatOrderNumber, getMoscowDayRangeUtc } from "@/lib/order-number";
+import { formatOrderNumber, formatOrderDatePrefix, getMoscowDayRangeUtc } from "@/lib/order-number";
 
 export async function generateOrderNumber(): Promise<string> {
   const now = new Date();
   const { start, end } = getMoscowDayRangeUtc(now);
-  const countToday = await prisma.order.count({
+  const prefix = formatOrderDatePrefix(now);
+  const existing = await prisma.order.findMany({
     where: { createdAt: { gte: start, lt: end } },
+    select: { orderNumber: true },
   });
-  return formatOrderNumber(now, countToday + 1);
+  let maxSequence = 0;
+  for (const { orderNumber } of existing) {
+    if (!orderNumber.startsWith(prefix + "/")) continue;
+    const seq = Number(orderNumber.slice(prefix.length + 1));
+    if (Number.isFinite(seq) && seq > maxSequence) maxSequence = seq;
+  }
+  return formatOrderNumber(now, maxSequence + 1);
 }

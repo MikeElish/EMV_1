@@ -1,5 +1,6 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateOrderNumber } from "@/lib/order-number-db";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
@@ -103,40 +104,58 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
   const nameById = new Map(products.map((p) => [p.id, p.name]));
 
   const statuses = await initialLineStatuses(items, deferred);
-  const orderNumber = await generateOrderNumber();
-  const created = await prisma.order.create({
-    data: {
-      orderNumber,
-      customerName,
-      customerPhone,
-      customerEmail: customerEmail || null,
-      deliveryNote: deliveryNote || null,
-      totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
-      userId: customerUserId || null,
-      buyerCompanyId,
-      managerId,
-      deferred,
-      status: aggregateOrderStatus(statuses),
-      items: {
-        create: items.map((i, index) => ({
-          productId: i.productId,
-          offerId: i.offerId || null,
-          nameSnapshot: nameById.get(i.productId)!,
-          priceSnapshot: i.price,
-          quantity: i.quantity,
-          status: statuses[index],
-          deferred,
-          deliveryMethod: deliveryMethodFromNote(deliveryNote),
-        })),
-      },
-    },
-  });
 
-  await orderMissingFromSuppliers(created.id);
-  await applyOrderSurcharges(created.id);
-  revalidatePath("/admin/crm/orders");
-  revalidatePath("/admin/warehouse/replenishment");
-  revalidatePath("/admin/crm/supplier-orders");
-  revalidatePath("/shop/orders");
-  return { ok: true, orderNumber };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const orderNumber = await generateOrderNumber();
+    try {
+      const created = await prisma.order.create({
+        data: {
+          orderNumber,
+          customerName,
+          customerPhone,
+          customerEmail: customerEmail || null,
+          deliveryNote: deliveryNote || null,
+          totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+          userId: customerUserId || null,
+          buyerCompanyId,
+          managerId,
+          deferred,
+          status: aggregateOrderStatus(statuses),
+          items: {
+            create: items.map((i, index) => ({
+              productId: i.productId,
+              offerId: i.offerId || null,
+              nameSnapshot: nameById.get(i.productId)!,
+              priceSnapshot: i.price,
+              quantity: i.quantity,
+              status: statuses[index],
+              deferred,
+              deliveryMethod: deliveryMethodFromNote(deliveryNote),
+            })),
+          },
+        },
+      });
+
+      await orderMissingFromSuppliers(created.id);
+      await applyOrderSurcharges(created.id);
+      revalidatePath("/admin/crm/orders");
+      revalidatePath("/admin/warehouse/replenishment");
+      revalidatePath("/admin/crm/supplier-orders");
+      revalidatePath("/shop/orders");
+      return { ok: true, orderNumber };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        Array.isArray((error.meta as { target?: unknown })?.target) &&
+        (error.meta as { target?: string[] }).target?.includes("orderNumber") &&
+        attempt < 4
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return { ok: false, error: "Не удалось получить уникальный номер заказа — попробуйте ещё раз" };
 }

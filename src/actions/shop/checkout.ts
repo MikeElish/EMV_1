@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validators/checkout";
 import { getAdminSession } from "@/lib/session";
@@ -126,32 +127,49 @@ export async function createOrder(
   const statuses = (await initialLineStatuses(orderItemsData, deferred)).map((status, index) =>
     orderItemsData[index].priceSnapshot > 0 || status === "IN_PROGRESS" ? status : "CHECKING"
   );
-  const orderNumber = await generateOrderNumber();
-  const order = await prisma.order.create({
-    data: {
-      orderNumber,
-      customerName,
-      customerPhone,
-      customerEmail,
-      deliveryNote,
-      totalAmount,
-      userId,
-      deferred,
-      termsAcceptedAt: privateCustomer ? new Date() : null,
-      managerId,
-      status: aggregateOrderStatus(statuses),
-      items: {
-        create: orderItemsData.map((item, i) => ({
-          ...item,
-          status: statuses[i],
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const orderNumber = await generateOrderNumber();
+    try {
+      const order = await prisma.order.create({
+        data: {
+          orderNumber,
+          customerName,
+          customerPhone,
+          customerEmail,
+          deliveryNote,
+          totalAmount,
+          userId,
           deferred,
-          deliveryMethod: deliveryMethodFromNote(deliveryNote),
-        })),
-      },
-    },
-  });
+          termsAcceptedAt: privateCustomer ? new Date() : null,
+          managerId,
+          status: aggregateOrderStatus(statuses),
+          items: {
+            create: orderItemsData.map((item, i) => ({
+              ...item,
+              status: statuses[i],
+              deferred,
+              deliveryMethod: deliveryMethodFromNote(deliveryNote),
+            })),
+          },
+        },
+      });
 
-  await orderMissingFromSuppliers(order.id);
-  await applyOrderSurcharges(order.id);
-  return { ok: true, orderNumber: order.orderNumber };
+      await orderMissingFromSuppliers(order.id);
+      await applyOrderSurcharges(order.id);
+      return { ok: true, orderNumber: order.orderNumber };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        Array.isArray((error.meta as { target?: unknown })?.target) &&
+        (error.meta as { target?: string[] }).target?.includes("orderNumber") &&
+        attempt < 4
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return { ok: false, error: "Не удалось получить уникальный номер заказа — попробуйте ещё раз" };
 }
