@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateLineBonus } from "@/actions/admin/orders";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 
 export function LineBonusCell({ itemId, bonus }: { itemId: string; bonus: number }) {
   const router = useRouter();
@@ -50,7 +50,7 @@ export function LineBonusCell({ itemId, bonus }: { itemId: string; bonus: number
           {pending ? "…" : "OK"}
         </button>
       </div>
-      <span className="block text-xs text-foreground/50">за строку: {formatRub(bonus)}</span>
+      <span className="block text-xs text-foreground/50">за строку: {formatAdminPrice(bonus)}</span>
       {error && <p className="mt-0.5 text-xs text-red-600">{error}</p>}
     </div>
   );

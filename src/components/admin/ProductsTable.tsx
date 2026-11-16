@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { utils, write } from "xlsx";
 import type { Product, Category, ProductPricing } from "@prisma/client";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { deleteProduct, listProductReserve, type ProductDocumentLine } from "@/actions/admin/products";
 import { DeleteButton } from "@/components/admin/DeleteButton";
@@ -24,7 +24,7 @@ type ProductRow = Product & {
   pricing: (ProductPricing & { supplier: { name: string } | null }) | null;
 };
 
-const priceOrDash = (kopecks: number | undefined) => (kopecks === undefined ? "—" : formatRub(kopecks));
+const priceOrDash = (kopecks: number | undefined) => (kopecks === undefined ? "—" : formatAdminPrice(kopecks));
 
 function buildExportHref(products: ProductRow[]) {
   const header = ["Товар", "Артикул", "Бренд", "Категория", "Поставщик", "Закупка", "Розница", "Опт", "Дилер", "Остаток", "Активен"];
@@ -36,7 +36,7 @@ function buildExportHref(products: ProductRow[]) {
     product.pricing?.supplier?.name ?? "",
     priceOrDash(product.pricing?.purchasePrice),
     priceOrDash(product.pricing?.retailPrice),
-    formatRub(product.price),
+    formatAdminPrice(product.price),
     priceOrDash(product.pricing?.dealerPrice),
     product.stock,
     product.isActive ? "Да" : "Нет",
@@ -402,7 +402,7 @@ export function ProductsTable({
                   <td className="py-2 pr-3 text-foreground/60">{product.pricing?.supplier?.name ?? "—"}</td>
                   <td className="py-2 pr-3">{priceOrDash(product.pricing?.purchasePrice)}</td>
                   <td className="py-2 pr-3">{priceOrDash(product.pricing?.retailPrice)}</td>
-                  <td className="py-2 pr-3 font-medium">{formatRub(product.price)}</td>
+                  <td className="py-2 pr-3 font-medium">{formatAdminPrice(product.price)}</td>
                   <td className="py-2 pr-3">{priceOrDash(product.pricing?.dealerPrice)}</td>
                   <td className="py-2 pr-3">
                     <StockCell

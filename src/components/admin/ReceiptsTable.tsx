@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
@@ -207,7 +207,7 @@ function ReceiptCard({ warehouses, onClose, onDone }: { warehouses: { ref: strin
                       <td className="py-1 pr-2 text-right">
                         <input value={prices[l.id] ?? ""} onChange={(e) => setPrices((p) => ({ ...p, [l.id]: e.target.value }))} inputMode="decimal" className={cellInput} />
                       </td>
-                      <td className="whitespace-nowrap py-1 text-right">{formatRub((parseRub(prices[l.id] ?? "") || 0) * l.quantity)}</td>
+                      <td className="whitespace-nowrap py-1 text-right">{formatAdminPrice((parseRub(prices[l.id] ?? "") || 0) * l.quantity)}</td>
                     </tr>
                   );
                 })}
@@ -221,7 +221,7 @@ function ReceiptCard({ warehouses, onClose, onDone }: { warehouses: { ref: strin
               <input name="note" className={inputClass} />
             </div>
             <p className="pb-2 text-sm">
-              Итого по УПД: <span className="font-medium">{formatRub(total)}</span>
+              Итого по УПД: <span className="font-medium">{formatAdminPrice(total)}</span>
             </p>
           </div>
 
@@ -309,7 +309,7 @@ export function ReceiptsTable({ receipts, warehouses }: { receipts: ReceiptRow[]
                     {r.purchases.length > 0 && <div className="text-xs text-foreground/50">поставщику № {r.purchases.join(", ")}</div>}
                     <div className="text-xs text-foreground/50">{r.lines} поз.</div>
                   </td>
-                  <td className="whitespace-nowrap py-2 pr-4 text-right">{formatRub(r.amount)}</td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-right">{formatAdminPrice(r.amount)}</td>
                   <td className="max-w-40 truncate py-2">
                     {r.fileUrl ? (
                       <DocumentFileLink

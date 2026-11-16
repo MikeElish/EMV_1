@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { MONTH_NAMES, type Period } from "@/lib/period";
 import { PeriodPicker } from "@/components/admin/PeriodPicker";
 
@@ -103,10 +103,10 @@ export function ExecutionChart({
         <>
           <div className="mt-4 flex flex-wrap gap-6 text-sm">
             <div>
-              Прибыль: <span className="font-semibold tabular-nums">{formatRub(last)}</span>
+              Прибыль: <span className="font-semibold tabular-nums">{formatAdminPrice(last)}</span>
             </div>
             <div>
-              Минимальный план: <span className="font-semibold tabular-nums">{formatRub(plan)}</span>
+              Минимальный план: <span className="font-semibold tabular-nums">{formatAdminPrice(plan)}</span>
               {plan === 0 && <span className="text-foreground/50"> (оклад не задан)</span>}
             </div>
             {done !== null && (

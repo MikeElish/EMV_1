@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_PROGRESS, SHIPPED_STATUSES } from "@/lib/validators/orders";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 import { PaidToggle, PAYMENT_STATE_LABELS, paymentStateOf } from "@/components/admin/PaidToggle";
@@ -528,11 +528,11 @@ export function OrdersTable({
                       </td>
                       <td className="py-2 pr-4">{g.quantity}</td>
                       <td className="whitespace-nowrap py-2 pr-4">
-                        {formatRub(g.order.totalAmount)}
+                        {formatAdminPrice(g.order.totalAmount)}
                       </td>
-                      <td className="whitespace-nowrap py-2 pr-4">{formatRub(g.extra)}</td>
+                      <td className="whitespace-nowrap py-2 pr-4">{formatAdminPrice(g.extra)}</td>
                       <td className="whitespace-nowrap py-2 pr-4 font-medium">
-                        {formatRub(g.order.totalAmount + g.extra)}
+                        {formatAdminPrice(g.order.totalAmount + g.extra)}
                       </td>
                       <td className="py-2 pr-4">{g.status}</td>
                       <td className="py-2 pr-4">
@@ -620,7 +620,7 @@ export function OrdersTable({
                           ) : item.bonus > 0 ? (
                             formatOrderLineUnitPrice(item)
                           ) : (
-                            formatRub(item.priceSnapshot)
+                            formatAdminPrice(item.priceSnapshot)
                           )}
                           {item.surcharge > 0 && !item.cancelled && (
                             <div
@@ -628,7 +628,7 @@ export function OrdersTable({
                               title="Заказ «Под заказ» меньше 10 000 ₽ — +1 500 ₽; маржа меньше 2 000 ₽ — до 2 500 ₽; поровну на позиции «Под заказ»"
                             >
                               <span>
-                                {manual ? "+ " : "в т.ч. "}надбавка {formatRub(item.surcharge)}
+                                {manual ? "+ " : "в т.ч. "}надбавка {formatAdminPrice(item.surcharge)}
                               </span>
                               {manual && order.canEdit && (
                                 <button
@@ -650,7 +650,7 @@ export function OrdersTable({
                           )}
                         </td>
                         <td className={`whitespace-nowrap py-2 pr-4 ${cancelledCellClass}`}>
-                          {formatRub(orderLineTotal(item))}
+                          {formatAdminPrice(orderLineTotal(item))}
                         </td>
                         <td className="whitespace-nowrap py-2 pr-4">
                           <ExtraCostsButton
@@ -660,7 +660,7 @@ export function OrdersTable({
                           />
                         </td>
                         <td className="whitespace-nowrap py-2 pr-4 font-medium">
-                          {formatRub(order.totalAmount + extra)}
+                          {formatAdminPrice(order.totalAmount + extra)}
                         </td>
                         <td className="py-2 pr-4">
                           {order.canEdit ? (

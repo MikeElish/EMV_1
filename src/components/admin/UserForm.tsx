@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { UserInput } from "@/lib/validators/crm";
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from "@/lib/validators/crm";
 import type { ActionResult } from "@/actions/crm/users";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type Company = { id: string; name: string; isOwn?: boolean };
 
@@ -40,7 +41,16 @@ export function UserForm({
   // Employees always belong to the site's own company (the server enforces it).
   const ownCompany = companies.find((c) => c.isOwn);
   const isEmployee = role !== "CUSTOMER";
+  const [companyId, setCompanyId] = useState<string>(initial?.companyId ?? "");
   const [submitting, setSubmitting] = useState(false);
+
+  const companyOptions = useMemo(
+    () =>
+      companies
+        .filter((c) => !c.isOwn)
+        .map((c) => ({ value: c.id, label: c.name })),
+    [companies]
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -194,21 +204,15 @@ export function UserForm({
               />
             </>
           ) : (
-            <select
+            <SearchSelect
               id="companyId"
               name="companyId"
-              defaultValue={initial?.companyId ?? ""}
-              className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
-            >
-              <option value="">— без компании —</option>
-              {companies
-                .filter((c) => !c.isOwn)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
+              value={companyId}
+              onChange={setCompanyId}
+              options={companyOptions}
+              emptyLabel="— без компании —"
+              className="mt-1"
+            />
           )}
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, type FormEvent } from "react";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { DeleteButton } from "@/components/admin/DeleteButton";
 import { deleteBankAccount, saveBankAccount, syncBankNow, uploadStatement } from "@/actions/admin/banks";
@@ -273,7 +273,7 @@ export function BanksSettings({ accounts, transactions }: { accounts: Account[];
                     <td className="py-1.5 pr-3">{t.bank}</td>
                     <td className={`whitespace-nowrap py-1.5 pr-3 text-right ${t.incoming ? "text-green-700 dark:text-green-500" : ""}`}>
                       {t.incoming ? "+" : "−"}
-                      {formatRub(t.amount)}
+                      {formatAdminPrice(t.amount)}
                     </td>
                     <td className="py-1.5 pr-3">
                       {t.counterparty ?? "—"}

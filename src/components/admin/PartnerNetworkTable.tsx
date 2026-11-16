@@ -21,7 +21,7 @@ const EMPTY_FILTERS: Filters = { brand: "", name: "", sku: "", quantity: "", pri
 
 type SupplierOption = { id: string; name: string; inn: string | null };
 
-function formatRub(minor: number | null) {
+function formatAdminPrice(minor: number | null) {
   if (minor === null) return "—";
   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(minor / 100);
 }
@@ -157,8 +157,8 @@ export function PartnerNetworkTable({
                 <td className="max-w-xs px-3 py-2">{s.name ?? "—"}</td>
                 <td className="px-3 py-2">{s.sku ?? "—"}</td>
                 <td className="px-3 py-2">{s.quantity ?? "—"}</td>
-                <td className="px-3 py-2">{formatRub(s.price)}</td>
-                <td className="px-3 py-2">{formatRub(s.total)}</td>
+                <td className="px-3 py-2">{formatAdminPrice(s.price)}</td>
+                <td className="px-3 py-2">{formatAdminPrice(s.total)}</td>
                 <td className="px-3 py-2">{dateTime(s.updatedAt)}</td>
                 {canEdit && (
                   <td className="px-3 py-2">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { formatSupplierCurrency, parseSupplierCurrency } from "@/lib/supplier-currency";
@@ -90,8 +90,8 @@ export function ReplenishmentOrdersTable({
                   <td className="px-3 py-2">{item.nameSnapshot}</td>
                   <td className="px-3 py-2">{item.product?.sku ?? "—"}</td>
                   <td className="px-3 py-2 text-right">{item.quantity}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right">{formatRub(item.priceSnapshot)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right">{formatRub(item.priceSnapshot * item.quantity)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right">{formatAdminPrice(item.priceSnapshot)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right">{formatAdminPrice(item.priceSnapshot * item.quantity)}</td>
                   <td className="whitespace-nowrap px-3 py-2">{ORDER_STATUS_LABELS[item.status]}</td>
                 </tr>
               ))
@@ -134,7 +134,7 @@ export function ReplenishmentOrdersTable({
                   <td className="whitespace-nowrap px-3 py-2">{line.product.sku}</td>
                   <td className="px-3 py-2 text-right">{line.quantity}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right">
-                    {formatRub(line.price)}
+                    {formatAdminPrice(line.price)}
                     {line.currency !== "RUB" && (
                       <div className="text-xs text-foreground/60">
                         {formatSupplierCurrency(line.quotedPrice ?? line.price, parseSupplierCurrency(line.currency) ?? "RUB")}
@@ -142,7 +142,7 @@ export function ReplenishmentOrdersTable({
                     )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right">
-                    {formatRub(line.price * line.quantity)}
+                    {formatAdminPrice(line.price * line.quantity)}
                     {line.currency !== "RUB" && (
                       <div className="text-xs text-foreground/60">
                         {formatSupplierCurrency((line.quotedPrice ?? line.price) * line.quantity, parseSupplierCurrency(line.currency) ?? "RUB")}

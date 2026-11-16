@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { DeleteButton } from "@/components/admin/DeleteButton";
@@ -59,7 +59,7 @@ const parseRub = (s: string) => {
   const n = parseFloat(s.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(n) && n > 0 ? rublesToKopecksRoundedUp(n) : NaN;
 };
-const FILE_KINDS: Record<string, string> = { INVOICE: "Счёт", PAYMENT: "Платёжка", OTHER: "Файл" };
+const FILE_KINDS: Record<string, string> = { INVOICE: "Счёт", PAYMENT: "Платёжка", OTHER: "Иные" };
 
 const STATUS_STYLES: Record<string, string> = {
   "Требуется оплата": "bg-amber-500/10 text-amber-700 dark:text-amber-400",
@@ -86,7 +86,7 @@ function Payments({ request }: { request: PaymentRequestRow }) {
         {list.map((t) => (
           <li key={t.id} className="flex items-center gap-3">
             <span className="whitespace-nowrap">{new Date(t.date).toLocaleDateString("ru-RU")}</span>
-            <span className="whitespace-nowrap font-medium">{formatRub(t.amount)}</span>
+            <span className="whitespace-nowrap font-medium">{formatAdminPrice(t.amount)}</span>
             <span className="min-w-0 flex-1 truncate text-foreground/60" title={t.purpose ?? ""}>
               {t.documentNumber && `№ ${t.documentNumber} · `}
               {t.purpose}
@@ -263,7 +263,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
               />
               {request?.currency !== undefined && request.currency !== "RUB" && (
                 <p className="mt-1 text-xs text-foreground/50">
-                  Эквивалент для сверки с банковской выпиской: {formatRub(request.amount)}
+                  Эквивалент для сверки с банковской выпиской: {formatAdminPrice(request.amount)}
                 </p>
               )}
             </div>
@@ -423,11 +423,19 @@ function StatusSelect({ request }: { request: PaymentRequestRow }) {
   );
 }
 
-function AddFile({ id }: { id: string }) {
+function AddFileButton({
+  id,
+  kind,
+  label,
+}: {
+  id: string;
+  kind: string;
+  label: string;
+}) {
   const [pending, startTransition] = useTransition();
   return (
     <label className={`cursor-pointer text-xs text-blue-600 hover:underline dark:text-blue-400 ${pending ? "opacity-50" : ""}`} onClick={(e) => e.stopPropagation()}>
-      + файл
+      + {label}
       <input
         type="file"
         className="hidden"
@@ -437,7 +445,7 @@ function AddFile({ id }: { id: string }) {
           if (!file) return;
           const body = new FormData();
           body.set("id", id);
-          body.set("kind", "OTHER");
+          body.set("kind", kind);
           body.set("file", file);
           startTransition(async () => {
             const r = await uploadPaymentRequestFile(body);
@@ -446,6 +454,16 @@ function AddFile({ id }: { id: string }) {
         }}
       />
     </label>
+  );
+}
+
+function AddFile({ id }: { id: string }) {
+  return (
+    <span className="flex flex-wrap gap-x-3 gap-y-1">
+      <AddFileButton id={id} kind="INVOICE" label="счёт" />
+      <AddFileButton id={id} kind="PAYMENT" label="платёжка" />
+      <AddFileButton id={id} kind="OTHER" label="иные" />
+    </span>
   );
 }
 
@@ -493,7 +511,7 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
           +
         </button>
         <h1 className="text-lg font-semibold">Заявки на оплату</h1>
-        <span className="text-sm text-foreground/50">к оплате {formatRub(total)}</span>
+        <span className="text-sm text-foreground/50">к оплате {formatAdminPrice(total)}</span>
         <label className="flex items-center gap-1.5 text-sm text-foreground/70">
           <input type="checkbox" checked={onlyOpen} onChange={(e) => toggleOpen(e.target.checked)} />
           Только неоплаченные
@@ -538,11 +556,11 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
                   <td className="whitespace-nowrap py-2 pr-4 text-right">
                     {r.currency !== "RUB" && r.currencyAmount !== null
                       ? formatSupplierCurrency(r.currencyAmount, r.currency)
-                      : formatRub(r.amount)}
-                    {r.currency !== "RUB" && <div className="text-xs text-foreground/50">{formatRub(r.amount)} экв.</div>}
+                      : formatAdminPrice(r.amount)}
+                    {r.currency !== "RUB" && <div className="text-xs text-foreground/50">{formatAdminPrice(r.amount)} экв.</div>}
                     {r.vatAmount !== null && r.vatAmount > 0 && (
                       <div className="text-xs text-foreground/50">
-                        НДС {r.vatPercent ?? 0}%: {formatRub(r.vatAmount)}
+                        НДС {r.vatPercent ?? 0}%: {formatAdminPrice(r.vatAmount)}
                       </div>
                     )}
                   </td>
@@ -558,6 +576,7 @@ export function PaymentRequestsTable({ requests }: { requests: PaymentRequestRow
                           fileUrl={f.fileUrl}
                           fileName={f.fileName}
                           onClick={(e) => e.stopPropagation()}
+                          forcePreview
                           className="text-blue-600 hover:underline dark:text-blue-400"
                         />
                       </span>

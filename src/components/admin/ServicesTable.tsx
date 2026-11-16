@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import type { Service } from "@prisma/client";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import {
   deleteService,
   importOneCService,
@@ -285,7 +285,7 @@ export function ServicesTable({ services }: { services: Service[] }) {
                     {s.code && <div className="text-xs text-foreground/40">{s.code}</div>}
                   </td>
                   <td className="py-2 pr-3 text-foreground/60">{s.unit ?? "—"}</td>
-                  <td className="py-2 pr-3 font-medium">{formatRub(s.price)}</td>
+                  <td className="py-2 pr-3 font-medium">{formatAdminPrice(s.price)}</td>
                   <td className="py-2 pr-3 text-foreground/60">{s.oneCRef ? "✓" : "—"}</td>
                   <td className="py-2 pr-3">
                     <ActiveSwitch service={s} />

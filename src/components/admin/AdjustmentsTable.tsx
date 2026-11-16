@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { AdjustmentModal } from "@/components/admin/StockDocForms";
@@ -76,7 +76,7 @@ export function AdjustmentsTable({ warehouses, docs }: { warehouses: { ref: stri
                   </td>
                   <td className="py-1.5 pr-3">{d.warehouse}</td>
                   <td className="py-1.5 pr-3 text-right">{d.lines}</td>
-                  <td className="whitespace-nowrap py-1.5 pr-3 text-right">{d.sum ? formatRub(Math.round(d.sum * 100)) : "—"}</td>
+                  <td className="whitespace-nowrap py-1.5 pr-3 text-right">{d.sum ? formatAdminPrice(Math.round(d.sum * 100)) : "—"}</td>
                   <td className="max-w-72 truncate py-1.5 pr-3 text-foreground/70" title={d.comment}>
                     {d.comment || "—"}
                   </td>

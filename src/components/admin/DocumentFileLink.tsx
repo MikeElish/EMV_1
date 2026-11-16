@@ -9,13 +9,16 @@ export function DocumentFileLink({
   fileName,
   className = "min-w-0 flex-1 truncate hover:underline",
   onClick,
+  forcePreview = false,
 }: {
   fileUrl: string;
   fileName: string;
   className?: string;
   onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  /** Always open in a new tab (view mode) instead of downloading. */
+  forcePreview?: boolean;
 }) {
-  const previewable = isPreviewableDocument(fileName);
+  const previewable = forcePreview || isPreviewableDocument(fileName);
   return (
     <a
       href={fileUrl}

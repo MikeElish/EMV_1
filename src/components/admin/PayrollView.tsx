@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import type { Period } from "@/lib/period";
 import type { PayrollLine } from "@/lib/payroll";
 import { savePayrollLine } from "@/actions/admin/payroll";
@@ -143,8 +143,8 @@ export function PayrollView({ period, month, lines }: { period: Period; month: s
                 <td colSpan={3} className="pt-3 pr-3 text-right">
                   ИТОГО
                 </td>
-                <td className="pt-3 pr-3 text-right tabular-nums">{formatRub(accrued)}</td>
-                <td className="pt-3 text-right tabular-nums">{formatRub(cash)}</td>
+                <td className="pt-3 pr-3 text-right tabular-nums">{formatAdminPrice(accrued)}</td>
+                <td className="pt-3 text-right tabular-nums">{formatAdminPrice(cash)}</td>
               </tr>
             </tfoot>
           </table>

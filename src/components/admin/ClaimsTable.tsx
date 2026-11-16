@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
@@ -79,7 +79,7 @@ function ClaimCard({ claim, onClose }: { claim: ClaimRow; onClose: () => void })
           {claim.sku && <span className="font-normal text-foreground/50"> · {claim.sku}</span>}
         </p>
         <p className="mt-1 text-foreground/70">
-          {claim.quantity} шт. × {formatRub(claim.price)} = {formatRub(claim.price * claim.quantity)} · причина: <b>{claim.reason}</b>
+          {claim.quantity} шт. × {formatAdminPrice(claim.price)} = {formatAdminPrice(claim.price * claim.quantity)} · причина: <b>{claim.reason}</b>
         </p>
         <p className="mt-2 whitespace-pre-wrap">{claim.description}</p>
         {claim.photos.length > 0 && (

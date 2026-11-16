@@ -5,12 +5,30 @@ export const MAX_ATTACHMENTS_BYTES = 15 * 1024 * 1024;
 
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 
+function splitRecipients(raw: string): string[] {
+  const items: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    const prev = raw[i - 1];
+    if (ch === '"' && prev !== "\\") {
+      inQuotes = !inQuotes;
+    }
+    if (!inQuotes && (ch === "," || ch === ";" || ch === "\n")) {
+      if (current.trim()) items.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) items.push(current.trim());
+  return items;
+}
+
 /** "a@b.ru, Иван <c@d.ru>; e@f.ru" -> ["a@b.ru", "Иван <c@d.ru>", "e@f.ru"], or an error. */
 export function parseRecipients(raw: string): { ok: true; list: string[] } | { ok: false; bad: string } {
-  const list = raw
-    .split(/[,;\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const list = splitRecipients(raw);
   for (const item of list) {
     const address = item.match(/<([^>]+)>\s*$/)?.[1] ?? item;
     if (!EMAIL_RE.test(address.trim())) return { ok: false, bad: item };

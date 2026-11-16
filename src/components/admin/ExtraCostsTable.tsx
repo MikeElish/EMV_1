@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { DeleteButton } from "@/components/admin/DeleteButton";
@@ -55,9 +55,10 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 type Line = { key: number; kind: "GOODS" | "SERVICE"; ref: string; name: string; qty: string; price: string };
-let nextKey = 1;
 
 function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: () => void }) {
+  const keyRef = useRef(1);
+  const nextKey = () => keyRef.current++;
   const [data, setData] = useState<ExtraCostFormData | null>(null);
   const [kind, setKind] = useState(cost?.kind ?? EXTRA_COST_KINDS[0]);
   const [status, setStatus] = useState(cost?.status ?? EXTRA_COST_STATUSES[0]);
@@ -69,7 +70,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
   const [tab, setTab] = useState<"GOODS" | "SERVICE">("GOODS");
   const [lines, setLines] = useState<Line[]>(
     (cost?.lines ?? []).map((l) => ({
-      key: nextKey++,
+      key: nextKey(),
       kind: l.kind,
       ref: (l.kind === "GOODS" ? l.productId : l.serviceId) ?? "",
       name: l.name,
@@ -302,7 +303,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
                     <td className="py-1 pr-2">
                       <input value={l.price} onChange={(e) => update(l.key, { price: e.target.value })} inputMode="decimal" className={cellInput} />
                     </td>
-                    <td className="whitespace-nowrap py-2 pr-2 text-right">{formatRub(lineSum(l))}</td>
+                    <td className="whitespace-nowrap py-2 pr-2 text-right">{formatAdminPrice(lineSum(l))}</td>
                     <td className="py-2">
                       <button type="button" aria-label="Убрать строку" onClick={() => setLines((all) => all.filter((x) => x.key !== l.key))} className="text-red-600">
                         ×
@@ -314,7 +315,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
             </table>
             <button
               type="button"
-              onClick={() => setLines((all) => [...all, { key: nextKey++, kind: tab, ref: "", name: "", qty: "1", price: "" }])}
+              onClick={() => setLines((all) => [...all, { key: nextKey(), kind: tab, ref: "", name: "", qty: "1", price: "" }])}
               className="mt-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
             >
               + Добавить {tab === "GOODS" ? "товар" : "услугу"}
@@ -325,7 +326,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
             <div>
               <label className="text-sm text-foreground/60">Сумма{lines.length ? " (по строкам)" : " *"}</label>
               {lines.length ? (
-                <p className="mt-2 font-medium">{formatRub(total)}</p>
+                <p className="mt-2 font-medium">{formatAdminPrice(total)}</p>
               ) : (
                 <input name="amount" defaultValue={rub(cost?.amount ?? 0)} inputMode="decimal" placeholder="0,00" className={inputClass} />
               )}
@@ -407,7 +408,7 @@ export function ExtraCostsTable({ costs, initialNumber }: { costs: ExtraCostList
           +
         </button>
         <h1 className="text-lg font-semibold">Доп.расходы</h1>
-        <span className="text-sm text-foreground/50">итого {formatRub(total)}</span>
+        <span className="text-sm text-foreground/50">итого {formatAdminPrice(total)}</span>
         <div className="ml-auto">
           <TableSearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
         </div>
@@ -445,7 +446,7 @@ export function ExtraCostsTable({ costs, initialNumber }: { costs: ExtraCostList
                   <td className="py-2 pr-4">{c.supplierName ?? "—"}</td>
                   <td className="py-2 pr-4">{c.inn ?? ""}</td>
                   <td className="py-2 pr-4">{c.kpp ?? ""}</td>
-                  <td className="whitespace-nowrap py-2 pr-4 text-right">{formatRub(c.amount)}</td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-right">{formatAdminPrice(c.amount)}</td>
                   <td className="py-2 pr-4">
                     <StatusSelect cost={c} />
                   </td>

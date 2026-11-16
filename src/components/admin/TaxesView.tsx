@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import type { Period } from "@/lib/period";
 import type { TaxYear } from "@/lib/taxes";
 import { saveTaxSettings } from "@/actions/admin/taxes";
@@ -53,15 +53,15 @@ export function TaxesView({ period, data, today }: { period: Period; data: TaxYe
       <div className="mt-4 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-foreground/15 px-4 py-3">
           <div className="text-xs uppercase text-foreground/60">Начислено за год</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums">{formatRub(total)}</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums">{formatAdminPrice(total)}</div>
         </div>
         <div className="rounded-lg border border-amber-500/40 bg-amber-400/10 px-4 py-3">
           <div className="text-xs uppercase text-amber-800 dark:text-amber-300">Срок уже наступил</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums">{formatRub(due)}</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums">{formatAdminPrice(due)}</div>
         </div>
         <div className="rounded-lg border border-green-600/40 bg-green-600/10 px-4 py-3">
           <div className="text-xs uppercase text-green-800 dark:text-green-400">Уплачено на ЕНП</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums">{formatRub(data.paid)}</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums">{formatAdminPrice(data.paid)}</div>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export function TaxesView({ period, data, today }: { period: Period; data: TaxYe
                 <td className={`whitespace-nowrap py-1.5 pr-3 ${p.due <= today ? "font-medium" : ""}`}>{ru(p.due)}</td>
                 <td className="py-1.5 pr-3">{p.tax}</td>
                 <td className="whitespace-nowrap py-1.5 pr-3">{p.period}</td>
-                <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{p.amount === null ? "—" : formatRub(p.amount)}</td>
+                <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{p.amount === null ? "—" : formatAdminPrice(p.amount)}</td>
                 <td className="py-1.5 text-xs text-foreground/60">{p.note}</td>
               </tr>
             ))}

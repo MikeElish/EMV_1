@@ -23,7 +23,7 @@ import { SupplierRequestModal } from "@/components/admin/SupplierRequestModal";
 import { ActionMenu } from "@/components/admin/ActionMenu";
 import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from "@/components/admin/LogisticsRequestModal";
 import { SearchSelect } from "@/components/SearchSelect";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { formatSupplierCurrency, type SupplierCurrency } from "@/lib/supplier-currency";
 
 export type SupplierOrderRow = {
@@ -153,7 +153,7 @@ const TEXT_COLUMNS: { key: TextKey; label: string; get: (r: SupplierOrderRow) =>
   { key: "sku", label: "Артикул", get: (r) => r.sku },
   { key: "quantity", label: "Количество", get: (r) => String(r.quantity) },
   { key: "supplier", label: "Поставщик", get: (r) => r.supplier ?? "" },
-  { key: "price", label: "Цена закупки", get: (r) => formatRub(r.price) },
+  { key: "price", label: "Цена закупки", get: (r) => formatAdminPrice(r.price) },
   { key: "days", label: "Срок поставки", get: (r) => days(r.deliveryDays) },
   { key: "quality", label: "Качество", get: (r) => r.quality ?? "" },
 ];
@@ -188,7 +188,7 @@ function SupplierOfferSelect({
         options={row.offerOptions.map((option) => ({
           value: option.id,
           label: option.supplierName,
-          hint: `${formatSupplierCurrency(option.quotedPrice, option.currency)} · ${formatRub(option.price)}`,
+          hint: `${formatSupplierCurrency(option.quotedPrice, option.currency)} · ${formatAdminPrice(option.price)}`,
         }))}
         placeholder="Поиск поставщика или цены"
         className="max-w-64 text-xs"
@@ -346,7 +346,10 @@ export function SupplierOrdersTable({
     return grouped ? [...list].sort((a, b) => (b.orderNumber ?? "").localeCompare(a.orderNumber ?? "")) : list;
   }, [rows, filters, category, unfinished, grouped]);
 
-  const requestLineIds = useMemo(() => filtered.filter((row) => row.canEdit && row.status === "TO_CHECK").map((row) => row.id), [filtered]);
+  const requestLineIds = useMemo(
+    () => filtered.filter((row) => row.canEdit && (row.status === "TO_CHECK" || row.status === "TO_ORDER")).map((row) => row.id),
+    [filtered]
+  );
 
   function buildSupplierPurchaseSource(purchaseId: string): LogisticsSource {
     const purchaseRows = rows.filter((r) => r.purchaseId === purchaseId);
@@ -532,7 +535,7 @@ export function SupplierOrdersTable({
                       <SupplierOfferSelect row={r} />
                     </td>
                     <td className="whitespace-nowrap py-2 pr-4">
-                      {formatRub(r.price)}
+                      {formatAdminPrice(r.price)}
                       {r.currency !== "RUB" && (
                         <div className="text-xs text-foreground/60">{formatSupplierCurrency(r.quotedPrice, r.currency)}</div>
                       )}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
@@ -112,7 +112,7 @@ export function LogisticsTable({ requests }: { requests: LogisticsRequestListIte
                   <td className="py-2 pr-4">
                     {r.executor ? [r.executor.lastName, r.executor.firstName].filter(Boolean).join(" ") || r.executor.login : "—"}
                   </td>
-                  <td className="whitespace-nowrap py-2 pr-4 text-right">{r.cost ? formatRub(r.cost) : "—"}</td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-right">{r.cost ? formatAdminPrice(r.cost) : "—"}</td>
                   <td className="py-2 pr-4">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[r.status]}`}>
                       {STATUS_LABELS[r.status]}

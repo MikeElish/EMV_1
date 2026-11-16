@@ -2,7 +2,7 @@
 
 import { FitWidth } from "@/components/FitWidth";
 import { useRouter } from "next/navigation";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 
 export type CompanyOrderRow = {
   id: string;
@@ -49,9 +49,9 @@ export function CompanyBalanceTab({ orders }: { orders: CompanyOrderRow[] }) {
                 {order.orderNumber}
               </button>
             </td>
-            <td className="py-2 pr-4">{formatRub(order.totalAmount)}</td>
-            <td className="py-2 pr-4">{formatRub(order.shippedAmount)}</td>
-            <td className="py-2 pr-4">{formatRub(order.paidAmount)}</td>
+            <td className="py-2 pr-4">{formatAdminPrice(order.totalAmount)}</td>
+            <td className="py-2 pr-4">{formatAdminPrice(order.shippedAmount)}</td>
+            <td className="py-2 pr-4">{formatAdminPrice(order.paidAmount)}</td>
             <td className="py-2 pr-4">
               {order.shippedAt ? order.shippedAt.toLocaleDateString("ru-RU") : "—"}
             </td>

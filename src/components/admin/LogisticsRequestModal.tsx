@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { saveLogisticsRequest, uploadLogisticsFile, getLogisticsFormData, type LogisticsFormData, type LogisticsRequestInput } from "@/actions/admin/logistics";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import type { LogisticsRequestType, LogisticsRequestStatus } from "@prisma/client";
 
 export type LogisticsSource =
@@ -271,13 +271,13 @@ export function LogisticsRequestModal({
                   <td className="py-2 pr-4">{line.name}</td>
                   <td className="py-2 pr-4">{line.sku ?? "—"}</td>
                   <td className="py-2 pr-4">{line.quantity}</td>
-                  <td className="py-2 pr-4">{formatRub(line.price)}</td>
-                  <td className="py-2 text-right">{formatRub(line.quantity * line.price)}</td>
+                  <td className="py-2 pr-4">{formatAdminPrice(line.price)}</td>
+                  <td className="py-2 text-right">{formatAdminPrice(line.quantity * line.price)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-sm">Итого по выбранным: <strong>{formatRub(total)}</strong></p>
+          <p className="mt-2 text-sm">Итого по выбранным: <strong>{formatAdminPrice(total)}</strong></p>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

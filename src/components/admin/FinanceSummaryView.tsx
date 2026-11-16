@@ -1,6 +1,6 @@
 "use client";
 
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import type { Period } from "@/lib/period";
 import { PeriodPicker } from "@/components/admin/PeriodPicker";
 
@@ -27,8 +27,8 @@ function Tile({ label, amount, vat, className, hint }: { label: string; amount: 
         {hint && <span className="text-[11px] opacity-70">{hint}</span>}
       </div>
       <div className="mt-1 flex items-baseline justify-between gap-3">
-        <span className="whitespace-nowrap text-xl font-semibold tabular-nums">{formatRub(amount)}</span>
-        {vat !== undefined && <span className="whitespace-nowrap text-sm tabular-nums opacity-80">НДС {formatRub(vat)}</span>}
+        <span className="whitespace-nowrap text-xl font-semibold tabular-nums">{formatAdminPrice(amount)}</span>
+        {vat !== undefined && <span className="whitespace-nowrap text-sm tabular-nums opacity-80">НДС {formatAdminPrice(vat)}</span>}
       </div>
     </div>
   );
@@ -72,11 +72,11 @@ export function FinanceSummaryView({ period, tiles, rows }: { period: Period; ti
                           {r.purpose}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums text-lime-700 dark:text-lime-400">{r.kind === "income" ? formatRub(r.amount) : ""}</td>
+                      <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums text-lime-700 dark:text-lime-400">{r.kind === "income" ? formatAdminPrice(r.amount) : ""}</td>
                       <td className={`whitespace-nowrap py-1.5 pr-3 text-right tabular-nums ${r.kind === "tax" ? "text-foreground/50" : "text-red-700 dark:text-red-400"}`}>
-                        {r.kind !== "income" ? formatRub(r.amount) : ""}
+                        {r.kind !== "income" ? formatAdminPrice(r.amount) : ""}
                       </td>
-                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-foreground/60">{r.vat ? formatRub(r.vat) : ""}</td>
+                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-foreground/60">{r.vat ? formatAdminPrice(r.vat) : ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -94,7 +94,7 @@ export function FinanceSummaryView({ period, tiles, rows }: { period: Period; ti
           <Tile label="Остаток" amount={tiles.rest} className="border-foreground/30 bg-foreground/[0.06] font-medium" />
           <p className="text-xs text-foreground/50">
             Остаток = Итого − НДС к уплате − Зарплата − НДФЛ. Переводы между своими счетами не учитываются; уплаченные налоги (ЕНП{" "}
-            {formatRub(tiles.taxPaid)}) — в «Налогах», не в затратах.
+            {formatAdminPrice(tiles.taxPaid)}) — в «Налогах», не в затратах.
           </p>
         </div>
       </div>

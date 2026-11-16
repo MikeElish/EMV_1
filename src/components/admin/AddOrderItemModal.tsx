@@ -6,7 +6,7 @@ import { getManualOrderFormData, type ManualOrderFormData } from "@/actions/admi
 import { addOrderItem } from "@/actions/admin/orders";
 import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
-import { rublesToKopecksRoundedUp, formatRub } from "@/lib/money";
+import { rublesToKopecksRoundedUp, formatAdminPrice } from "@/lib/money";
 
 type Order = { id: string; orderNumber: string };
 
@@ -95,7 +95,7 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
         </div>
         {selected && (
           <p className="text-xs text-foreground/50">
-            Розница {formatRub(selected.prices.retail)}, опт {formatRub(selected.prices.wholesale)}
+            Розница {formatAdminPrice(selected.prices.retail)}, опт {formatAdminPrice(selected.prices.wholesale)}
           </p>
         )}
         <div className="flex justify-end gap-2 pt-2">

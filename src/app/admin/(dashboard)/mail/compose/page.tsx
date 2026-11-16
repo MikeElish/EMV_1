@@ -11,7 +11,12 @@ import { getSignatureLogoDataUri } from "@/lib/mail/signature-logo";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
-const formatAddress = (a: MailAddress) => (a.name ? `${a.name} <${a.address}>` : a.address);
+const formatAddress = (a: MailAddress) => {
+  if (!a.name) return a.address;
+  const needsQuotes = /[<>",;]/.test(a.name);
+  const name = needsQuotes ? `"${a.name.replace(/"/g, '\\"')}"` : a.name;
+  return `${name} <${a.address}>`;
+};
 const join = (list: MailAddress[]) => list.map(formatAddress).join(", ");
 
 function withPrefix(prefix: string, subject: string) {

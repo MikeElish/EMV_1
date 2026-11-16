@@ -12,7 +12,7 @@ import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CompanyBalanceTab, type CompanyOrderRow } from "@/components/admin/CompanyBalanceTab";
 import { SupplierProfileTab } from "@/components/admin/SupplierProfileTab";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 
 type Manager = { id: string; lastName: string | null; firstName: string | null; login: string; role: Role };
@@ -131,7 +131,7 @@ export function CompaniesTable({
                             : "text-foreground/60"
                       }`}
                     >
-                      {formatRub(balance)}
+                      {formatAdminPrice(balance)}
                     </button>
                   </td>
                 </tr>

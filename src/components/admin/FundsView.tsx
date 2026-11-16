@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import type { Period } from "@/lib/period";
 import { FUNDS, FUND_LABELS, type Fund } from "@/lib/fund-labels";
 import { PeriodPicker } from "@/components/admin/PeriodPicker";
@@ -31,7 +31,7 @@ export function FundsView({ period, data, balances, moves }: { period: Period; d
         <PeriodPicker period={period} path="/admin/finance/funds" modes={["month"]} />
       </div>
       <p className="mt-1 text-xs text-foreground/50">
-        Поступления месяца {formatRub(data.income)} распределяются по фондам; заявка на оплату списывает деньги со своего фонда и не оплачивается, если в
+        Поступления месяца {formatAdminPrice(data.income)} распределяются по фондам; заявка на оплату списывает деньги со своего фонда и не оплачивается, если в
         нём не хватает.
       </p>
 
@@ -46,9 +46,9 @@ export function FundsView({ period, data, balances, moves }: { period: Period; d
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className={`text-xs uppercase tracking-wide ${f === "FREE" ? "font-bold" : "font-semibold"}`}>{FUND_LABELS[f]}</span>
-                <span className="whitespace-nowrap text-xs text-foreground/60">остаток {formatRub(balances[f])}</span>
+                <span className="whitespace-nowrap text-xs text-foreground/60">остаток {formatAdminPrice(balances[f])}</span>
               </div>
-              <div className={`mt-1 whitespace-nowrap text-xl tabular-nums ${f === "FREE" ? "font-bold" : "font-semibold"}`}>{formatRub(data.allocations[f])}</div>
+              <div className={`mt-1 whitespace-nowrap text-xl tabular-nums ${f === "FREE" ? "font-bold" : "font-semibold"}`}>{formatAdminPrice(data.allocations[f])}</div>
               {data.notes[f] && <div className="mt-0.5 text-[11px] text-foreground/60">{data.notes[f]}</div>}
             </button>
           ))}
@@ -96,8 +96,8 @@ export function FundsView({ period, data, balances, moves }: { period: Period; d
                           )}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums text-green-700 dark:text-green-400">{m.in ? formatRub(m.in) : ""}</td>
-                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-red-700 dark:text-red-400">{m.out ? formatRub(m.out) : ""}</td>
+                      <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums text-green-700 dark:text-green-400">{m.in ? formatAdminPrice(m.in) : ""}</td>
+                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-red-700 dark:text-red-400">{m.out ? formatAdminPrice(m.out) : ""}</td>
                     </tr>
                   ))
                 )}

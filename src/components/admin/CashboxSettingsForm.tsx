@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { retryReceipt, saveCashboxSettings, testAtol, testSbp, type ActionResult } from "@/actions/admin/cashbox-settings";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 
 const inputClassName = "w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50";
 
@@ -214,7 +214,7 @@ export function CashboxSettingsForm({
                 <tr key={p.id} className="border-t border-foreground/10">
                   <td className="whitespace-nowrap py-1.5 pr-4">{new Date(p.createdAt).toLocaleString("ru-RU")}</td>
                   <td className="py-1.5 pr-4">{p.orderNumber}</td>
-                  <td className="whitespace-nowrap py-1.5 pr-4 text-right">{formatRub(p.amount)}</td>
+                  <td className="whitespace-nowrap py-1.5 pr-4 text-right">{formatAdminPrice(p.amount)}</td>
                   <td className="py-1.5 pr-4">
                     {PAYMENT_STATUS[p.status] ?? p.status}
                     {p.paidAt && <span className="text-foreground/50"> · {new Date(p.paidAt).toLocaleString("ru-RU")}</span>}
@@ -247,7 +247,7 @@ export function CashboxSettingsForm({
                   <td className="whitespace-nowrap py-1.5 pr-4">{new Date(r.createdAt).toLocaleString("ru-RU")}</td>
                   <td className="py-1.5 pr-4">{r.orderNumber}</td>
                   <td className="py-1.5 pr-4">{RECEIPT_KIND[r.kind] ?? r.kind}</td>
-                  <td className="whitespace-nowrap py-1.5 pr-4 text-right">{formatRub(r.amount)}</td>
+                  <td className="whitespace-nowrap py-1.5 pr-4 text-right">{formatAdminPrice(r.amount)}</td>
                   <td className="py-1.5 pr-4">
                     <span className={r.status === "fail" ? "text-red-600" : r.status === "done" ? "text-green-700 dark:text-green-500" : ""}>
                       {RECEIPT_STATUS[r.status] ?? r.status}

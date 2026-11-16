@@ -13,7 +13,7 @@ import {
 } from "@/components/shop/DeliveryMethodSelect";
 import { RU_CITIES } from "@/content/ru-cities";
 import { DELLIN_TERMINALS } from "@/content/dellin-terminals";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import {
   getManualOrderFormData,
   createManualOrder,
@@ -543,7 +543,7 @@ export function NewOrderModal({
                               onAdd={mode === "crm" ? (sku) => void addUnknownSku(sku, line.key) : undefined}
                               renderItem={(p) => (
                                 <>
-                                  {p.name} <span className="text-foreground/50">· {p.sku} · {formatRub(priceOf(p, priceType, markup))}</span>
+                                  {p.name} <span className="text-foreground/50">· {p.sku} · {formatAdminPrice(priceOf(p, priceType, markup))}</span>
                                   {p.supplierOffers.length > 0 && (
                                     <span className="mt-1 block text-xs text-foreground/50">
                                       {p.supplierOffers.map((offer) => (
@@ -571,7 +571,7 @@ export function NewOrderModal({
                                 options={product.supplierOffers.map((offer) => ({
                                   value: offer.id,
                                   label: `${supplierDisplayName(offer.supplier ?? { name: null, city: null }, role)} · ${formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}`,
-                                  hint: `${offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`} · ${formatRub(offer.price)}`,
+                                  hint: `${offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`} · ${formatAdminPrice(offer.price)}`,
                                 }))}
                                 placeholder="Выберите поставщика и срок"
                                 className="text-xs"
@@ -600,7 +600,7 @@ export function NewOrderModal({
                             className={inputClassName}
                           />
                         </td>
-                        <td className="py-3 pr-3 text-right">{formatRub(lineTotals[index])}</td>
+                        <td className="py-3 pr-3 text-right">{formatAdminPrice(lineTotals[index])}</td>
                         <td className="py-3">
                           <button
                             type="button"
@@ -656,7 +656,7 @@ export function NewOrderModal({
 
           <div className="mt-6 flex items-center justify-between border-t border-foreground/10 pt-4">
             <span className="text-sm">
-              Итого: <strong>{formatRub(total)}</strong>
+              Итого: <strong>{formatAdminPrice(total)}</strong>
             </span>
             <button
               type="button"

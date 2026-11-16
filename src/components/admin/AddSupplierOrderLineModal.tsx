@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { addManualSupplierOrderLine, getManualSupplierOrderFormData } from "@/actions/admin/supplier-orders";
 import { Modal } from "@/components/Modal";
 import { SearchSelect } from "@/components/SearchSelect";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 
 export function AddSupplierOrderLineModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
@@ -139,7 +139,7 @@ export function AddSupplierOrderLineModal({ onClose }: { onClose: () => void }) 
                 <p className="mt-1 text-xs text-foreground/50">Нет заказов покупателей с незакрытыми позициями.</p>
               )}
             </div>
-            {selected && <p className="text-xs text-foreground/50">В наличии: {selected.stock} шт. · цена закупки {formatRub(selected.purchasePrice)}</p>}
+            {selected && <p className="text-xs text-foreground/50">В наличии: {selected.stock} шт. · цена закупки {formatAdminPrice(selected.purchasePrice)}</p>}
           </>
         )}
         <div className="flex justify-end gap-2 pt-2">

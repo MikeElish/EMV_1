@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import type { SalaryReport } from "@/lib/salary-report";
 
 const inputClass = "rounded-md border border-foreground/20 bg-background px-2 py-1.5 text-sm";
@@ -12,7 +12,7 @@ function Tile({ label, amount, className, strong = false }: { label: string; amo
   return (
     <div className={`rounded-lg border px-4 py-3 ${className}`}>
       <div className="text-xs uppercase tracking-wide opacity-80">{label}</div>
-      <div className={`mt-1 whitespace-nowrap tabular-nums ${strong ? "text-2xl font-bold" : "text-xl font-semibold"}`}>{formatRub(amount)}</div>
+      <div className={`mt-1 whitespace-nowrap tabular-nums ${strong ? "text-2xl font-bold" : "text-xl font-semibold"}`}>{formatAdminPrice(amount)}</div>
     </div>
   );
 }
@@ -79,7 +79,7 @@ export function SalaryReportView({
           <p className="mt-2 text-xs text-foreground/50">
             {report.percent === null
               ? "У сотрудника не задан «% от прибыли» (CRM → Пользователи → карточка) — «К выплате» не считается."
-              : `Бонус = ${String(report.percent).replace(".", ",")}% от прибыли ${formatRub(report.profit)} (продажи − себестоимость − затраты) сверх плана ${formatRub(report.plan)} (оклад × 1,5 × 1,5). Оклад начисляется в Финансы → Зарплата.`}
+              : `Бонус = ${String(report.percent).replace(".", ",")}% от прибыли ${formatAdminPrice(report.profit)} (продажи − себестоимость − затраты) сверх плана ${formatAdminPrice(report.plan)} (оклад × 1,5 × 1,5). Оклад начисляется в Финансы → Зарплата.`}
           </p>
 
           <h2 className="mt-8 text-base font-semibold">Деталировка</h2>
@@ -115,9 +115,9 @@ export function SalaryReportView({
                         )}
                         {r.note && <div className="text-xs text-amber-700 dark:text-amber-500">{r.note}</div>}
                       </td>
-                      <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">{r.income ? formatRub(r.income) : ""}</td>
-                      <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-red-700 dark:text-red-400">{r.costs ? formatRub(r.costs) : ""}</td>
-                      <td className="whitespace-nowrap py-2 text-right tabular-nums">{formatRub(r.total)}</td>
+                      <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">{r.income ? formatAdminPrice(r.income) : ""}</td>
+                      <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums text-red-700 dark:text-red-400">{r.costs ? formatAdminPrice(r.costs) : ""}</td>
+                      <td className="whitespace-nowrap py-2 text-right tabular-nums">{formatAdminPrice(r.total)}</td>
                     </tr>
                   ))
                 )}
@@ -127,7 +127,7 @@ export function SalaryReportView({
                   <td colSpan={3} className="pt-3 pr-4 text-right font-semibold">
                     ИТОГО
                   </td>
-                  <td className="whitespace-nowrap pt-3 text-right font-bold tabular-nums">{formatRub(report.profit)}</td>
+                  <td className="whitespace-nowrap pt-3 text-right font-bold tabular-nums">{formatAdminPrice(report.profit)}</td>
                 </tr>
               </tfoot>
             </table>

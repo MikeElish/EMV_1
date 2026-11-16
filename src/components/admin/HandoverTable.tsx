@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 import { TableSearchInput } from "@/components/admin/TableSearchInput";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
@@ -77,7 +77,7 @@ function HandoverCard({
         {kind}: заказ {order.orderNumber}
       </h2>
       <p className="mt-1 text-sm text-foreground/60">
-        {order.customer} · {order.ready.length} поз. на {formatRub(order.readySum)} · {order.payment}
+        {order.customer} · {order.ready.length} поз. на {formatAdminPrice(order.readySum)} · {order.payment}
       </p>
       <form onSubmit={submit} className="mt-4 space-y-3">
         <div>
@@ -103,25 +103,6 @@ function HandoverCard({
         </div>
       </form>
     </Modal>
-  );
-}
-
-function UpdButton({ orderId, onDone }: { orderId: string; onDone: (message: string) => void }) {
-  const [pending, startTransition] = useTransition();
-  return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={() =>
-        startTransition(async () => {
-          const r = await issueUpd(orderId);
-          onDone(r.ok ? r.message : r.error);
-        })
-      }
-      className="ml-2 rounded-md border border-amber-500/40 px-2 py-1 text-xs text-amber-700 hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
-    >
-      {pending ? "Проводим..." : "Сформировать УПД"}
-    </button>
   );
 }
 
@@ -183,8 +164,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                 <th className="py-2 pr-4">Оплата</th>
                 <th className="py-2 pr-4">Статус</th>
                 <th className="py-2 pr-4">Документы</th>
-                <th className="py-2 pr-4">Действие</th>
-                <th className="py-2" />
+                <th className="py-2">Действие</th>
               </tr>
             </thead>
             <tbody>
@@ -208,7 +188,7 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                       </div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap py-2 pr-4 text-right">{o.ready.length ? formatRub(o.readySum) : ""}</td>
+                  <td className="whitespace-nowrap py-2 pr-4 text-right">{o.ready.length ? formatAdminPrice(o.readySum) : ""}</td>
                   <td className="whitespace-nowrap py-2 pr-4">{o.ready.length ? o.payment : ""}</td>
                   <td className="py-2 pr-4">
                     <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATE_STYLES[o.state] ?? ""}`}>{o.state}</span>
@@ -238,22 +218,22 @@ export function HandoverTable({ orders }: { orders: HandoverRow[] }) {
                           label: "Логистика",
                           onClick: () => setLogisticsSource(buildHandoverLogisticsSource(o)),
                         },
+                        ...(o.canEdit && o.updPending
+                          ? [
+                              {
+                                label: "Сформировать УПД",
+                                onClick: () => issueUpd(o.id).then((r) => setMessage(r.ok ? r.message : r.error)),
+                              },
+                            ]
+                          : []),
+                        ...(o.canEdit && o.ready.length > 0
+                          ? HANDOVER_KINDS.map((kind) => ({
+                              label: kind,
+                              onClick: () => setActing({ order: o, kind }),
+                            }))
+                          : []),
                       ]}
                     />
-                  </td>
-                  <td className="whitespace-nowrap py-2">
-                    {o.canEdit && o.updPending && <UpdButton orderId={o.id} onDone={setMessage} />}
-                    {o.canEdit && o.ready.length > 0 &&
-                      HANDOVER_KINDS.map((kind) => (
-                        <button
-                          key={kind}
-                          type="button"
-                          onClick={() => setActing({ order: o, kind })}
-                          className="ml-2 rounded-md border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/5"
-                        >
-                          {kind}
-                        </button>
-                      ))}
                   </td>
                 </tr>
               ))}

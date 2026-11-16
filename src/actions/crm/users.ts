@@ -23,11 +23,13 @@ const LOGIN_PREFIX: Partial<Record<Role, string>> = {
   MECHANIC: "meh",
   DISPATCHER: "d",
   DRIVER: "v",
+  ACCOUNTANT: "buh",
 };
 
 // Owner and Customer log in with their email; every other role gets a
 // role-prefixed sequential code (all three manager tiers share one "m..."
-// sequence, per the confirmed numbering scheme).
+// sequence, per the confirmed numbering scheme). If the role has no prefix,
+// the part of the email before @ is used as the login.
 async function generateLogin(role: Role, email: string | undefined): Promise<string> {
   if (role === "CUSTOMER") {
     if (!email) throw new Error("Для роли «Покупатель» обязателен email — он используется как логин");
@@ -35,7 +37,21 @@ async function generateLogin(role: Role, email: string | undefined): Promise<str
   }
 
   const prefix = LOGIN_PREFIX[role];
-  if (!prefix) throw new Error("Не удалось определить логин для этой роли");
+  if (!prefix) {
+    if (!email) throw new Error("Не удалось определить логин для этой роли");
+    const local = email.split("@")[0];
+    if (!local) throw new Error("Не удалось определить логин для этой роли");
+    const base = local.toLowerCase().replace(/[^a-z0-9._-]/g, "");
+    if (!base) throw new Error("Не удалось определить логин для этой роли");
+    // Ensure uniqueness by appending a counter if needed.
+    let candidate = base;
+    let counter = 1;
+    while (await prisma.user.findUnique({ where: { login: candidate }, select: { id: true } })) {
+      candidate = `${base}${counter}`;
+      counter++;
+    }
+    return candidate;
+  }
 
   const existing = await prisma.user.findMany({
     where: { login: { startsWith: prefix } },

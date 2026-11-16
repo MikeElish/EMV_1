@@ -11,9 +11,21 @@ const preciseFormatter = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 2,
 });
 
+const adminFormatter = new Intl.NumberFormat("ru-RU", {
+  style: "currency",
+  currency: "RUB",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 /** price/stock amounts are stored in kopecks (minor units) to avoid float rounding errors */
 export function formatRub(minorUnits: number): string {
   return formatter.format(minorUnits / 100);
+}
+
+/** Admin UI price formatter: always shows exactly 2 decimal places. */
+export function formatAdminPrice(minorUnits: number): string {
+  return adminFormatter.format(minorUnits / 100);
 }
 
 /** A product with no price yet (0) is sold «по запросу»: the manager names the price. */

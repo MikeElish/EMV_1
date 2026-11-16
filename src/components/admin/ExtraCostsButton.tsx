@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatRub } from "@/lib/money";
+import { formatAdminPrice } from "@/lib/money";
 import { Modal } from "@/components/Modal";
 
 export type ExtraCostRow = {
@@ -25,7 +25,7 @@ export function ExtraCostsButton({
   total: number;
 }) {
   const [open, setOpen] = useState(false);
-  if (!costs.length) return <span className="text-foreground/50">{formatRub(0)}</span>;
+  if (!costs.length) return <span className="text-foreground/50">{formatAdminPrice(0)}</span>;
 
   return (
     <>
@@ -35,7 +35,7 @@ export function ExtraCostsButton({
         title="Показать документы"
         className="font-medium text-blue-600 underline underline-offset-4 hover:opacity-80 dark:text-blue-400"
       >
-        {formatRub(total)}
+        {formatAdminPrice(total)}
       </button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidthClassName="max-w-xl">
@@ -64,7 +64,7 @@ export function ExtraCostsButton({
                     </span>
                   </td>
                   <td className="py-2 pr-4 text-foreground/70">{c.service?.name ?? c.kind}</td>
-                  <td className="py-2 text-right">{formatRub(c.amount)}</td>
+                  <td className="py-2 text-right">{formatAdminPrice(c.amount)}</td>
                 </tr>
               ))}
             </tbody>

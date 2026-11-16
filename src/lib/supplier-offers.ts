@@ -4,6 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { getMarkups } from "@/lib/price-settings";
 import { applyMarkup, markupOf, tierPrice, type Markups, type PriceTier } from "@/lib/pricing";
 
+/** Supplier-specific default quality when none is supplied by the import or portal. */
+const DEFAULT_QUALITY_BY_SUPPLIER: Record<string, string> = {
+  cmusqs6ql00xe9ryn3obijj46: "TVH", // ДРО-ПАРТС ООО
+  cmusqs6sy00yq9ryn1vb3gdlu: "Аналог (OEM)", // ООО "ТЕХНОГУТ"
+  cmusqs6vf01099ryn7nddaugn: "Аналог (OEM)", // УНИВЕРСАЛ СЕРВИС ООО
+};
+
 type Db = Prisma.TransactionClient | typeof prisma;
 type OfferPricing = {
   currency?: string;
@@ -58,7 +65,8 @@ export async function upsertSupplierOffer(
     orderBy: { priceUpdatedAt: "desc" },
   });
   const deliveryDays = offer.deliveryDays === undefined ? existing?.deliveryDays ?? null : offer.deliveryDays;
-  const quality = offer.quality === undefined ? existing?.quality ?? null : offer.quality;
+  const defaultQuality = offer.supplierId ? DEFAULT_QUALITY_BY_SUPPLIER[offer.supplierId] : undefined;
+  const quality = offer.quality === undefined ? (existing?.quality ?? defaultQuality ?? null) : offer.quality;
   const warehouse = offer.warehouse === undefined ? existing?.warehouse ?? null : offer.warehouse;
   const currency = offer.currency ?? existing?.currency ?? "RUB";
   const quotedPrice = offer.quotedPrice ?? offer.price;

@@ -7,7 +7,7 @@ import type { OrderStatus } from "@prisma/client";
 import { createBonusPaymentRequest, saveBonusOverride } from "@/actions/admin/bonuses";
 import { Modal } from "@/components/Modal";
 import { PeriodPicker } from "@/components/admin/PeriodPicker";
-import { formatRub, rublesToKopecksRoundedUp } from "@/lib/money";
+import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
 import type { Period } from "@/lib/period";
 import type { BonusReportRow } from "@/lib/bonuses-report";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
@@ -55,7 +55,7 @@ function BonusAmountCell({
     });
   }
 
-  if (!editable) return <span>{formatRub(row.bonus)}</span>;
+  if (!editable) return <span>{formatAdminPrice(row.bonus)}</span>;
   return (
     <div onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center justify-end gap-1">
@@ -155,15 +155,15 @@ export function BonusesReportView({
                   <span className="font-medium">{row.company}</span>
                   <span className="block text-xs text-foreground/50">{row.manager}</span>
                 </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatRub(row.income)}</td>
-                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatRub(row.sales)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.income)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.sales)}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right">
-                  {formatRub(row.cost)}
+                  {formatAdminPrice(row.cost)}
                   {row.unknownCostLines > 0 && <span className="ml-1 text-xs text-amber-600" title={`Нет закупочной цены у ${row.unknownCostLines} поз.`}>*</span>}
                 </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatRub(row.margin)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.margin)}</td>
                 <td className="py-2 pr-3 text-right"><BonusAmountCell key={`${row.key}:${period.from}:${period.to}:${row.bonus}`} row={row} period={period} editable={canEditBonus} /></td>
-                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatRub(row.issued)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.issued)}</td>
                 <td className="py-2"><BonusRequestAction row={row} period={period} /></td>
               </tr>
             ))}
