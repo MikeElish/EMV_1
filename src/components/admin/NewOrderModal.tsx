@@ -25,6 +25,7 @@ import {
 import { PRICE_TYPES, PRICE_TYPE_LABELS, type PriceType } from "@/lib/validators/manual-order";
 import { applyMarkup } from "@/lib/pricing";
 import { formatSupplierCurrency, parseSupplierCurrency } from "@/lib/supplier-currency";
+import { useRole } from "@/components/admin/AccessContext";
 
 type Customer = ManualOrderFormData["customers"][number];
 type Company = ManualOrderFormData["companies"][number];
@@ -136,6 +137,12 @@ function SearchPicker<T extends { id: string }>({
   );
 }
 
+function supplierDisplayName(supplier: { name: string | null; city: string | null }, role: string | null) {
+  const privileged = ["OWNER", "ADMIN", "SUPPLIER", "ACCOUNTANT"].includes(role ?? "");
+  if (privileged) return supplier.name ?? "Поставщик";
+  return supplier.city ?? supplier.name ?? "Поставщик";
+}
+
 const filterBuyer = (b: Buyer, q: string) =>
   b.customer
     ? matches(q, b.customer.name, b.customer.email, b.customer.phone, b.customer.companyName)
@@ -160,6 +167,7 @@ export function NewOrderModal({
   mode?: ManualOrderFormMode;
 }) {
   const router = useRouter();
+  const role = useRole();
   const [data, setData] = useState<ManualOrderFormData | null>(null);
   const [tab, setTab] = useState<Tab>("items");
 
@@ -534,7 +542,7 @@ export function NewOrderModal({
                                     <span className="mt-1 block text-xs text-foreground/50">
                                       {p.supplierOffers.map((offer) => (
                                         <span key={offer.id} className="block">
-                                          {offer.supplier?.name ?? "Поставщик"} · {formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}
+                                          {supplierDisplayName(offer.supplier ?? { name: null, city: null }, role)} · {formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}
                                           {" · "}{offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`}
                                         </span>
                                       ))}
@@ -556,7 +564,7 @@ export function NewOrderModal({
                                 emptyLabel="Поставщик не выбран"
                                 options={product.supplierOffers.map((offer) => ({
                                   value: offer.id,
-                                  label: `${offer.supplier?.name ?? "Поставщик"} · ${formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}`,
+                                  label: `${supplierDisplayName(offer.supplier ?? { name: null, city: null }, role)} · ${formatSupplierCurrency(offer.quotedPrice ?? offer.price, parseSupplierCurrency(offer.currency) ?? "RUB")}`,
                                   hint: `${offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`} · ${formatRub(offer.price)}`,
                                 }))}
                                 placeholder="Выберите поставщика и срок"

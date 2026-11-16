@@ -143,7 +143,7 @@ export async function getSupplierRequestData(inputIds: string[]): Promise<
         })
       : [],
     prisma.company.findMany({
-      where: { isOwn: false, OR: [{ type: "Поставщик" }, { supplierOffers: { some: {} } }, { supplierOrderLines: { some: {} } }] },
+      where: { isOwn: false, isOnlineStore: false, OR: [{ type: "Поставщик" }, { supplierOffers: { some: {} } }, { supplierOrderLines: { some: {} } }] },
       select: { id: true, name: true, contactEmail: true },
       orderBy: { name: "asc" },
     }),
@@ -284,6 +284,7 @@ export async function submitSupplierRequests(input: SendInput): Promise<Supplier
       where: {
         id: { in: [...new Set(quotes.map((quote) => quote.supplierId))] },
         isOwn: false,
+        isOnlineStore: false,
         OR: [{ type: "Поставщик" }, { supplierOffers: { some: {} } }, { supplierOrderLines: { some: {} } }],
       },
       select: { id: true, name: true, contactEmail: true, contactName: true },

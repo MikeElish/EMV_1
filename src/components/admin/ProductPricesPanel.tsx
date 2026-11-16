@@ -4,6 +4,7 @@ import { SearchSelect } from "@/components/SearchSelect";
 import { FitWidth } from "@/components/FitWidth";
 import { applyMarkup, markupOf, type Markups } from "@/lib/pricing";
 import { rublesToKopecksRoundedUp } from "@/lib/money";
+import { useRole } from "@/components/admin/AccessContext";
 
 export type SaleKind = "retail" | "wholesale" | "dealer";
 export type PriceField = { pct: string; rub: string };
@@ -23,6 +24,7 @@ export type PricesState = {
 export type OfferRow = {
   id: string;
   supplierName: string | null;
+  supplierCity: string | null;
   price: number;
   deliveryDays: number | null;
   quality: string | null;
@@ -32,6 +34,15 @@ export type OfferRow = {
 };
 
 export const QUALITY_SUGGESTIONS = ["Оригинал", "Аналог (OEM)", "Аналог", "Б/у", "TVH"];
+
+function supplierDisplayName(
+  supplier: { name: string | null; city: string | null },
+  role: string | null,
+) {
+  const privileged = ["OWNER", "ADMIN", "SUPPLIER", "ACCOUNTANT"].includes(role ?? "");
+  if (privileged) return supplier.name ?? "—";
+  return supplier.city ?? supplier.name ?? "—";
+}
 
 export const SALE_KINDS: { kind: SaleKind; label: string; hint?: string }[] = [
   { kind: "retail", label: "Розничная" },
@@ -110,6 +121,7 @@ function OffersTable({
   selectedId: string;
   onSelect: (offer: OfferRow) => void;
 }) {
+  const role = useRole();
   const choosable = offers.filter((offer) => !offer.noOffer).length > 1;
   return (
     <div>
@@ -147,7 +159,7 @@ function OffersTable({
                       )}
                     </td>
                   )}
-                  <td className="py-2 pr-3">{o.supplierName ?? "—"}</td>
+                  <td className="py-2 pr-3">{supplierDisplayName({ name: o.supplierName, city: o.supplierCity }, role)}</td>
                   <td className="whitespace-nowrap py-2 pr-3 font-medium">{o.noOffer ? "Нет предложения" : formatPrice(o.price)}</td>
                   <td className="whitespace-nowrap py-2 pr-3">{formatDays(o.deliveryDays)}</td>
                   <td className="py-2 pr-3">{o.quality ?? "—"}</td>
@@ -178,10 +190,11 @@ export function ProductPricesPanel({
 }: {
   value: PricesState;
   onChange: (next: PricesState) => void;
-  suppliers: { id: string; name: string; inn: string | null }[];
+  suppliers: { id: string; name: string; city: string | null; inn: string | null }[];
   /** Supplier offers of an existing card; empty for a new product. */
   offers?: OfferRow[];
 }) {
+  const role = useRole();
   const purchase = toKopecks(value.purchaseRub);
 
   function setPurchase(purchaseRub: string) {
@@ -261,7 +274,11 @@ export function ProductPricesPanel({
               id="supplierId"
               value={value.supplierId}
               onChange={(supplierId) => onChange({ ...value, supplierId })}
-              options={suppliers.map((s) => ({ value: s.id, label: s.name, hint: s.inn ? `ИНН ${s.inn}` : undefined }))}
+              options={suppliers.map((s) => ({
+                value: s.id,
+                label: supplierDisplayName({ name: s.name, city: s.city }, role),
+                hint: s.inn ? `ИНН ${s.inn}` : undefined,
+              }))}
               emptyLabel="— не выбран —"
               placeholder="Название или ИНН поставщика"
               className="mt-1"

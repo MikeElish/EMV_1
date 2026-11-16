@@ -29,7 +29,7 @@ export default async function CrmOrdersPage({
           company: { select: { name: true } },
         },
       },
-      buyerCompany: { select: { name: true } },
+      buyerCompany: { select: { name: true, contract: true } },
     },
     orderBy: { createdAt: "desc" },
   });

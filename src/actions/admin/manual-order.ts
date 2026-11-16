@@ -103,7 +103,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
       currency: true,
       deliveryDays: true,
       selected: true,
-      supplier: { select: { name: true } },
+      supplier: { select: { name: true, city: true } },
     },
     orderBy: [{ selected: "desc" }, { priceUpdatedAt: "desc" }],
   });

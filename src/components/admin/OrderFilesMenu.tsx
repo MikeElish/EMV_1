@@ -8,10 +8,20 @@ import { OrderDocumentsModal } from "@/components/admin/OrderDocumentsModal";
 import { DropdownMenu } from "@/components/DropdownMenu";
 
 const DOCUMENT_CATEGORIES = Object.keys(
-  ORDER_DOCUMENT_CATEGORY_LABELS
+  ORDER_DOCUMENT_CATEGORY_LABELS,
 ) as OrderDocumentCategory[];
 
-export function OrderFilesMenu({ orderId, canEdit }: { orderId: string; canEdit: boolean }) {
+export function OrderFilesMenu({
+  orderId,
+  canEdit,
+  deferred,
+  contract,
+}: {
+  orderId: string;
+  canEdit: boolean;
+  deferred: boolean;
+  contract: string | null;
+}) {
   const [modalCategory, setModalCategory] = useState<OrderDocumentCategory | null>(null);
 
   function handleCancel(close: () => void) {
@@ -29,19 +39,21 @@ export function OrderFilesMenu({ orderId, canEdit }: { orderId: string; canEdit:
       >
         {(close) => (
           <>
-            {DOCUMENT_CATEGORIES.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => {
-                  setModalCategory(category);
-                  close();
-                }}
-                className="block w-full px-3 py-2 text-left hover:bg-foreground/5"
-              >
-                {ORDER_DOCUMENT_CATEGORY_LABELS[category]}
-              </button>
-            ))}
+            {DOCUMENT_CATEGORIES.filter((category) => category !== "CONTRACT" || deferred).map(
+              (category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => {
+                    setModalCategory(category);
+                    close();
+                  }}
+                  className="block w-full px-3 py-2 text-left hover:bg-foreground/5"
+                >
+                  {ORDER_DOCUMENT_CATEGORY_LABELS[category]}
+                </button>
+              ),
+            )}
             {canEdit && (
               <button
                 type="button"
@@ -60,6 +72,7 @@ export function OrderFilesMenu({ orderId, canEdit }: { orderId: string; canEdit:
           orderId={orderId}
           category={modalCategory}
           canEdit={canEdit}
+          contract={contract}
           onClose={() => setModalCategory(null)}
         />
       )}

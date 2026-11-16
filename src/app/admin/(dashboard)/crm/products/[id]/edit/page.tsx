@@ -16,7 +16,7 @@ export default async function EditProductPage({
       where: { id },
       include: {
         pricing: true,
-        offers: { include: { supplier: { select: { name: true } } }, orderBy: { price: "asc" } },
+        offers: { include: { supplier: { select: { name: true, city: true } } }, orderBy: { price: "asc" } },
       },
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
@@ -62,6 +62,7 @@ export default async function EditProductPage({
         offers={product.offers.map((o) => ({
           id: o.id,
           supplierName: o.supplier?.name ?? null,
+          supplierCity: o.supplier?.city ?? null,
           price: o.price,
           deliveryDays: o.deliveryDays,
           quality: o.quality,

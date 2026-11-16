@@ -68,6 +68,7 @@ export const companySchema = z
     country: z.string().trim().max(100).optional(),
     city: z.string().trim().max(120).optional(),
     hasContract: z.boolean().default(false),
+    isOnlineStore: z.boolean().default(false),
     contract: z.string().trim().optional(),
     type: z.string().trim().optional(),
     managerId: z.string().trim().optional(),

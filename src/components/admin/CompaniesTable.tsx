@@ -189,6 +189,7 @@ export function CompaniesTable({
                   country: selected.country ?? undefined,
                   city: selected.city ?? undefined,
                   hasContract: selected.hasContract,
+                  isOnlineStore: selected.isOnlineStore,
                   contract: selected.contract ?? undefined,
                   type: selected.type ?? undefined,
                   managerId: selected.managerId ?? undefined,

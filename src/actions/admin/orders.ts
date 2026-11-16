@@ -104,6 +104,27 @@ export async function updateLinePrice(itemId: string, price: number): Promise<Ac
   revalidateOrders();
   return { ok: true };
 }
+
+/** Remove the «Под заказ» surcharge from one line (manual mode). */
+export async function clearLineSurcharge(itemId: string): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  const item = await prisma.orderItem.findUnique({
+    where: { id: itemId },
+    select: { orderId: true, cancelled: true, surcharge: true },
+  });
+  if (!item) return { ok: false, error: "Позиция не найдена" };
+  const assignmentDenied = await assignedOrderDenied(item.orderId);
+  if (assignmentDenied) return assignmentDenied;
+  if (item.cancelled) return { ok: false, error: "Надбавку у отменённой позиции не сбросить" };
+  if (item.surcharge === 0) return { ok: true };
+  await prisma.orderItem.update({ where: { id: itemId }, data: { surcharge: 0 } });
+  await refreshOrder(prisma, item.orderId);
+  await applyOrderSurcharges(item.orderId);
+  revalidateOrders();
+  return { ok: true };
+}
+
 /** «Ручное редактирование» (owner): change the quantity of one line. */
 export async function updateLineQuantity(itemId: string, quantity: number): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
@@ -180,28 +201,51 @@ export async function addOrderItem(
   return { ok: true };
 }
 
-/** Owner-only manual bonus for a line; never changes an issued document. */
+/** Manual bonus for a line. Before an invoice is issued only the owner may
+ *  edit it (when manual input is enabled). After the invoice is issued and
+ *  before the line is shipped the order manager may also change it, provided
+ *  the bonus does not exceed the order total. */
 export async function updateLineBonus(itemId: string, bonus: number): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
-  const ownerDenied = await ownerOnly();
-  if (ownerDenied) return ownerDenied;
-  if (!(await ownerManualInputEnabled())) return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
   if (!Number.isInteger(bonus) || bonus < 0 || bonus > 1_000_000_000_000) {
     return { ok: false, error: "Укажите бонус в копейках, не меньше нуля" };
   }
 
   const item = await prisma.orderItem.findUnique({
     where: { id: itemId },
-    select: { id: true, orderId: true, saleRef: true, status: true, paid: true, priceSnapshot: true, order: { select: { invoiceRef: true } } },
+    select: {
+      id: true,
+      orderId: true,
+      saleRef: true,
+      status: true,
+      paid: true,
+      priceSnapshot: true,
+      quantity: true,
+      order: { select: { invoiceRef: true, totalAmount: true } },
+    },
   });
   if (!item) return { ok: false, error: "Позиция не найдена" };
   const assignmentDenied = await assignedOrderDenied(item.orderId);
   if (assignmentDenied) return assignmentDenied;
   if (item.status === "CANCELLED") return { ok: false, error: "У отменённой позиции нельзя изменить бонус" };
   if (bonus > 0 && item.priceSnapshot <= 0) return { ok: false, error: "Сначала укажите цену позиции" };
-  if (item.paid || item.saleRef || item.order.invoiceRef) {
-    return { ok: false, error: "Бонус нельзя изменить после оплаты, оформления счёта или УПД" };
+  if (item.paid || item.saleRef) {
+    return { ok: false, error: "Бонус нельзя изменить после оплаты или оформления УПД" };
+  }
+
+  const shipped = (await import("@/lib/validators/orders")).SHIPPED_STATUSES.includes(item.status);
+  const invoiceIssued = !!item.order.invoiceRef;
+  if (shipped) {
+    return { ok: false, error: "Бонус нельзя изменить после отгрузки" };
+  }
+  if (!invoiceIssued) {
+    const ownerDenied = await ownerOnly();
+    if (ownerDenied) return ownerDenied;
+    if (!(await ownerManualInputEnabled())) return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
+  }
+  if (bonus > item.order.totalAmount) {
+    return { ok: false, error: "Бонус не может превышать общую сумму счёта" };
   }
 
   await prisma.orderItem.update({ where: { id: item.id }, data: { bonus } });

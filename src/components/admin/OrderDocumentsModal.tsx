@@ -18,11 +18,13 @@ export function OrderDocumentsModal({
   orderId,
   category,
   canEdit,
+  contract,
   onClose,
 }: {
   orderId: string;
   category: OrderDocumentCategory;
   canEdit: boolean;
+  contract?: string | null;
   onClose: () => void;
 }) {
   const [documents, setDocuments] = useState<OrderDocument[] | null>(null);
@@ -99,6 +101,23 @@ export function OrderDocumentsModal({
         <h2 className="text-lg font-semibold">
           {ORDER_DOCUMENT_CATEGORY_LABELS[category]}
         </h2>
+        {category === "CONTRACT" && contract && (
+          <p className="text-sm text-foreground/60">
+            Договор в карточке компании:{" "}
+            {/^https?:\/\//i.test(contract) ? (
+              <a
+                href={contract}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {contract}
+              </a>
+            ) : (
+              <span className="text-foreground">{contract}</span>
+            )}
+          </p>
+        )}
         {canEdit && category === "INVOICE" && (
           <button
             type="button"

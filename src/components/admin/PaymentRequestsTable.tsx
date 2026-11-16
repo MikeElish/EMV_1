@@ -119,7 +119,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
   const [orderId, setOrderId] = useState(request?.orderId ?? "");
   const [fund, setFund] = useState(request?.fund ?? "FREE");
   const [purposeCategory, setPurposeCategory] = useState(request?.purposeCategory ?? "OTHER");
-  const [vatPercent, setVatPercent] = useState<number | null>(request?.vatPercent ?? 20);
+  const [vatPercent, setVatPercent] = useState<number | null>(request?.vatPercent ?? 22);
   const [customVatPercent, setCustomVatPercent] = useState(String(request?.vatPercent ?? ""));
   const [vatAmount, setVatAmount] = useState<number | null>(request?.vatAmount ?? null);
   const [inn, setInn] = useState("");
@@ -252,6 +252,13 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
                 inputMode="decimal"
                 placeholder="0,00"
                 disabled={request?.currency !== undefined && request.currency !== "RUB"}
+                onChange={(event) => {
+                  if (vatPercent === null) return;
+                  const amountKopecks = parseRub(event.target.value);
+                  if (amountKopecks > 0) {
+                    setVatAmount(Math.round(amountKopecks * vatPercent / (100 + vatPercent)));
+                  }
+                }}
                 className={`${inputClass} disabled:opacity-70`}
               />
               {request?.currency !== undefined && request.currency !== "RUB" && (
@@ -263,7 +270,7 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
             <div>
               <label className="text-sm text-foreground/60">НДС %</label>
               <select
-                value={vatPercent === null ? "none" : [0, 10, 20, 30].includes(vatPercent) ? String(vatPercent) : "custom"}
+                value={vatPercent === null ? "none" : [0, 5, 7, 10, 20, 22, 30].includes(vatPercent) ? String(vatPercent) : "custom"}
                 onChange={(event) => {
                   const value = event.target.value;
                   if (value === "none") {
@@ -285,12 +292,15 @@ function RequestCard({ request, onClose }: { request: PaymentRequestRow | null; 
               >
                 <option value="none">Без НДС</option>
                 <option value="0">0%</option>
+                <option value="5">5%</option>
+                <option value="7">7%</option>
                 <option value="10">10%</option>
                 <option value="20">20%</option>
+                <option value="22">22%</option>
                 <option value="30">30%</option>
                 <option value="custom">Другое</option>
               </select>
-              {vatPercent !== null && ![0, 10, 20, 30].includes(vatPercent) && (
+              {vatPercent !== null && ![0, 5, 7, 10, 20, 22, 30].includes(vatPercent) && (
                 <input
                   value={customVatPercent}
                   onChange={(event) => {

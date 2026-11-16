@@ -17,7 +17,7 @@ import {
 } from "@/components/admin/ProductPricesPanel";
 
 type Category = { id: string; name: string };
-type Supplier = { id: string; name: string; inn: string | null };
+type Supplier = { id: string; name: string; city: string | null; inn: string | null };
 type Tab = "main" | "prices";
 
 const TAB_LABELS: Record<Tab, string> = { main: "Основное", prices: "Цены" };

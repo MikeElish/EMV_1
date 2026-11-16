@@ -597,6 +597,7 @@ model Company {
   kpp                         String?
   oneCRef                     String?             @unique
   isOwn                       Boolean             @default(false)
+  isOnlineStore               Boolean             @default(false)
   priceType                   CompanyPriceType    @default(WHOLESALE)
   individualMarkup            Float?
   contactEmail                String?
@@ -1156,6 +1157,7 @@ enum OrderDocumentCategory {
   INVOICE
   UPD
   WAYBILL
+  CONTRACT
 }
 
 enum DeliveryMethod {

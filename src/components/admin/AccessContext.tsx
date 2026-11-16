@@ -8,8 +8,17 @@ import { sectionOfPath, type AccessLevel, type AccessMap } from "@/lib/access";
 // menus, tabs and the «только просмотр» mode.
 
 const AccessContext = createContext<AccessMap | null>(null);
+const RoleContext = createContext<string | null>(null);
 
-export function AccessProvider({ access, children }: { access: AccessMap; children: React.ReactNode }) {
+export function AccessProvider({
+  access,
+  role,
+  children,
+}: {
+  access: AccessMap;
+  role?: string | null;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const section = sectionOfPath(pathname);
   const level: AccessLevel = section ? access[section.key] ?? "hide" : "edit";
@@ -20,7 +29,16 @@ export function AccessProvider({ access, children }: { access: AccessMap; childr
     if (root) root.dataset.access = level;
   }, [level]);
 
-  return <AccessContext.Provider value={access}>{children}</AccessContext.Provider>;
+  return (
+    <AccessContext.Provider value={access}>
+      <RoleContext.Provider value={role ?? null}>{children}</RoleContext.Provider>
+    </AccessContext.Provider>
+  );
+}
+
+/** The signed-in employee's role, or null outside the admin. */
+export function useRole(): string | null {
+  return useContext(RoleContext);
 }
 
 /** Null outside the admin: everything is open there. */

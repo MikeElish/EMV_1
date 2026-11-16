@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatRub } from "@/lib/money";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_PROGRESS } from "@/lib/validators/orders";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_PROGRESS, SHIPPED_STATUSES } from "@/lib/validators/orders";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 import { PaidToggle, PAYMENT_STATE_LABELS, paymentStateOf } from "@/components/admin/PaidToggle";
 import { DeliveryDateInput } from "@/components/admin/DeliveryDateInput";
@@ -21,6 +22,7 @@ import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from 
 import { DELIVERY_METHOD_LABELS, DELIVERY_METHODS } from "@/lib/delivery";
 import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/client";
 import type { PaymentState } from "@/actions/admin/orders";
+import { clearLineSurcharge } from "@/actions/admin/orders";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManagerSelect";
 import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/lib/order-pricing";
@@ -38,7 +40,7 @@ export type OrderRow = Order & {
     login: string;
     company: { name: string } | null;
   } | null;
-  buyerCompany: { name: string } | null;
+  buyerCompany: { name: string; contract: string | null } | null;
 };
 
 type Row = {
@@ -190,6 +192,7 @@ export function OrdersTable({
   canDelete?: boolean;
   manualInputEnabled?: boolean;
 }) {
+  const router = useRouter();
   const [filters, setFilters] = useRememberedState<Filters>(
     "filters",
     { ...EMPTY_FILTERS, orderNumber: initialOrderNumber ?? "" },
@@ -323,6 +326,16 @@ export function OrdersTable({
     return result;
   }, [grouped, filtered, filters.quantity]);
 
+  const showBonusColumn = useMemo(
+    () =>
+      manual ||
+      filtered.some(
+        ({ order, item }) =>
+          order.invoiceRef && !SHIPPED_STATUSES.includes(item.status) && order.canEdit,
+      ),
+    [manual, filtered],
+  );
+
   const textFilters = grouped
     ? TEXT_FILTERS.filter((f) => GROUPED_COLUMNS.has(f.key))
     : TEXT_FILTERS;
@@ -412,7 +425,7 @@ export function OrdersTable({
                 <th className="py-2 pr-4">Доставка</th>
                 <th className="py-2 pr-4">Дата поставки</th>
                 <th className="py-2 pr-4">Оплата</th>
-                {!grouped && manual && <th className="py-2 pr-4">Бонус</th>}
+                {!grouped && showBonusColumn && <th className="py-2 pr-4">Бонус</th>}
                 {!grouped && <th className="py-2 pr-4">Файлы</th>}
                 {!grouped && <th className="py-2 pr-4">Действие</th>}
                 {canDelete && <th className="py-2" />}
@@ -479,7 +492,7 @@ export function OrdersTable({
                     ))}
                   </select>
                 </th>
-                {!grouped && manual && <th className="pb-2 pr-4" />}
+                {!grouped && showBonusColumn && <th className="pb-2 pr-4" />}
                 {!grouped && <th className="pb-2 pr-4" />}
                 {!grouped && <th className="pb-2 pr-4" />}
                 {canDelete && <th className="pb-2" />}
@@ -556,7 +569,7 @@ export function OrdersTable({
                 {filtered.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={TEXT_FILTERS.length + 5 + (manual ? 1 : 0)}
+                      colSpan={TEXT_FILTERS.length + 5 + (showBonusColumn ? 1 : 0)}
                       className="py-4 text-sm text-foreground/40"
                     >
                       Ничего не найдено.
@@ -611,10 +624,28 @@ export function OrdersTable({
                           )}
                           {item.surcharge > 0 && !item.cancelled && (
                             <div
-                              className="whitespace-nowrap text-xs text-foreground/50"
+                              className="flex items-center gap-1 whitespace-nowrap text-xs text-foreground/50"
                               title="Заказ «Под заказ» меньше 10 000 ₽ — +1 500 ₽; маржа меньше 2 000 ₽ — до 2 500 ₽; поровну на позиции «Под заказ»"
                             >
-                              {manual ? "+ " : "в т.ч. "}надбавка {formatRub(item.surcharge)}
+                              <span>
+                                {manual ? "+ " : "в т.ч. "}надбавка {formatRub(item.surcharge)}
+                              </span>
+                              {manual && order.canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!confirm("Убрать надбавку у позиции?")) return;
+                                    clearLineSurcharge(item.id).then((r) => {
+                                      if (!r.ok) alert(r.error);
+                                      else router.refresh();
+                                    });
+                                  }}
+                                  className="text-red-600 hover:opacity-70"
+                                  aria-label="Убрать надбавку"
+                                >
+                                  ✕
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -679,13 +710,18 @@ export function OrdersTable({
                             PAYMENT_STATE_LABELS[paymentStateOf(item)]
                           )}
                         </td>
-                        {manual && (
+                        {(manual || (order.invoiceRef && !SHIPPED_STATUSES.includes(item.status))) && (
                           <td className="py-2 pr-4">
-                            {!item.cancelled && <LineBonusCell itemId={item.id} bonus={item.bonus} />}
+                            {!item.cancelled && order.canEdit && <LineBonusCell itemId={item.id} bonus={item.bonus} />}
                           </td>
                         )}
                         <td className="py-2 pr-4">
-                          <OrderFilesMenu orderId={order.id} canEdit={order.canEdit} />
+                          <OrderFilesMenu
+                            orderId={order.id}
+                            canEdit={order.canEdit}
+                            deferred={order.deferred}
+                            contract={order.buyerCompany?.contract ?? null}
+                          />
                         </td>
                         {!grouped && (
                           <td className="py-2 pr-4">

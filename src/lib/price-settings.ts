@@ -28,7 +28,7 @@ export async function getExchangeRates(): Promise<ExchangeRates> {
 export async function getSuppliers() {
   return prisma.company.findMany({
     where: { type: { equals: "Поставщик", mode: "insensitive" } },
-    select: { id: true, name: true, inn: true },
+    select: { id: true, name: true, city: true, inn: true },
     orderBy: { name: "asc" },
   });
 }

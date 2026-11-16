@@ -40,4 +40,5 @@ export const ORDER_DOCUMENT_CATEGORY_LABELS: Record<OrderDocumentCategory, strin
   INVOICE: "Счёт на оплату",
   UPD: "УПД",
   WAYBILL: "Транспортная накладная",
+  CONTRACT: "Договор (отсрочка)",
 };

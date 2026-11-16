@@ -25,6 +25,7 @@ function toCompanyData(data: CompanyInput) {
     country: data.country || null,
     city: data.city || null,
     hasContract: data.hasContract,
+    isOnlineStore: data.isOnlineStore,
     contract: data.hasContract ? data.contract || null : null,
     type: data.type || null,
     managerId: data.managerId || null,

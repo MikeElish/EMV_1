@@ -36,6 +36,7 @@ export function CompanyForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [hasContract, setHasContract] = useState(initial?.hasContract ?? false);
+  const [isOnlineStore, setIsOnlineStore] = useState(initial?.isOnlineStore ?? false);
   const [paymentType, setPaymentType] = useState(initial?.paymentType ?? "PREPAYMENT");
   const [priceType, setPriceType] = useState(initial?.priceType ?? "WHOLESALE");
   const [managerId, setManagerId] = useState(initial?.managerId ?? "");
@@ -105,6 +106,7 @@ export function CompanyForm({
       country: country || undefined,
       city: city || undefined,
       hasContract,
+      isOnlineStore,
       contract: String(formData.get("contract") ?? "") || undefined,
       type: String(formData.get("type") ?? "") || undefined,
       managerId: String(formData.get("managerId") ?? "") || undefined,
@@ -330,6 +332,14 @@ export function CompanyForm({
             defaultValue={initial?.type}
             className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50"
           />
+          <label className="mt-2 flex items-center gap-2 text-sm text-foreground/60">
+            <input
+              type="checkbox"
+              checked={isOnlineStore}
+              onChange={(e) => setIsOnlineStore(e.target.checked)}
+            />
+            Интернет-магазин (не предлагать как поставщика)
+          </label>
           <datalist id="company-type-suggestions">
             {COMPANY_TYPE_SUGGESTIONS.map((t) => (
               <option key={t} value={t} />
