@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { accessDenied } from "@/lib/access-server";
-import { brandSlug } from "@/lib/site";
 import { brandSchema, type BrandInput } from "@/lib/validators/brand";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -98,6 +97,3 @@ export async function setBrandActive(id: string, isActive: boolean): Promise<Act
   return { ok: true };
 }
 
-export function generateBrandSlug(name: string): string {
-  return brandSlug(name);
-}
