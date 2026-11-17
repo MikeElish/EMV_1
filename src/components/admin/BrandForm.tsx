@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import type { BrandInput } from "@/lib/validators/brand";
 import type { ActionResult } from "@/actions/admin/brands";
 
@@ -8,10 +9,12 @@ export function BrandForm({
   initial,
   onSubmit,
   onSuccess,
+  cancelHref,
 }: {
   initial?: BrandInput;
   onSubmit: (input: BrandInput) => Promise<ActionResult>;
   onSuccess?: () => void;
+  cancelHref?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -75,13 +78,23 @@ export function BrandForm({
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {submitting ? "Сохраняем..." : "Сохранить"}
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-md bg-foreground px-6 py-2 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {submitting ? "Сохраняем..." : "Сохранить"}
+        </button>
+        {cancelHref && (
+          <Link
+            href={cancelHref}
+            className="rounded-md border border-foreground/20 px-6 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Отмена
+          </Link>
+        )}
+      </div>
     </form>
   );
 }

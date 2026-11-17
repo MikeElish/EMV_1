@@ -27,6 +27,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "crm.products", label: "Товары", path: "/admin/crm/products" },
       { key: "crm.services", label: "Услуги", path: "/admin/crm/services" },
       { key: "crm.categories", label: "Категории", path: "/admin/crm/categories" },
+      { key: "crm.brands", label: "Бренды", path: "/admin/crm/brands" },
       { key: "crm.search", label: "Поиск", path: "/admin/crm/search" },
       { key: "crm.price-check", label: "Проценка", path: "/admin/crm/price-check" },
       { key: "crm.supplier-orders", label: "Заказ поставщику", path: "/admin/crm/supplier-orders" },
@@ -123,6 +124,9 @@ function legacy(own: Record<string, unknown>, byRole: Record<string, unknown>, k
   }
   if (key === "finance.bonuses") {
     return isLevel(own["finance.payroll"]) ? own["finance.payroll"] : byRole["finance.payroll"];
+  }
+  if (key === "crm.brands") {
+    return isLevel(own["crm.categories"]) ? own["crm.categories"] : byRole["crm.categories"];
   }
   if (!key.startsWith("reports.")) return undefined;
   return isLevel(own.reports) ? own.reports : byRole.reports;
