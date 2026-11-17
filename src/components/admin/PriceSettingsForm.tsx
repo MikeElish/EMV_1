@@ -13,6 +13,7 @@ const MARKUP_FIELDS: { key: keyof Markups; label: string; hint?: string }[] = [
   { key: "retailMarkup", label: "Розничная цена" },
   { key: "wholesaleMarkup", label: "Оптовая цена", hint: "показывается на сайте" },
   { key: "dealerMarkup", label: "Дилерская цена" },
+  { key: "tenderMarkup", label: "Тендер", hint: "наценка для тендерных заказов" },
 ];
 
 const RATE_FIELDS: { key: keyof ExchangeRates; label: string; cbr: keyof CbrRates }[] = [
@@ -71,6 +72,7 @@ export function PriceSettingsForm({
           retailMarkup: readNum("retailMarkup"),
           wholesaleMarkup: readNum("wholesaleMarkup"),
           dealerMarkup: readNum("dealerMarkup"),
+          tenderMarkup: readNum("tenderMarkup"),
         },
         exchangeRates: {
           USD: readNum("exchangeRateUSD"),

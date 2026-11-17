@@ -150,8 +150,8 @@ const filterBuyer = (b: Buyer, q: string) =>
 const filterProduct = (p: Product, q: string) => matches(q, p.sku, p.name, p.brand);
 
 /** The product's price for the order's price type. */
-function priceOf(p: Product, type: PriceType, markup: number | null): number {
-  if (type === "tender") return p.purchase > 0 ? applyMarkup(p.purchase, 50) : p.prices.wholesale;
+function priceOf(p: Product, type: PriceType, markup: number | null, tenderMarkup: number): number {
+  if (type === "tender") return p.purchase > 0 ? applyMarkup(p.purchase, tenderMarkup) : p.prices.wholesale;
   if (type === "individual") return p.purchase > 0 && markup !== null && p.prices.wholesale > 0 ? applyMarkup(p.purchase, markup) : p.prices.wholesale;
   return p.prices[type];
 }
@@ -188,6 +188,7 @@ export function NewOrderModal({
   const [priceType, setPriceType] = useState<PriceType>("wholesale");
   // The picked buyer's company «Индивидуальный» markup, %.
   const [markup, setMarkup] = useState<number | null>(null);
+  const [tenderMarkup, setTenderMarkup] = useState<number>(50);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod | null>(null);
@@ -203,6 +204,7 @@ export function NewOrderModal({
       .then((formData) => {
         if (!active) return;
         setData(formData);
+        setTenderMarkup(formData.tenderMarkup);
         if (mode === "replenishment") {
           const ownCompany = formData.companies.find((item) => item.isOwn);
           if (!ownCompany) {
@@ -266,7 +268,7 @@ export function NewOrderModal({
     setLines((prev) =>
       prev.map((l) => {
         const product = productById.get(l.productId);
-        return product ? { ...l, priceRub: kopecksToRub(priceOf(product, next, withMarkup)) } : l;
+        return product ? { ...l, priceRub: kopecksToRub(priceOf(product, next, withMarkup, tenderMarkup)) } : l;
       })
     );
   }
@@ -468,7 +470,7 @@ export function NewOrderModal({
                       setLines((prev) =>
                         prev.map((l) => {
                           const product = productById.get(l.productId);
-                          return product ? { ...l, priceRub: kopecksToRub(priceOf(product, "individual", Number.isFinite(n) ? n : null)) } : l;
+                          return product ? { ...l, priceRub: kopecksToRub(priceOf(product, "individual", Number.isFinite(n) ? n : null, tenderMarkup)) } : l;
                         })
                       );
                     }}
@@ -538,12 +540,12 @@ export function NewOrderModal({
                               onPick={(p) => updateLine(line.key, {
                                 productId: p.id,
                                 offerId: p.supplierOffers.find((offer) => offer.selected)?.id ?? p.supplierOffers[0]?.id ?? "",
-                                priceRub: kopecksToRub(priceOf(p, priceType, markup)),
+                                priceRub: kopecksToRub(priceOf(p, priceType, markup, tenderMarkup)),
                               })}
                               onAdd={mode === "crm" ? (sku) => void addUnknownSku(sku, line.key) : undefined}
                               renderItem={(p) => (
                                 <>
-                                  {p.name} <span className="text-foreground/50">· {p.sku} · {formatAdminPrice(priceOf(p, priceType, markup))}</span>
+                                  {p.name} <span className="text-foreground/50">· {p.sku} · {formatAdminPrice(priceOf(p, priceType, markup, tenderMarkup))}</span>
                                   {p.supplierOffers.length > 0 && (
                                     <span className="mt-1 block text-xs text-foreground/50">
                                       {p.supplierOffers.map((offer) => (

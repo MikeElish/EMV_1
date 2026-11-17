@@ -3,11 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/session";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { tierPrice, type PriceTier } from "@/lib/pricing";
+import { getMarkups } from "@/lib/price-settings";
 
 /** A company's price type; null when it is the shop's own (Опт) or the markup isn't set. */
-export function companyTier(company: { priceType: PriceTier["type"]; individualMarkup: number | null } | null): PriceTier | null {
+export async function companyTier(
+  company: { priceType: PriceTier["type"]; individualMarkup: number | null } | null
+): Promise<PriceTier | null> {
   if (!company || company.priceType === "WHOLESALE") return null;
   if (company.priceType === "INDIVIDUAL" && company.individualMarkup === null) return null;
+  if (company.priceType === "TENDER") {
+    const { tenderMarkup } = await getMarkups();
+    return { type: "TENDER", markup: tenderMarkup };
+  }
   return { type: company.priceType, markup: company.individualMarkup };
 }
 

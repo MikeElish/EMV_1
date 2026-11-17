@@ -7,14 +7,15 @@ export const PRICE_TYPE_LABELS: Record<PriceType, string> = {
   retail: "Розница",
   wholesale: "Опт",
   dealer: "Дилер",
-  tender: "Тендер (+50%)",
+  tender: "Тендер",
   individual: "Индивидуальный",
 };
 /** Company.priceType → the order window's price type. */
-export const COMPANY_PRICE_TYPE: Record<"RETAIL" | "WHOLESALE" | "DEALER" | "INDIVIDUAL", PriceType> = {
+export const COMPANY_PRICE_TYPE: Record<"RETAIL" | "WHOLESALE" | "DEALER" | "TENDER" | "INDIVIDUAL", PriceType> = {
   RETAIL: "retail",
   WHOLESALE: "wholesale",
   DEALER: "dealer",
+  TENDER: "tender",
   INDIVIDUAL: "individual",
 };
 

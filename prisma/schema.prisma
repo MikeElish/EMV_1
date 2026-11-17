@@ -208,9 +208,19 @@ model PriceSettings {
   retailMarkup    Float @default(30)
   wholesaleMarkup Float @default(20)
   dealerMarkup    Float @default(15)
+  tenderMarkup    Float @default(50)
   exchangeRateUsd Float @default(0)
   exchangeRateEur Float @default(0)
   exchangeRateCny Float @default(0)
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model LogisticsSetting {
@@ -1212,6 +1222,7 @@ enum CompanyPriceType {
   RETAIL
   WHOLESALE
   DEALER
+  TENDER
   INDIVIDUAL
 }
 

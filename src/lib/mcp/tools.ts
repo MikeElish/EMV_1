@@ -4,6 +4,7 @@ import { OrderStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createManualOrderRecord } from "@/lib/manual-order";
 import { applyMarkup } from "@/lib/pricing";
+import { getMarkups } from "@/lib/price-settings";
 import { findCanonicalBrand } from "@/lib/normalize-brand";
 import { setLineStatuses } from "@/lib/order-status";
 import { getWarehouseData, balances } from "@/lib/onec-warehouse";
@@ -62,11 +63,12 @@ const productSelect = {
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 /** Same as the «Новый заказ» window: «Индивидуальный» = purchase + the company's markup. */
-function priceFor(p: ProductRow, type: PriceType, markup: number | null): number {
+async function priceFor(p: ProductRow, type: PriceType, markup: number | null): Promise<number> {
   const prices = { retail: p.pricing?.retailPrice ?? p.price, wholesale: p.price, dealer: p.pricing?.dealerPrice ?? p.price };
   if (type === "tender") {
+    const { tenderMarkup } = await getMarkups();
     const purchase = p.pricing?.purchasePrice ?? 0;
-    return purchase > 0 ? applyMarkup(purchase, 50) : prices.wholesale;
+    return purchase > 0 ? applyMarkup(purchase, tenderMarkup) : prices.wholesale;
   }
   if (type === "individual") {
     const purchase = p.pricing?.purchasePrice ?? 0;
@@ -285,7 +287,7 @@ export const TOOLS: Tool[] = [
         const quantity = Math.floor(Number(item.quantity));
         if (!(quantity >= 1)) throw new ToolError(`Количество для ${product.sku} должно быть не меньше 1`);
         const manual = typeof item.price_rub === "number" ? Math.round(item.price_rub * 100) : null;
-        lines.push({ product, quantity, price: manual ?? priceFor(product, priceType, markup) });
+        lines.push({ product, quantity, price: manual ?? (await priceFor(product, priceType, markup)) });
       }
       if (missing.length) throw new ToolError(`Не найдены артикулы: ${missing.join(", ")}. Проверьте через search_products`);
 

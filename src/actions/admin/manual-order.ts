@@ -7,6 +7,7 @@ import { getAdminSession } from "@/lib/session";
 import { createManualOrderRecord, type ManualOrderResult } from "@/lib/manual-order";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { getMarkups } from "@/lib/price-settings";
 import {
   COMPANY_PRICE_TYPE,
   type ManualOrderRecordInput,
@@ -20,7 +21,8 @@ export type ManualOrderFormMode = "crm" | "replenishment";
 export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") {
   await requireSection(mode === "replenishment" ? "warehouse.replenishment" : "crm.orders", "view");
 
-  const [customers, companies, products] = await Promise.all([
+  const [markups, customers, companies, products] = await Promise.all([
+    getMarkups(),
     mode === "crm"
       ? prisma.user.findMany({
       where: { role: "CUSTOMER" },
@@ -113,6 +115,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
   }
 
   return {
+    tenderMarkup: markups.tenderMarkup,
     customers: (mode === "replenishment" ? [] : customers).map((c) => ({
       id: c.id,
       name: [c.lastName, c.firstName, c.patronymic].filter(Boolean).join(" ") || c.login,

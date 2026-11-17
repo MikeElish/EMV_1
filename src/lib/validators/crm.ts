@@ -50,11 +50,12 @@ export const COMPANY_PAYMENT_TYPE_LABELS: Record<(typeof COMPANY_PAYMENT_TYPES)[
   DEFERRED: "Отсрочка платежа",
 };
 
-export const COMPANY_PRICE_TYPES = ["RETAIL", "WHOLESALE", "DEALER", "INDIVIDUAL"] as const;
+export const COMPANY_PRICE_TYPES = ["RETAIL", "WHOLESALE", "DEALER", "TENDER", "INDIVIDUAL"] as const;
 export const COMPANY_PRICE_TYPE_LABELS: Record<(typeof COMPANY_PRICE_TYPES)[number], string> = {
   RETAIL: "Розница",
   WHOLESALE: "Опт (цены сайта)",
   DEALER: "Дилер",
+  TENDER: "Тендер",
   INDIVIDUAL: "Индивидуальный",
 };
 

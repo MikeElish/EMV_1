@@ -1,9 +1,9 @@
 // Shared by the product card (client) and the server actions, so the
 // "% ↔ price" math is identical on both sides. Amounts are in kopecks.
 
-export type Markups = { retailMarkup: number; wholesaleMarkup: number; dealerMarkup: number };
+export type Markups = { retailMarkup: number; wholesaleMarkup: number; dealerMarkup: number; tenderMarkup: number };
 
-export const DEFAULT_MARKUPS: Markups = { retailMarkup: 30, wholesaleMarkup: 20, dealerMarkup: 15 };
+export const DEFAULT_MARKUPS: Markups = { retailMarkup: 30, wholesaleMarkup: 20, dealerMarkup: 15, tenderMarkup: 50 };
 
 /** Sale price = purchase + markup%, rounded up to the kopeck (never below the markup). */
 export function applyMarkup(purchase: number, markupPercent: number): number {
@@ -17,12 +17,13 @@ export function markupOf(purchase: number, price: number): number {
 }
 
 /** A client company's price type (Company.priceType); WHOLESALE is the shop's own price. */
-export type PriceTier = { type: "RETAIL" | "WHOLESALE" | "DEALER" | "INDIVIDUAL"; markup: number | null };
+export type PriceTier = { type: "RETAIL" | "WHOLESALE" | "DEALER" | "TENDER" | "INDIVIDUAL"; markup: number | null };
 
 export const PRICE_TIER_LABELS: Record<PriceTier["type"], string> = {
   RETAIL: "Розница",
   WHOLESALE: "Опт",
   DEALER: "Дилер",
+  TENDER: "Тендер",
   INDIVIDUAL: "Индивидуальный",
 };
 
@@ -41,6 +42,8 @@ export function tierPrice(
       return p && p.retailPrice > 0 ? p.retailPrice : product.price;
     case "DEALER":
       return p && p.dealerPrice > 0 ? p.dealerPrice : product.price;
+    case "TENDER":
+      return p && p.purchasePrice > 0 && tier.markup !== null ? applyMarkup(p.purchasePrice, tier.markup) : product.price;
     case "INDIVIDUAL":
       return p && p.purchasePrice > 0 && tier.markup !== null ? applyMarkup(p.purchasePrice, tier.markup) : product.price;
     default:

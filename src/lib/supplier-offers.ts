@@ -154,6 +154,7 @@ export async function syncSelectedOffer(db: Db, productId: string) {
     retailMarkup: keep(pricing?.retailPrice ?? 0, defaults.retailMarkup),
     wholesaleMarkup: keep(product.price, defaults.wholesaleMarkup),
     dealerMarkup: keep(pricing?.dealerPrice ?? 0, defaults.dealerMarkup),
+    tenderMarkup: defaults.tenderMarkup,
   };
   const data = {
     purchasePrice: selected.price,

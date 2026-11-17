@@ -11,7 +11,7 @@ import type { ExchangeRates } from "@/lib/supplier-currency";
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
 const markup = z.coerce.number().min(0, "Наценка не может быть отрицательной").max(1000, "Слишком большая наценка");
-const markupsSchema = z.object({ retailMarkup: markup, wholesaleMarkup: markup, dealerMarkup: markup });
+const markupsSchema = z.object({ retailMarkup: markup, wholesaleMarkup: markup, dealerMarkup: markup, tenderMarkup: markup });
 const rate = z.coerce.number().min(0, "Курс не может быть отрицательным").max(1_000_000, "Слишком большой курс");
 const exchangeRatesSchema = z.object({ USD: rate, EUR: rate, CNY: rate });
 

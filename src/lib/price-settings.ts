@@ -10,6 +10,7 @@ export async function getMarkups(): Promise<Markups> {
         retailMarkup: settings.retailMarkup,
         wholesaleMarkup: settings.wholesaleMarkup,
         dealerMarkup: settings.dealerMarkup,
+        tenderMarkup: settings.tenderMarkup,
       }
     : DEFAULT_MARKUPS;
 }

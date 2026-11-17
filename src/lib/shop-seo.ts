@@ -1,36 +1,25 @@
 import { prisma } from "@/lib/prisma";
-import { brandSlug } from "@/lib/site";
 
 export type ShopBrand = { name: string; slug: string; count: number };
 
-/** Brands that have products on sale, each with its page slug (A→Z). */
+/** Brands marked as active, each with its page slug (A→Z). */
 export async function getShopBrands(): Promise<ShopBrand[]> {
-  const rows = await prisma.product.groupBy({
-    by: ["brand"],
-    where: { isActive: true, brand: { not: null }, category: { isActive: true } },
-    _count: true,
-  });
-  const bySlug = new Map<string, ShopBrand>();
-  for (const row of rows) {
-    const name = row.brand!.trim();
-    const slug = brandSlug(name);
-    if (!name || !slug) continue;
-    const existing = bySlug.get(slug);
-    // Two spellings of one slug share the page; the bigger one names it.
-    if (existing) {
-      if (row._count > existing.count) existing.name = name;
-      existing.count += row._count;
-    } else bySlug.set(slug, { name, slug, count: row._count });
-  }
-  return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const [brands, counts] = await Promise.all([
+    prisma.brand.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.product.groupBy({
+      by: ["brand"],
+      where: { isActive: true, brand: { not: null }, category: { isActive: true } },
+      _count: true,
+    }),
+  ]);
+  const countByName = new Map(counts.map((c) => [c.brand ?? "", c._count]));
+  return brands
+    .map((b) => ({ name: b.name, slug: b.slug, count: countByName.get(b.name) ?? 0 }))
+    .filter((b) => b.count > 0);
 }
 
-/** The brand spellings behind a page slug (usually one). */
+/** The brand name behind a page slug. */
 export async function brandNamesForSlug(slug: string): Promise<string[]> {
-  const rows = await prisma.product.findMany({
-    where: { isActive: true, brand: { not: null } },
-    distinct: ["brand"],
-    select: { brand: true },
-  });
-  return rows.map((r) => r.brand!).filter((b) => brandSlug(b.trim()) === slug);
+  const brand = await prisma.brand.findUnique({ where: { slug } });
+  return brand ? [brand.name] : [];
 }
