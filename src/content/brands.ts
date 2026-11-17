@@ -1,4 +1,4 @@
-// Canonical brand list for spec-equipment/parts, sourced from import_template.xlsx
+// Canonical brand list for spec-equipment/parts, auto-generated from import_template.xlsx
 export const BRANDS: string[] = [
   "3M",
   "A&I",
@@ -362,6 +362,7 @@ export const BRANDS: string[] = [
   "DELTROL CONTROLS",
   "DEMAC",
   "DEMKE ELECTRONIC",
+  "Denso",
   "DEPOT CNH",
   "DERAY",
   "DESTA",
@@ -1754,5 +1755,5 @@ export const BRANDS: string[] = [
   "ZOOMLION",
   "ZTD",
   "ZUBR",
-  "ZVER"
+  "ZVER",
 ];
