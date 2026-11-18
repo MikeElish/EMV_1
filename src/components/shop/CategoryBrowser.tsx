@@ -156,9 +156,9 @@ export function CategoryBrowser({
     const sorted =
       sortOption === "default" ? filtered : [...filtered].sort(SORT_COMPARATORS[sortOption]);
 
-    // In-stock items always lead the list, out-of-order status aside; the
+    // In-stock items (own or partner) always lead the list, out-of-order status aside; the
     // chosen sort still governs the order within each of the two groups.
-    return [...sorted.filter((p) => p.stock > 0), ...sorted.filter((p) => p.stock <= 0)];
+    return [...sorted.filter((p) => p.stock > 0 || p.partnerStock > 0), ...sorted.filter((p) => p.stock <= 0 && p.partnerStock <= 0)];
   }, [hasActiveFilter, selectedId, brand, products, search, sortOption]);
 
   return (
