@@ -574,6 +574,7 @@ export function OrdersTable({
                           order={g.order}
                           managerName={employees.find((e) => e.id === g.order.managerId)?.name ?? "не назначен"}
                           onLogistics={() => setLogisticsSource(buildOrderLogisticsSource(g.order))}
+                          canDelete={canDelete && manualInputEnabled}
                         />
                       </td>
                     </tr>
@@ -744,6 +745,7 @@ export function OrdersTable({
                               itemId={item.id}
                               managerName={employees.find((e) => e.id === order.managerId)?.name ?? "не назначен"}
                               onLogistics={() => setLogisticsSource(buildOrderLogisticsSource(order))}
+                              canDelete={canDelete && manualInputEnabled}
                             />
                           </td>
                         )}

@@ -11,11 +11,13 @@ export function OrderActionsMenu({
   itemId,
   managerName,
   onLogistics,
+  canDelete = false,
 }: {
   order: OrderRow;
   itemId?: string;
   managerName: string;
   onLogistics: () => void;
+  canDelete?: boolean;
 }) {
   const [showCard, setShowCard] = useState(false);
 
@@ -47,13 +49,15 @@ export function OrderActionsMenu({
             >
               Карточка
             </button>
-            <OrderDeleteButton
-              orderId={order.id}
-              orderNumber={order.orderNumber}
-              itemId={itemId}
-              lines={order.items.length}
-              variant="menu"
-            />
+            {canDelete && (
+              <OrderDeleteButton
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                itemId={itemId}
+                lines={order.items.length}
+                variant="menu"
+              />
+            )}
           </>
         )}
       </DropdownMenu>
