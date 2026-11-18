@@ -5,7 +5,7 @@ import type { MailAccount } from "@/lib/mail/account";
 
 export class MailError extends Error {}
 
-const IDLE_CLOSE_MS = 2 * 60 * 1000;
+const IDLE_CLOSE_MS = 60 * 1000;
 
 type PoolEntry = { key: string; client: Promise<ImapFlow>; timer?: NodeJS.Timeout };
 
@@ -81,7 +81,7 @@ async function getClient(account: MailAccount): Promise<ImapFlow> {
 
 // Yandex drops idle connections now and then: the pooled one is dead.
 const isDropped = (error: unknown) =>
-  /Connection not available|ECONNRESET|EPIPE|Connection closed|socket|NoConnection/i.test(
+  /Connection not available|ECONNRESET|EPIPE|Connection closed|socket|NoConnection|Unexpected close/i.test(
     `${(error as { code?: string })?.code ?? ""} ${(error as Error)?.message ?? ""}`
   );
 

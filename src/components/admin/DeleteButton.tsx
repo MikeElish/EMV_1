@@ -6,10 +6,12 @@ export function DeleteButton({
   action,
   confirmText = "Удалить?",
   className,
+  variant = "link",
 }: {
   action: () => Promise<{ ok: boolean; error?: string }>;
   confirmText?: string;
   className?: string;
+  variant?: "link" | "menu";
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,12 @@ export function DeleteButton({
         data-edit-only
         onClick={handleClick}
         disabled={pending}
-        className={className ?? "text-red-600 hover:underline disabled:opacity-50"}
+        className={
+          className ??
+          (variant === "menu"
+            ? "block w-full px-3 py-2 text-left text-red-600 hover:bg-foreground/5"
+            : "text-red-600 hover:underline disabled:opacity-50")
+        }
       >
         {pending ? "..." : "Удалить"}
       </button>

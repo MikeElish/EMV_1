@@ -16,11 +16,10 @@ import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/validators/supplier-orders";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DocumentFileLink } from "@/components/admin/DocumentFileLink";
 import { SheetExportButton } from "@/components/admin/SheetExportButton";
-import { SupplierOrderDeleteButton } from "@/components/admin/SupplierOrderDeleteButton";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 import { AddSupplierOrderLineModal } from "@/components/admin/AddSupplierOrderLineModal";
 import { SupplierRequestModal } from "@/components/admin/SupplierRequestModal";
-import { ActionMenu } from "@/components/admin/ActionMenu";
+import { SupplierOrderActionsMenu } from "@/components/admin/SupplierOrderActionsMenu";
 import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from "@/components/admin/LogisticsRequestModal";
 import { SearchSelect } from "@/components/SearchSelect";
 import { formatAdminPrice } from "@/lib/money";
@@ -569,19 +568,11 @@ export function SupplierOrdersTable({
                       ))}
                       {r.canEdit && r.supplier && ["TO_ORDER", "AWAITING_PAYMENT"].includes(r.status) && <InvoiceUpload id={r.id} />}
                     </td>
-                    <td className="py-2 pr-4">
-                      <ActionMenu
-                        items={[
-                          {
-                            label: "Логистика",
-                            onClick: () => r.purchaseId && setLogisticsSource(buildSupplierPurchaseSource(r.purchaseId)),
-                            disabled: !r.purchaseId,
-                          },
-                        ]}
-                      />
-                    </td>
                     <td className="py-2 text-right">
-                      {canDelete && <SupplierOrderDeleteButton id={r.id} />}
+                      <SupplierOrderActionsMenu
+                        row={r}
+                        onLogistics={() => r.purchaseId && setLogisticsSource(buildSupplierPurchaseSource(r.purchaseId))}
+                      />
                     </td>
                   </tr>
                 ))

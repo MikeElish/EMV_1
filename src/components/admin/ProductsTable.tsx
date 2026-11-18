@@ -7,8 +7,8 @@ import { utils, write } from "xlsx";
 import type { Product, Category, ProductPricing } from "@prisma/client";
 import { formatAdminPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
-import { deleteProduct, listProductReserve, type ProductDocumentLine } from "@/actions/admin/products";
-import { DeleteButton } from "@/components/admin/DeleteButton";
+import { listProductReserve, type ProductDocumentLine } from "@/actions/admin/products";
+import { ProductActionsMenu } from "@/components/admin/ProductActionsMenu";
 import { ActiveToggle } from "@/components/admin/ActiveToggle";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { Modal } from "@/components/Modal";
@@ -19,7 +19,7 @@ import {
 } from "@/components/admin/products-return";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
 
-type ProductRow = Product & {
+export type ProductRow = Product & {
   category: Category;
   pricing: (ProductPricing & { supplier: { name: string } | null }) | null;
 };
@@ -415,23 +415,11 @@ export function ProductsTable({
                     <ActiveToggle productId={product.id} isActive={product.isActive} />
                   </td>
                   <td className="py-2 pr-2 text-right">
-                    <div className="flex justify-end gap-4">
-                      {(!product.pendingRegistration || canEditPendingRegistration) && (
-                        <Link
-                          href={`/admin/crm/products/${product.id}/edit`}
-                          onClick={rememberPlace}
-                          className="hover:underline"
-                        >
-                          Изменить
-                        </Link>
-                      )}
-                      {(!product.pendingRegistration || canEditPendingRegistration) && (
-                        <DeleteButton
-                          action={deleteProduct.bind(null, product.id)}
-                          confirmText={`Удалить товар «${product.name}»?`}
-                        />
-                      )}
-                    </div>
+                    <ProductActionsMenu
+                      product={product}
+                      canEdit={!product.pendingRegistration || canEditPendingRegistration}
+                      onRememberPlace={rememberPlace}
+                    />
                   </td>
                 </tr>
               ))}
