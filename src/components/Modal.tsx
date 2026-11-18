@@ -17,6 +17,7 @@ export function Modal({
   maxHeightClassName = "max-h-[80vh]",
   title,
   dismissible = true,
+  onBeforeClose,
 }: {
   onClose: () => void;
   children: React.ReactNode;
@@ -26,6 +27,8 @@ export function Modal({
   title?: string;
   /** false: no ✕, Esc and a click outside do nothing -- the content decides. */
   dismissible?: boolean;
+  /** Return false to keep the modal open (e.g. ask for unsaved-changes confirmation). */
+  onBeforeClose?: () => boolean;
 }) {
   const [visible, setVisible] = useState(false);
   const [layer, setLayer] = useState(50);
@@ -47,6 +50,7 @@ export function Modal({
 
   function close() {
     if (!dismissible) return;
+    if (onBeforeClose && !onBeforeClose()) return;
     unregisterWindow(id);
     setVisible(false);
     setTimeout(onClose, TRANSITION_MS);

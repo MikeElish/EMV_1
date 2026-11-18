@@ -140,7 +140,7 @@ function SearchPicker<T extends { id: string }>({
 function supplierDisplayName(supplier: { name: string | null; city: string | null }, role: string | null) {
   const privileged = ["OWNER", "ADMIN", "SUPPLIER", "ACCOUNTANT"].includes(role ?? "");
   if (privileged) return supplier.name ?? "Поставщик";
-  return supplier.city ?? supplier.name ?? "Поставщик";
+  return supplier.city ?? "—";
 }
 
 const filterBuyer = (b: Buyer, q: string) =>
@@ -171,10 +171,6 @@ export function NewOrderModal({
   const [data, setData] = useState<ManualOrderFormData | null>(null);
   const [tab, setTab] = useState<Tab>("items");
 
-  function handleClose() {
-    if (hasChanges && !confirm("В карточке есть изменения. Выйти без сохранения?")) return;
-    onClose();
-  }
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -356,7 +352,7 @@ export function NewOrderModal({
   }
 
   return (
-    <Modal onClose={handleClose} maxWidthClassName="max-w-4xl">
+    <Modal onClose={onClose} onBeforeClose={() => !hasChanges || confirm("В карточке есть изменения. Выйти без сохранения?")} maxWidthClassName="max-w-4xl">
       <h2 className="text-xl font-bold">{mode === "replenishment" ? "Новое пополнение остатков" : "Новый заказ"}</h2>
 
       {!data ? (

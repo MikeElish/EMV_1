@@ -298,16 +298,25 @@ export async function updateLineDelivery(
   const lines = await prisma.orderItem.findMany({ where: { id: { in: target.ids } } });
   const asked: string[] = [];
   for (const line of lines) {
-    if (line.deliveryMethod === method && (days === undefined || line.deliveryDays === days)) continue;
+    const methodChanged = line.deliveryMethod !== method;
+    const daysChanged = days !== undefined && line.deliveryDays !== days;
+    if (!methodChanged && !daysChanged) continue;
+
+    // Only the delivery days changed: no customer confirmation needed.
+    if (!methodChanged && daysChanged) {
+      await prisma.orderItem.update({ where: { id: line.id }, data: { deliveryDays: Math.max(0, days) } });
+      continue;
+    }
+
     // What the customer chose stays the reference until they answer.
     const chosen = line.deliveryConfirmPending ? line.deliveryPrevMethod : line.deliveryMethod;
-    const back = chosen === method && days === undefined;
+    const back = chosen === method;
     const data: Prisma.OrderItemUpdateInput = {
       deliveryMethod: method,
       deliveryPrevMethod: back ? null : chosen,
       deliveryConfirmPending: !back,
     };
-    if (days !== undefined) data.deliveryDays = Math.max(0, days);
+    if (daysChanged) data.deliveryDays = Math.max(0, days);
     await prisma.orderItem.update({ where: { id: line.id }, data });
     if (!back) asked.push(line.id);
   }

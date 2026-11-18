@@ -41,7 +41,7 @@ function supplierDisplayName(
 ) {
   const privileged = ["OWNER", "ADMIN", "SUPPLIER", "ACCOUNTANT"].includes(role ?? "");
   if (privileged) return supplier.name ?? "—";
-  return supplier.city ?? supplier.name ?? "—";
+  return supplier.city ?? "—";
 }
 
 export const SALE_KINDS: { kind: SaleKind; label: string; hint?: string }[] = [

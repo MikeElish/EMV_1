@@ -36,10 +36,12 @@ export function PaidToggle({
   itemId,
   state,
   activeLines,
+  canEdit = true,
 }: {
   itemId: string;
   state: PaymentState;
   activeLines: number;
+  canEdit?: boolean;
 }) {
   const line = useLineChange<PaymentState>({
     current: state,
@@ -49,6 +51,13 @@ export function PaidToggle({
   });
 
   const current = OPTIONS.find((o) => o.value === line.value)!;
+  if (!canEdit) {
+    return (
+      <span className={`inline-block rounded-md border px-2 py-1 text-xs ${current.className}`}>
+        {current.label}
+      </span>
+    );
+  }
   return (
     <>
       <select

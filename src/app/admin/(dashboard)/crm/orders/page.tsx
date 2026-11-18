@@ -52,6 +52,8 @@ export default async function CrmOrdersPage({
   });
   const employees = staff.map((u) => ({ id: u.id, name: [u.lastName, u.firstName].filter(Boolean).join(" ") || u.login }));
 
+  const canEditPayment = ["OWNER", "ADMIN", "ACCOUNTANT"].includes(me?.role ?? "");
+
   return (
     <CrmPage>
       <OrdersTable
@@ -63,6 +65,7 @@ export default async function CrmOrdersPage({
         canDelete={me?.role === "OWNER"}
         employees={employees}
         manualInputEnabled={me?.role === "OWNER" && siteSettings?.manualInputEnabled === true}
+        canEditPayment={canEditPayment}
       />
     </CrmPage>
   );

@@ -200,6 +200,7 @@ export function OrdersTable({
   canDelete = false,
   employees = [],
   manualInputEnabled = false,
+  canEditPayment = false,
 }: {
   orders: OrderRow[];
   initialOrderNumber?: string;
@@ -208,6 +209,7 @@ export function OrdersTable({
   /** Владелец: «Удалить» on every row. */
   canDelete?: boolean;
   manualInputEnabled?: boolean;
+  canEditPayment?: boolean;
 }) {
   const router = useRouter();
   const [filters, setFilters] = useRememberedState<Filters>(
@@ -716,6 +718,7 @@ export function OrdersTable({
                               itemId={item.id}
                               state={paymentStateOf(item)}
                               activeLines={activeLines}
+                              canEdit={canEditPayment}
                             />
                           ) : (
                             PAYMENT_STATE_LABELS[paymentStateOf(item)]
