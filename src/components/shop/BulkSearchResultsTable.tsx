@@ -9,10 +9,15 @@ import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 
 function availabilityLabel(row: MatchedBulkSearchRow): { text: string; className: string } {
   if (!row.product) return { text: "В запросе", className: "text-foreground/40" };
-  if (row.product.stock <= 0) return { text: "Под заказ", className: "text-foreground/40" };
-  const className =
-    row.quantity <= row.product.stock ? "text-green-700 dark:text-green-500" : "text-red-600";
-  return { text: String(row.product.stock), className };
+  if (row.product.stock > 0) {
+    const className =
+      row.quantity <= row.product.stock ? "text-green-700 dark:text-green-500" : "text-red-600";
+    return { text: String(row.product.stock), className };
+  }
+  if (row.product.partnerStock > 0) {
+    return { text: "В наличии / партнёрская сеть", className: "text-green-700 dark:text-green-500" };
+  }
+  return { text: "Под заказ", className: "text-foreground/40" };
 }
 
 function buildExportHref(rows: MatchedBulkSearchRow[]) {
@@ -43,7 +48,12 @@ function ResultRow({
   const availability = availabilityLabel(row);
   const product = row.product;
   // "Под заказ" items (stock <= 0) aren't capped by an on-hand count.
-  const maxQuantity = product && product.stock > 0 ? product.stock : 999;
+  const maxQuantity =
+    product && product.stock > 0
+      ? product.stock
+      : product && product.partnerStock > 0
+        ? product.partnerStock
+        : 999;
   const [quantity, setQuantity] = useState(Math.min(Math.max(1, row.quantity), maxQuantity));
   const [justAdded, setJustAdded] = useState(false);
 

@@ -13,7 +13,8 @@ export function RowOrderButton({ product, offer }: { product: Product; offer?: S
   const [justAdded, setJustAdded] = useState(false);
 
   // "Под заказ" items (stock <= 0) aren't capped by an on-hand count.
-  const maxQuantity = product.stock > 0 ? product.stock : 999;
+  const maxQuantity =
+    product.stock > 0 ? product.stock : product.partnerStock > 0 ? product.partnerStock : 999;
 
   function handleStart(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();

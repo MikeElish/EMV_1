@@ -13,6 +13,7 @@ export function AddToCartButton({
     name: string;
     price: number;
     stock: number;
+    partnerStock?: number;
   };
 }) {
   const { addItem } = useCart();
@@ -20,7 +21,9 @@ export function AddToCartButton({
   const [justAdded, setJustAdded] = useState(false);
 
   // "Под заказ" items (stock <= 0) aren't capped by an on-hand count.
-  const maxQuantity = product.stock > 0 ? product.stock : 999;
+  const partnerStock = product.partnerStock ?? 0;
+  const maxQuantity =
+    product.stock > 0 ? product.stock : partnerStock > 0 ? partnerStock : 999;
 
   function handleAdd() {
     addItem(

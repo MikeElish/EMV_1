@@ -6,6 +6,7 @@ import type { Product } from "@prisma/client";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
 import { OfferPrice, OffersDropdown, useProductOffers } from "@/components/shop/ShopOffers";
+import { StockBadge } from "@/components/shop/StockBadge";
 import { BRANDS } from "@/content/brands";
 
 export type BrowserCategory = {
@@ -441,13 +442,7 @@ function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: (
           title={offers ? "Предложения" : "Открыть карточку товара"}
           className="mr-auto flex shrink-0 items-center gap-3 text-left sm:mr-0"
         >
-          <span
-            className={`shrink-0 text-xs ${
-              product.stock > 0 ? "text-green-700 dark:text-green-500" : "text-foreground/40"
-            }`}
-          >
-            {product.stock > 0 ? "В наличии" : "Под заказ"}
-          </span>
+          <StockBadge product={product} size="xs" />
           <span className="shrink-0 text-right font-medium sm:w-28">
             <OfferPrice product={product} />
             {offers && <span className="ml-1 text-xs text-foreground/50">{open ? "▴" : "▾"}</span>}

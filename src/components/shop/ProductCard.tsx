@@ -8,20 +8,9 @@ import { useCart } from "@/components/shop/CartProvider";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { ProtectedImage } from "@/components/shop/ProtectedImage";
 import { OfferPrice, OffersDropdown, useProductOffers } from "@/components/shop/ShopOffers";
+import { StockBadge } from "@/components/shop/StockBadge";
 
 type Attributes = { machineType?: string } | null;
-
-function StockBadge({ stock }: { stock: number }) {
-  return stock > 0 ? (
-    <span className="whitespace-nowrap text-xs text-green-700 dark:text-green-500">
-      В наличии
-    </span>
-  ) : (
-    <span className="whitespace-nowrap text-xs text-foreground/40">
-      Под заказ
-    </span>
-  );
-}
 
 function ProductListRow({ product }: { product: Product }) {
   const { addItem } = useCart();
@@ -70,7 +59,7 @@ function ProductListRow({ product }: { product: Product }) {
         >
           {product.name}
         </button>
-        <StockBadge stock={product.stock} />
+        <StockBadge product={product} />
         {offers ? (
           <button
             type="button"
@@ -178,7 +167,7 @@ export function ProductCard({
           <span className="font-semibold">
             <OfferPrice product={product} />
           </span>
-          <StockBadge stock={product.stock} />
+          <StockBadge product={product} />
         </div>
       </div>
     </ShopLink>

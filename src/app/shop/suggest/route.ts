@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       // In stock first, then by name.
       orderBy: [{ stock: "desc" }, { name: "asc" }],
       take: LIMIT,
-      select: { id: true, slug: true, name: true, sku: true, brand: true, price: true, stock: true, images: true },
+      select: { id: true, slug: true, name: true, sku: true, brand: true, price: true, stock: true, partnerStock: true, images: true },
     }),
     prisma.product.count({ where }),
   ]);

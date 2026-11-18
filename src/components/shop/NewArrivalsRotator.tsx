@@ -5,6 +5,7 @@ import type { Product } from "@prisma/client";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
 import { OfferPrice } from "@/components/shop/ShopOffers";
+import { StockBadge } from "@/components/shop/StockBadge";
 
 export type RotatorDirection = {
   key: string;
@@ -204,13 +205,7 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
             <span className="block truncate">{product.name}</span>
             <span className="block truncate text-xs text-foreground/40">{product.sku}</span>
           </span>
-          <span
-            className={`shrink-0 text-xs ${
-              product.stock > 0 ? "text-green-700 dark:text-green-500" : "text-foreground/40"
-            }`}
-          >
-            {product.stock > 0 ? "В наличии" : "Под заказ"}
-          </span>
+          <StockBadge product={product} />
           <span className="shrink-0 text-right font-medium sm:w-28">
             <OfferPrice product={product} />
           </span>

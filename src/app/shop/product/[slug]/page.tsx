@@ -10,6 +10,7 @@ import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ShopLink } from "@/components/shop/ShopLink";
 import { absoluteUrl, brandSlug, productHeading, productIntro, rubText, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 import { CustomerPriceText } from "@/components/shop/CustomerPrices";
+import { ProductAvailabilityText } from "@/components/shop/StockBadge";
 
 type Attributes = { machineType?: string; compatibleWith?: string[] } | null;
 
@@ -71,7 +72,10 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
       lowPrice: (Math.min(...prices) / 100).toFixed(2),
       highPrice: (Math.max(...prices) / 100).toFixed(2),
       offerCount: prices.length,
-      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/BackOrder",
+      availability:
+        product.stock > 0 || product.partnerStock > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/BackOrder",
       url: absoluteUrl(`/shop/product/${product.slug}`),
       seller: { "@type": "Organization", name: SHOP_NAME },
     },
@@ -121,13 +125,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
               <OfferPrice product={product} />
             </p>
             <p className="mt-2 text-sm">
-              {product.stock > 0 ? (
-                <span className="text-green-700 dark:text-green-500">
-                  В наличии ({product.stock} шт.)
-                </span>
-              ) : (
-                <span className="text-foreground/50">Под заказ</span>
-              )}
+              <ProductAvailabilityText product={product} size="sm" />
             </p>
 
             <AddToCartButton
@@ -138,6 +136,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
                 name: product.name,
                 price: product.price,
                 stock: product.stock,
+                partnerStock: product.partnerStock,
               }}
             />
             <ProductOffersBlock product={product} />

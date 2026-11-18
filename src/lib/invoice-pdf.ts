@@ -12,8 +12,18 @@ export const FONT = path.join(process.cwd(), "assets", "fonts", "PTSans-Regular.
 export const FONT_BOLD = path.join(process.cwd(), "assets", "fonts", "PTSans-Bold.ttf");
 const LOGO = path.join(process.cwd(), "assets", "invoice-logo.png");
 // Kept off git and off the public folder: copied to the server by hand.
-export const STAMP = path.join(process.cwd(), "private", "invoice", "stamp.png");
-export const SIGNATURE = path.join(process.cwd(), "private", "invoice", "signature.png");
+function resolveInvoiceAsset(filename: string): string {
+  const candidates = [
+    process.env.INVOICE_PRIVATE_DIR ? path.join(process.env.INVOICE_PRIVATE_DIR, filename) : "",
+    path.join(process.cwd(), "private", "invoice", filename),
+    path.join(process.cwd(), "..", "private", "invoice", filename),
+    path.join("/var/www/emv", "private", "invoice", filename),
+  ].filter(Boolean);
+  const found = candidates.find((p) => existsSync(p));
+  return found ?? (candidates[1] as string);
+}
+export const STAMP = resolveInvoiceAsset("stamp.png");
+export const SIGNATURE = resolveInvoiceAsset("signature.png");
 
 export const SELLER = {
   bank: 'ООО "Банк Точка" г. Москва',
@@ -180,15 +190,20 @@ export function renderInvoicePdf(data: InvoiceData): Promise<Buffer> {
     doc.addPage();
     y = doc.page.margins.top + 20;
   }
+  const hasSignature = existsSync(SIGNATURE);
+  const hasStamp = existsSync(STAMP);
+  if (!hasSignature) console.warn("[invoice-pdf] signature not found:", SIGNATURE);
+  if (!hasStamp) console.warn("[invoice-pdf] stamp not found:", STAMP);
+
   text(SELLER.signerTitle, L, y, { font: "b" });
   line(L + 90, y + 11, L + 220, y + 11);
   line(L + 232, y + 11, L + 340, y + 11);
   text(SELLER.signer, L + 236, y + 1);
   text("подпись", L + 90, y + 13, { width: 130, align: "center", size: 7 });
   text("расшифровка подписи", L + 232, y + 13, { width: 108, align: "center", size: 7 });
-  if (existsSync(SIGNATURE)) doc.image(SIGNATURE, L + 104, y - 22, { fit: [104, 56] });
+  if (hasSignature) doc.image(SIGNATURE, L + 104, y - 22, { fit: [104, 56] });
   text("М.П.", L + 170, y + 40);
-  if (existsSync(STAMP)) doc.image(STAMP, L + 196, y + 26, { fit: [104, 104] });
+  if (hasStamp) doc.image(STAMP, L + 196, y + 26, { fit: [104, 104] });
 
   doc.end();
   return done;
