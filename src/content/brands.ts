@@ -809,6 +809,7 @@ export const BRANDS: string[] = [
   "JELAU",
   "JGL",
   "JHECO",
+  "JHLIFT",
   "JIDECO",
   "JIMRAY",
   "JINHUA WINNER",
