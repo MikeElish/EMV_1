@@ -27,7 +27,7 @@ import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManag
 import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/lib/order-pricing";
 
 type OrderLine = OrderItem & {
-  product: { name: string; sku: string; stock: number } | null;
+  product: { name: string; sku: string; stock: number; pricing: { purchasePrice: number } | null } | null;
   supplierOrderLines: { price: number; quantity: number; deliveryDays: number | null; purchase: { sentAt: Date | null } | null }[];
 };
 
@@ -137,21 +137,27 @@ function supplierDeliveryDate(line: OrderLine): Date | null {
 }
 
 function linePurchaseCost(line: OrderLine): number {
-  return line.supplierOrderLines.reduce((sum, sol) => sum + sol.price * sol.quantity, 0);
+  const linked = line.supplierOrderLines.reduce((sum, sol) => sum + sol.price * sol.quantity, 0);
+  if (line.supplierOrderLines.length > 0) return linked;
+  const purchasePrice = line.product?.pricing?.purchasePrice ?? 0;
+  return purchasePrice * line.quantity;
 }
 
 function orderMargin(order: OrderRow): number {
-  const selling = order.items.reduce((sum, item) => sum + orderLineTotal(item), 0);
-  const purchase = order.items.reduce((sum, item) => sum + linePurchaseCost(item), 0);
+  const active = order.items.filter((i) => i.status !== "CANCELLED");
+  const selling = active.reduce((sum, item) => sum + orderLineTotal(item), 0);
+  const purchase = active.reduce((sum, item) => sum + linePurchaseCost(item), 0);
   const extra = order.extraCosts.reduce((sum, c) => sum + c.amount, 0);
   return selling - purchase - extra;
 }
 
 function lineMargin(item: OrderLine, order: OrderRow): number {
+  if (item.status === "CANCELLED") return 0;
   const selling = orderLineTotal(item);
   const purchase = linePurchaseCost(item);
   const extra = order.extraCosts.reduce((sum, c) => sum + c.amount, 0);
-  const share = order.items.length > 0 ? extra / order.items.length : 0;
+  const activeCount = order.items.filter((i) => i.status !== "CANCELLED").length;
+  const share = activeCount > 0 ? extra / activeCount : 0;
   return selling - purchase - share;
 }
 
