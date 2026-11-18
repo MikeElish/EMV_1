@@ -444,6 +444,7 @@ export const BRANDS: string[] = [
   "DRESSELHAUS",
   "Dressta",
   "DRG",
+  "Dropsa",
   "DST-URAL",
   "DUCELIER",
   "DULEVO",
