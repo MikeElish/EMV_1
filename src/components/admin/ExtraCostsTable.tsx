@@ -94,7 +94,7 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
   const shown = lines.filter((l) => l.kind === tab);
   const lineSum = (l: Line) => {
     const q = parseFloat(l.qty.replace(",", "."));
-    const p = parseRub(l.price);
+    const p = parseRub(l.price ?? "");
     return Number.isFinite(q) && Number.isFinite(p) ? Math.round(q * p) : 0;
   };
   const total = lines.reduce((s, l) => s + lineSum(l), 0);
@@ -109,7 +109,9 @@ function CostCard({ cost, onClose }: { cost: ExtraCostListRow | null; onClose: (
       update(key, { ref, name: p ? [p.brand, p.name, p.sku].filter(Boolean).join(" ") : "" });
     } else {
       const s = data?.services.find((x) => x.id === ref);
-      update(key, { ref, name: s?.name ?? "", price: s && s.price > 0 ? rub(s.price) : undefined });
+      const patch: Partial<Line> = { ref, name: s?.name ?? "" };
+      if (s && s.price > 0) patch.price = rub(s.price);
+      update(key, patch);
     }
   }
 
