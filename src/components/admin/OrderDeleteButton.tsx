@@ -14,6 +14,7 @@ export function OrderDeleteButton({
   orderNumber,
   itemId,
   lines,
+  variant = "link",
 }: {
   orderId: string;
   orderNumber: string;
@@ -21,6 +22,7 @@ export function OrderDeleteButton({
   itemId?: string;
   /** Lines in the order. */
   lines: number;
+  variant?: "link" | "menu";
 }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
@@ -49,7 +51,11 @@ export function OrderDeleteButton({
           e.stopPropagation();
           setAsking(true);
         }}
-        className="text-sm text-red-600 hover:underline"
+        className={
+          variant === "menu"
+            ? "block w-full px-3 py-2 text-left text-red-600 hover:bg-foreground/5"
+            : "text-sm text-red-600 hover:underline"
+        }
       >
         Удалить
       </button>

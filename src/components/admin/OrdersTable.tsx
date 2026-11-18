@@ -8,7 +8,7 @@ import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 import { PaidToggle, PAYMENT_STATE_LABELS, paymentStateOf } from "@/components/admin/PaidToggle";
 import { DeliveryDateInput } from "@/components/admin/DeliveryDateInput";
 import { OrderFilesMenu } from "@/components/admin/OrderFilesMenu";
-import { OrderDeleteButton } from "@/components/admin/OrderDeleteButton";
+import { OrderActionsMenu } from "@/components/admin/OrderActionsMenu";
 import { NewOrderModal } from "@/components/admin/NewOrderModal";
 import { LinePriceCell } from "@/components/admin/LinePriceCell";
 import { AddOrderItemModal } from "@/components/admin/AddOrderItemModal";
@@ -17,7 +17,6 @@ import { LineBonusCell } from "@/components/admin/LineBonusCell";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { DeliveryMethodCell } from "@/components/admin/DeliveryMethodCell";
 import { ExtraCostsButton, type ExtraCostRow } from "@/components/admin/ExtraCostsButton";
-import { ActionMenu } from "@/components/admin/ActionMenu";
 import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from "@/components/admin/LogisticsRequestModal";
 import { DELIVERY_METHOD_LABELS, DELIVERY_METHODS } from "@/lib/delivery";
 import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/client";
@@ -428,7 +427,6 @@ export function OrdersTable({
                 {!grouped && showBonusColumn && <th className="py-2 pr-4">Бонус</th>}
                 {!grouped && <th className="py-2 pr-4">Файлы</th>}
                 {!grouped && <th className="py-2 pr-4">Действие</th>}
-                {canDelete && <th className="py-2" />}
               </tr>
               <tr className="text-left">
                 {textFilters.map((f) => (
@@ -495,7 +493,6 @@ export function OrdersTable({
                 {!grouped && showBonusColumn && <th className="pb-2 pr-4" />}
                 {!grouped && <th className="pb-2 pr-4" />}
                 {!grouped && <th className="pb-2 pr-4" />}
-                {canDelete && <th className="pb-2" />}
               </tr>
             </thead>
             {grouped ? (
@@ -546,20 +543,12 @@ export function OrdersTable({
                       <td className="whitespace-nowrap py-2 pr-4">{g.dates}</td>
                       <td className="py-2 pr-4">{g.payment}</td>
                       <td className="py-2 pr-4">
-                        <ActionMenu
-                          items={[
-                            {
-                              label: "Логистика",
-                              onClick: () => setLogisticsSource(buildOrderLogisticsSource(g.order)),
-                            },
-                          ]}
+                        <OrderActionsMenu
+                          order={g.order}
+                          managerName={employees.find((e) => e.id === g.order.managerId)?.name ?? "не назначен"}
+                          onLogistics={() => setLogisticsSource(buildOrderLogisticsSource(g.order))}
                         />
                       </td>
-                      {canDelete && (
-                        <td className="py-2">
-                          <OrderDeleteButton orderId={g.order.id} orderNumber={g.order.orderNumber} lines={g.order.items.length} />
-                        </td>
-                      )}
                     </tr>
                   ))
                 )}
@@ -725,23 +714,11 @@ export function OrdersTable({
                         </td>
                         {!grouped && (
                           <td className="py-2 pr-4">
-                            <ActionMenu
-                              items={[
-                                {
-                                  label: "Логистика",
-                                  onClick: () => setLogisticsSource(buildOrderLogisticsSource(order)),
-                                },
-                              ]}
-                            />
-                          </td>
-                        )}
-                        {canDelete && (
-                          <td className="py-2">
-                            <OrderDeleteButton
-                              orderId={order.id}
-                              orderNumber={order.orderNumber}
+                            <OrderActionsMenu
+                              order={order}
                               itemId={item.id}
-                              lines={order.items.length}
+                              managerName={employees.find((e) => e.id === order.managerId)?.name ?? "не назначен"}
+                              onLogistics={() => setLogisticsSource(buildOrderLogisticsSource(order))}
                             />
                           </td>
                         )}
