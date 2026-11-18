@@ -62,6 +62,16 @@ export function SbpPayButton({ orderNumber, amount, returnedPaymentId }: { order
             {busy ? "Переходим к оплате…" : `Оплатить по СБП ${formatRub(amount)}`}
           </button>
           <p className="mt-2 text-center text-xs text-foreground/50">Оплата через приложение вашего банка по QR-коду или ссылке.</p>
+          <p className="mt-2 text-center text-xs text-foreground/50">
+            Если страница банка не открывается — откройте её в{" "}
+            <a href="https://browser.yandex.ru/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+              Яндекс Браузере
+            </a>{" "}
+            или установите{" "}
+            <a href="https://www.gosuslugi.ru/landing/crt" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+              сертификаты Минцифры
+            </a>.
+          </p>
         </>
       )}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
