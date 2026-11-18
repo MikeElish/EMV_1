@@ -12,6 +12,11 @@ import { addPurchaseFile } from "@/lib/supplier-purchases";
 import { ownerManualInputEnabled } from "@/lib/manual-input";
 import { priceWithSupplierLogistics } from "@/lib/supplier-pricing";
 import { parseSupplierCurrency } from "@/lib/supplier-currency";
+import { refreshOrder } from "@/lib/order-status";
+import { applyOrderSurcharges } from "@/lib/order-surcharge";
+import { companyTier } from "@/lib/customer-pricing";
+import { applyMarkup, markupOf, tierPrice } from "@/lib/pricing";
+import { getMarkups } from "@/lib/price-settings";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type SheetResult = { ok: true; base64: string; fileName: string } | { ok: false; error: string };
@@ -153,7 +158,7 @@ export async function changeSupplierOrderOffer(lineId: string, offerId: string):
       typeof offerId !== "string" || !offerId || offerId.length > 200) {
     return { ok: false, error: "Выберите предложение поставщика" };
   }
-  const line = await prisma.supplierOrderLine.findUnique({ where: { id: lineId }, select: { productId: true, purchaseId: true } });
+  const line = await prisma.supplierOrderLine.findUnique({ where: { id: lineId }, select: { productId: true, purchaseId: true, orderItemId: true } });
   if (!line) return { ok: false, error: "Позиция не найдена" };
   if (line.purchaseId) return { ok: false, error: "Поставщик уже получил заказ — изменить выбор нельзя" };
   const offer = await prisma.supplierOffer.findFirst({
@@ -185,6 +190,55 @@ export async function changeSupplierOrderOffer(lineId: string, offerId: string):
       noOffer: false,
     },
   });
+
+  // If this supplier line covers a customer order line that is still being
+  // priced, update the customer price to match the newly chosen offer.
+  if (line.orderItemId) {
+    const orderItem = await prisma.orderItem.findUnique({
+      where: { id: line.orderItemId },
+      include: {
+        order: {
+          select: {
+            buyerCompanyId: true,
+            user: { select: { company: { select: { priceType: true, individualMarkup: true } } } },
+          },
+        },
+      },
+    });
+    if (
+      orderItem &&
+      !orderItem.paid &&
+      !orderItem.saleRef &&
+      (orderItem.status === "CHECKING" || orderItem.status === "IN_PROGRESS")
+    ) {
+      const company = orderItem.order.buyerCompanyId
+        ? await prisma.company.findUnique({
+            where: { id: orderItem.order.buyerCompanyId },
+            select: { priceType: true, individualMarkup: true },
+          })
+        : orderItem.order.user?.company ?? null;
+      const tier = await companyTier(company);
+      const product = await prisma.product.findUnique({
+        where: { id: line.productId },
+        include: { pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } },
+      });
+      if (product) {
+        const sitePrice = tierPrice(product, tier);
+        const purchase = product.pricing?.purchasePrice ?? 0;
+        const defaults = await getMarkups();
+        const markup = purchase > 0 && sitePrice > 0 ? markupOf(purchase, sitePrice) : defaults.wholesaleMarkup;
+        const clientPrice = offer.selected ? sitePrice : applyMarkup(offer.price, markup);
+        await prisma.orderItem.update({
+          where: { id: orderItem.id },
+          data: { offerId: offer.id, priceSnapshot: clientPrice },
+        });
+        await refreshOrder(prisma, orderItem.orderId);
+        await applyOrderSurcharges(orderItem.orderId);
+        revalidatePath("/admin/crm/orders");
+      }
+    }
+  }
+
   revalidatePath("/admin/crm/supplier-orders");
   return { ok: true };
 }
