@@ -28,7 +28,7 @@ import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/
 
 type OrderLine = OrderItem & {
   product: { name: string; sku: string; stock: number } | null;
-  supplierOrderLines: { deliveryDays: number | null; purchase: { sentAt: Date | null } | null }[];
+  supplierOrderLines: { price: number; quantity: number; deliveryDays: number | null; purchase: { sentAt: Date | null } | null }[];
 };
 
 export type OrderRow = Order & {
@@ -110,7 +110,7 @@ const TEXT_FILTERS: { key: keyof Filters; label: string }[] = [
   { key: "price", label: "Цена" },
   { key: "total", label: "Всего" },
   { key: "extra", label: "Доп.расходы" },
-  { key: "grand", label: "ИТОГО" },
+  { key: "grand", label: "Маржа" },
 ];
 
 /** «Не завершённые»: everything but Выполнен and Отменён (shipped and still unpaid counts as open). */
@@ -134,6 +134,25 @@ function supplierDeliveryDate(line: OrderLine): Date | null {
   if (!sol || sol.deliveryDays == null) return line.deliveryDate ?? null;
   const base = sol.purchase?.sentAt ?? new Date();
   return new Date(base.getTime() + sol.deliveryDays * 24 * 60 * 60 * 1000);
+}
+
+function linePurchaseCost(line: OrderLine): number {
+  return line.supplierOrderLines.reduce((sum, sol) => sum + sol.price * sol.quantity, 0);
+}
+
+function orderMargin(order: OrderRow): number {
+  const selling = order.items.reduce((sum, item) => sum + orderLineTotal(item), 0);
+  const purchase = order.items.reduce((sum, item) => sum + linePurchaseCost(item), 0);
+  const extra = order.extraCosts.reduce((sum, c) => sum + c.amount, 0);
+  return selling - purchase - extra;
+}
+
+function lineMargin(item: OrderLine, order: OrderRow): number {
+  const selling = orderLineTotal(item);
+  const purchase = linePurchaseCost(item);
+  const extra = order.extraCosts.reduce((sum, c) => sum + c.amount, 0);
+  const share = order.items.length > 0 ? extra / order.items.length : 0;
+  return selling - purchase - share;
 }
 
 type OrderGroup = {
@@ -318,8 +337,8 @@ export function OrdersTable({
       if (filters.total && !has(String((grouped ? order.totalAmount : orderLineTotal(item)) / 100), filters.total))
         return false;
       if (filters.extra && !has(String(extra / 100), filters.extra)) return false;
-      if (filters.grand && !has(String((order.totalAmount + extra) / 100), filters.grand))
-        return false;
+      const margin = grouped ? orderMargin(order) : lineMargin(item, order);
+      if (filters.grand && !has(String(margin / 100), filters.grand)) return false;
       if (filters.status && item.status !== filters.status) return false;
       if (filters.delivery && item.deliveryMethod !== filters.delivery) return false;
       if (filters.deliveryDate) {
@@ -556,7 +575,7 @@ export function OrdersTable({
                       </td>
                       <td className="whitespace-nowrap py-2 pr-4">{formatAdminPrice(g.extra)}</td>
                       <td className="whitespace-nowrap py-2 pr-4 font-medium">
-                        {formatAdminPrice(g.order.totalAmount + g.extra)}
+                        {formatAdminPrice(orderMargin(g.order))}
                       </td>
                       <td className="py-2 pr-4">{g.status}</td>
                       <td className="py-2 pr-4">
@@ -677,7 +696,7 @@ export function OrdersTable({
                           />
                         </td>
                         <td className="whitespace-nowrap py-2 pr-4 font-medium">
-                          {formatAdminPrice(order.totalAmount + extra)}
+                          {formatAdminPrice(lineMargin(item, order))}
                         </td>
                         <td className="py-2 pr-4">
                           {order.canEdit ? (
