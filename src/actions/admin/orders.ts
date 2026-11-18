@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, assignedOrderDenied, ownerOnly, requireSection } from "@/lib/access-server";
-import { OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
+import { Prisma, OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
 import {
   uploadOrderDocumentFile,
   deleteOrderDocumentFile,
@@ -284,7 +284,8 @@ export async function updateLineDeliveryDate(
 export async function updateLineDelivery(
   itemId: string,
   method: DeliveryMethod,
-  scope: LineScope = "item"
+  scope: LineScope = "item",
+  days?: number
 ): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
@@ -297,18 +298,17 @@ export async function updateLineDelivery(
   const lines = await prisma.orderItem.findMany({ where: { id: { in: target.ids } } });
   const asked: string[] = [];
   for (const line of lines) {
-    if (line.deliveryMethod === method) continue;
+    if (line.deliveryMethod === method && (days === undefined || line.deliveryDays === days)) continue;
     // What the customer chose stays the reference until they answer.
     const chosen = line.deliveryConfirmPending ? line.deliveryPrevMethod : line.deliveryMethod;
-    const back = chosen === method;
-    await prisma.orderItem.update({
-      where: { id: line.id },
-      data: {
-        deliveryMethod: method,
-        deliveryPrevMethod: back ? null : chosen,
-        deliveryConfirmPending: !back,
-      },
-    });
+    const back = chosen === method && days === undefined;
+    const data: Prisma.OrderItemUpdateInput = {
+      deliveryMethod: method,
+      deliveryPrevMethod: back ? null : chosen,
+      deliveryConfirmPending: !back,
+    };
+    if (days !== undefined) data.deliveryDays = Math.max(0, days);
+    await prisma.orderItem.update({ where: { id: line.id }, data });
     if (!back) asked.push(line.id);
   }
   if (asked.length) {

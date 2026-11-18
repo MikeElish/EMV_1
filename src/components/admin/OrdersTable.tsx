@@ -26,7 +26,10 @@ import { useRememberedState } from "@/components/admin/AdminPlaces";
 import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManagerSelect";
 import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/lib/order-pricing";
 
-type OrderLine = OrderItem & { product: { sku: string; stock: number } | null };
+type OrderLine = OrderItem & {
+  product: { sku: string; stock: number } | null;
+  supplierOrderLines: { deliveryDays: number | null; purchase: { sentAt: Date | null } | null }[];
+};
 
 export type OrderRow = Order & {
   canEdit: boolean;
@@ -126,6 +129,13 @@ const PAYMENT_ORDER: PaymentState[] = ["unpaid", "deferred", "paid"];
 const formatDay = (d: Date) =>
   new Date(d).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" });
 
+function supplierDeliveryDate(line: OrderLine): Date | null {
+  const sol = line.supplierOrderLines[0];
+  if (!sol || sol.deliveryDays == null) return line.deliveryDate ?? null;
+  const base = sol.purchase?.sentAt ?? new Date();
+  return new Date(base.getTime() + sol.deliveryDays * 24 * 60 * 60 * 1000);
+}
+
 type OrderGroup = {
   order: OrderRow;
   customer: string;
@@ -145,11 +155,19 @@ function groupOf(order: OrderRow, customer: string, extra: number): OrderGroup {
   const statuses = STATUS_ORDER.filter((st) => order.items.some((i) => i.status === st));
   const deliveries = DELIVERY_METHODS.filter((m) => lines.some((i) => i.deliveryMethod === m));
   const payments = PAYMENT_ORDER.filter((st) => lines.some((i) => paymentStateOf(i) === st));
-  const times = lines
-    .map((i) => (i.deliveryDate ? new Date(i.deliveryDate).getTime() : null))
+  const clientDates = lines
+    .map((i) => {
+      const supplierDate = supplierDeliveryDate(i);
+      if (!supplierDate) return null;
+      const d = new Date(supplierDate);
+      if (i.deliveryMethod === "ADDRESS" || i.deliveryMethod === "TERMINAL") {
+        d.setDate(d.getDate() + (i.deliveryDays || 0));
+      }
+      return d.getTime();
+    })
     .filter((t): t is number => t !== null);
-  const min = times.length ? Math.min(...times) : null;
-  const max = times.length ? Math.max(...times) : null;
+  const min = clientDates.length ? Math.min(...clientDates) : null;
+  const max = clientDates.length ? Math.max(...clientDates) : null;
   return {
     order,
     customer,
@@ -302,8 +320,15 @@ export function OrdersTable({
         return false;
       if (filters.status && item.status !== filters.status) return false;
       if (filters.delivery && item.deliveryMethod !== filters.delivery) return false;
-      if (filters.deliveryDate && toInputValue(item.deliveryDate) !== filters.deliveryDate)
-        return false;
+      if (filters.deliveryDate) {
+        const supplierDate = supplierDeliveryDate(item);
+        if (!supplierDate) return false;
+        const clientDate = new Date(supplierDate);
+        if (item.deliveryMethod === "ADDRESS" || item.deliveryMethod === "TERMINAL") {
+          clientDate.setDate(clientDate.getDate() + (item.deliveryDays || 0));
+        }
+        if (toInputValue(clientDate) !== filters.deliveryDate) return false;
+      }
       if (filters.paid && paymentStateOf(item) !== filters.paid) return false;
       return true;
     });
@@ -667,6 +692,7 @@ export function OrdersTable({
                             <DeliveryMethodCell
                               itemId={item.id}
                               method={item.deliveryMethod}
+                              days={item.deliveryDays}
                               confirmPending={item.deliveryConfirmPending}
                               activeLines={activeLines}
                             />
@@ -678,15 +704,11 @@ export function OrdersTable({
                           )}
                         </td>
                         <td className="py-2 pr-4">
-                          {order.canEdit ? (
-                            <DeliveryDateInput
-                              itemId={item.id}
-                              deliveryDate={item.deliveryDate}
-                              activeLines={activeLines}
-                            />
-                          ) : (
-                            item.deliveryDate ? new Date(item.deliveryDate).toLocaleDateString("ru-RU") : "—"
-                          )}
+                          <DeliveryDateInput
+                            supplierDate={supplierDeliveryDate(item)}
+                            deliveryDays={item.deliveryDays}
+                            needsDelivery={item.deliveryMethod === "ADDRESS" || item.deliveryMethod === "TERMINAL"}
+                          />
                         </td>
                         <td className="py-2 pr-4">
                           {order.canEdit ? (

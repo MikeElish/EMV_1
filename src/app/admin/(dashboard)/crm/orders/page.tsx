@@ -12,7 +12,14 @@ export default async function CrmOrdersPage({
   const orders = await prisma.order.findMany({
     include: {
       items: {
-        include: { product: { select: { sku: true, stock: true } } },
+        include: {
+          product: { select: { sku: true, stock: true } },
+          supplierOrderLines: {
+            select: { deliveryDays: true, purchase: { select: { sentAt: true } } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
         orderBy: { id: "asc" },
       },
       extraCosts: {

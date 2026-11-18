@@ -1,45 +1,37 @@
 "use client";
 
-import { updateLineDeliveryDate } from "@/actions/admin/orders";
-import { useLineChange } from "@/components/admin/LineChange";
-
-function toInputValue(date: Date | null): string {
-  if (!date) return "";
-  return new Date(date).toISOString().slice(0, 10);
+function formatDay(date: Date | string | null): string {
+  if (!date) return "—";
+  return new Date(date).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" });
 }
 
-function formatDay(value: string) {
-  return value ? value.split("-").reverse().join(".") : "без даты";
+function addDays(date: Date | string | null, days: number): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" });
 }
 
-/** Planned delivery date of one line; offers the same date for the order's other lines. */
+/**
+ * Read-only delivery dates for an order line.
+ * - До склада: supplier promise (from the supplier order line).
+ * - До клиента: supplier promise + delivery days when ADDRESS/TERMINAL,
+ *   otherwise the same as До склада.
+ */
 export function DeliveryDateInput({
-  itemId,
-  deliveryDate,
-  activeLines,
+  supplierDate,
+  deliveryDays,
+  needsDelivery,
 }: {
-  itemId: string;
-  deliveryDate: Date | null;
-  activeLines: number;
+  supplierDate: Date | string | null;
+  deliveryDays: number;
+  needsDelivery: boolean;
 }) {
-  const line = useLineChange<string>({
-    current: toInputValue(deliveryDate),
-    activeLines,
-    apply: (value, scope) => updateLineDeliveryDate(itemId, value || null, scope),
-    question: (v) => `Установить дату поставки ${formatDay(v)} для остальных позиций заказа?`,
-  });
-
+  const toClient = needsDelivery ? addDays(supplierDate, deliveryDays) : formatDay(supplierDate);
   return (
-    <>
-      <input
-        type="date"
-        value={line.value}
-        disabled={line.pending}
-        onChange={(e) => line.change(e.target.value)}
-        className="rounded-md border border-foreground/20 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-foreground/50"
-      />
-      {line.errorText}
-      {line.dialog}
-    </>
+    <div className="whitespace-nowrap text-xs leading-5">
+      <div className="text-foreground/70">До склада — {formatDay(supplierDate)}</div>
+      <div>До клиента — {toClient}</div>
+    </div>
   );
 }

@@ -44,6 +44,11 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
         include: {
           product: { select: { id: true, sku: true, name: true, stock: true, offers: { where: { selected: true }, select: { deliveryDays: true, quality: true } } } },
           offer: { select: { deliveryDays: true, quality: true } },
+          supplierOrderLines: {
+            select: { deliveryDays: true, purchase: { select: { sentAt: true } } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
         },
       },
       user: { select: { company: true } },
@@ -59,7 +64,7 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
   if (!company) throw new Error(`Покупатель «${order.customerName}» не найден среди компаний — счёт выставляется компании`);
   if (order.items.some((i) => i.priceSnapshot <= 0)) throw new Error("В заказе есть позиции без цены (По запросу) — сначала укажите цены");
 
-  // Срок: in stock -- 2 days; otherwise the supplier's term plus those 2 days.
+  // Срок: in stock -- 2 days; otherwise the supplier's term + handling + delivery days.
   const needed = new Map<string, number>();
   for (const i of order.items) needed.set(i.productId, (needed.get(i.productId) ?? 0) + i.quantity);
   let days: number | null = IN_STOCK_DAYS;
@@ -68,8 +73,10 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
     const offer = i.offer ?? i.product.offers[0] ?? null;
     if (offer?.quality) qualities.add(offer.quality);
     if (i.product.stock >= (needed.get(i.productId) ?? 0)) continue;
-    if (offer?.deliveryDays == null) days = null;
-    else if (days !== null) days = Math.max(days, offer.deliveryDays + IN_STOCK_DAYS);
+    const supplierDays = offer?.deliveryDays ?? i.supplierOrderLines[0]?.deliveryDays ?? null;
+    const transportDays = i.deliveryMethod === "ADDRESS" || i.deliveryMethod === "TERMINAL" ? i.deliveryDays || 0 : 0;
+    if (supplierDays == null) days = null;
+    else if (days !== null) days = Math.max(days, supplierDays + IN_STOCK_DAYS + transportDays);
   }
 
   const contractNumber = company.hasContract && company.contract ? company.contract.replace(/^№\s*/, "").trim() : null;

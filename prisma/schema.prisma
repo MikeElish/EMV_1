@@ -409,6 +409,7 @@ model OrderItem {
   deferred               Boolean             @default(false)
   deliveryConfirmPending Boolean             @default(false)
   deliveryDate           DateTime?
+  deliveryDays           Int                 @default(0)
   deliveryMethod         DeliveryMethod?
   deliveryPrevMethod     DeliveryMethod?
   paid                   Boolean             @default(false)
