@@ -47,12 +47,14 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
         },
       },
       user: { select: { company: true } },
+      buyerCompany: true,
     },
   });
   if (!order) throw new Error("Заказ не найден");
   if (!order.items.length) throw new Error("В заказе нет позиций");
   const company =
     order.user?.company ??
+    order.buyerCompany ??
     (await prisma.company.findFirst({ where: { name: { equals: order.customerName, mode: "insensitive" }, isOwn: false } }));
   if (!company) throw new Error(`Покупатель «${order.customerName}» не найден среди компаний — счёт выставляется компании`);
   if (order.items.some((i) => i.priceSnapshot <= 0)) throw new Error("В заказе есть позиции без цены (По запросу) — сначала укажите цены");
