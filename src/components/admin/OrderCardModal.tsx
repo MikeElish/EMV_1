@@ -93,7 +93,7 @@ export function OrderCardModal({
             {order.items.map((item, index) => (
               <tr key={item.id} className="border-b border-foreground/10">
                 <td className="py-2 pr-4">{index + 1}</td>
-                <td className="py-2 pr-4">{item.nameSnapshot}</td>
+                <td className="py-2 pr-4">{item.product?.name ?? item.nameSnapshot}</td>
                 <td className="py-2 pr-4">{item.product?.sku ?? "—"}</td>
                 <td className="py-2 pr-4">{item.quantity}</td>
                 <td className="py-2 pr-4">

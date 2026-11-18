@@ -27,7 +27,7 @@ import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManag
 import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/lib/order-pricing";
 
 type OrderLine = OrderItem & {
-  product: { sku: string; stock: number } | null;
+  product: { name: string; sku: string; stock: number } | null;
   supplierOrderLines: { deliveryDays: number | null; purchase: { sentAt: Date | null } | null }[];
 };
 
@@ -616,7 +616,7 @@ export function OrdersTable({
                               </div>
                             ))}
                         </td>
-                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.nameSnapshot}</td>
+                        <td className={`py-2 pr-4 ${cancelledCellClass}`}>{item.product?.name ?? item.nameSnapshot}</td>
                         <td className={`py-2 pr-4 ${cancelledCellClass}`}>
                           {item.product?.sku ?? "—"}
                         </td>

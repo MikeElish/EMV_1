@@ -13,7 +13,7 @@ export default async function CrmOrdersPage({
     include: {
       items: {
         include: {
-          product: { select: { sku: true, stock: true } },
+          product: { select: { name: true, sku: true, stock: true } },
           supplierOrderLines: {
             select: { deliveryDays: true, purchase: { select: { sentAt: true } } },
             orderBy: { createdAt: "desc" },
