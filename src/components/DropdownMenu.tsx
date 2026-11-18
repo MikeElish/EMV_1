@@ -45,8 +45,8 @@ export function DropdownMenu({
       }
       setOpen(false);
     }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    document.addEventListener("click", onClickOutside);
+    return () => document.removeEventListener("click", onClickOutside);
   }, []);
 
   return (
@@ -57,6 +57,7 @@ export function DropdownMenu({
       {open && pos && (
         <div
           ref={panelRef}
+          onClick={(e) => e.stopPropagation()}
           style={{ position: "fixed", top: pos.top, right: pos.right }}
           className="z-20 w-56 rounded-md border border-foreground/10 bg-background py-1 text-sm shadow-lg"
         >
