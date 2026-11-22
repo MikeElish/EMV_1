@@ -203,8 +203,7 @@ export async function addOrderItem(
 
 /** Manual bonus for a line. Before an invoice is issued only the owner may
  *  edit it (when manual input is enabled). After the invoice is issued and
- *  before the line is shipped the order manager may also change it, provided
- *  the bonus does not exceed the order total. */
+ *  before the line is shipped the order manager may also change it. */
 export async function updateLineBonus(itemId: string, bonus: number): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
@@ -243,9 +242,6 @@ export async function updateLineBonus(itemId: string, bonus: number): Promise<Ac
     const ownerDenied = await ownerOnly();
     if (ownerDenied) return ownerDenied;
     if (!(await ownerManualInputEnabled())) return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
-  }
-  if (bonus > item.order.totalAmount) {
-    return { ok: false, error: "Бонус не может превышать общую сумму счёта" };
   }
 
   await prisma.orderItem.update({ where: { id: item.id }, data: { bonus } });

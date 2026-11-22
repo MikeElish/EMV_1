@@ -79,12 +79,29 @@ export async function createOrder(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Некорректные данные" };
   }
-  const { customerName, customerPhone, customerEmail, deliveryNote, items, termsAccepted } =
+  const { customerName, customerPhone, customerEmail, deliveryNote, items, termsAccepted, deliveryPaidByRecipient } =
     parsed.data;
   const priced = await priceCart(items);
   if (!priced.ok) return priced;
-  const orderItemsData = priced.lines;
-  const totalAmount = orderItemsData.reduce((s, l) => s + l.priceSnapshot * l.quantity, 0);
+  let orderItemsData = priced.lines;
+  let totalAmount = orderItemsData.reduce((s, l) => s + l.priceSnapshot * l.quantity, 0);
+
+  const deliveryMethod = deliveryMethodFromNote(deliveryNote);
+  if (!deliveryPaidByRecipient && (deliveryMethod === "ADDRESS" || deliveryMethod === "TERMINAL")) {
+    const serviceProduct = await prisma.product.findFirst({
+      where: { sku: "SERVICE-DELIVERY-SMALL", isActive: true },
+      select: { id: true, name: true },
+    });
+    if (!serviceProduct) {
+      return { ok: false, error: "Сервис доставки не настроен — обратитесь к администратору" };
+    }
+    const deliveryFee = deliveryMethod === "TERMINAL" ? 2500_00 : 5000_00;
+    orderItemsData = [
+      ...orderItemsData,
+      { productId: serviceProduct.id, nameSnapshot: serviceProduct.name, priceSnapshot: deliveryFee, quantity: 1 },
+    ];
+    totalAmount += deliveryFee;
+  }
 
   // Guest checkout stays the default -- if the shopper happens to be logged
   // in as a Покупатель at the moment of checkout, the order is silently
@@ -138,6 +155,7 @@ export async function createOrder(
           customerEmail,
           deliveryNote,
           totalAmount,
+          deliveryPaidByRecipient,
           userId,
           deferred,
           termsAcceptedAt: privateCustomer ? new Date() : null,

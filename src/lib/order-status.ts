@@ -90,10 +90,74 @@ function orderSummary(lines: SummaryLine[]) {
   };
 }
 
+const DELIVERY_SERVICE_PRODUCT_SKU = "SERVICE-DELIVERY-SMALL";
+const DELIVERY_SERVICE_ID = "cmutfgqwk00009rs5aoc3g1xz";
+
+async function ensureDeliveryExtraCost(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      paid: true,
+      deliveryPaidByRecipient: true,
+      managerId: true,
+      items: {
+        select: {
+          productId: true,
+          priceSnapshot: true,
+          quantity: true,
+          product: { select: { sku: true } },
+        },
+      },
+    },
+  });
+  if (!order?.paid || order.deliveryPaidByRecipient !== false) return;
+  const deliveryLine = order.items.find((i) => i.product.sku === DELIVERY_SERVICE_PRODUCT_SKU);
+  if (!deliveryLine) return;
+
+  const existing = await prisma.extraCost.findFirst({
+    where: { orderId, serviceId: DELIVERY_SERVICE_ID },
+  });
+  if (existing) return;
+
+  const amount = deliveryLine.priceSnapshot * deliveryLine.quantity;
+  const nearestDate = await prisma.orderItem.findFirst({
+    where: { orderId, deliveryDate: { not: null } },
+    orderBy: { deliveryDate: "asc" },
+    select: { deliveryDate: true },
+  });
+
+  await prisma.extraCost.create({
+    data: {
+      orderId,
+      serviceId: DELIVERY_SERVICE_ID,
+      amount,
+      kind: "Логистика",
+      status: "Запланировано",
+      employeeId: order.managerId,
+      date: nearestDate?.deliveryDate ?? new Date(),
+      lines: {
+        create: {
+          kind: "SERVICE",
+          serviceId: DELIVERY_SERVICE_ID,
+          name: "Услуга по организации доставки (экспедированию) малогабаритного груза",
+          quantity: deliveryLine.quantity,
+          price: deliveryLine.priceSnapshot,
+          sum: amount,
+        },
+      },
+    },
+  });
+}
+
 /** Recomputes the order-level fields after lines changed outside setLineStatuses. */
 export async function refreshOrder(db: Db, orderId: string) {
+  const before = await db.order.findUnique({ where: { id: orderId }, select: { paid: true } });
   const lines = await db.orderItem.findMany({ where: { orderId } });
   await db.order.update({ where: { id: orderId }, data: orderSummary(lines) });
+  const after = await db.order.findUnique({ where: { id: orderId }, select: { paid: true } });
+  if (!before?.paid && after?.paid) {
+    await ensureDeliveryExtraCost(orderId).catch((e) => console.error("[delivery-extra-cost]", e));
+  }
 }
 
 /**

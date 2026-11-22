@@ -38,7 +38,7 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
     }
     orderInput = ownParsed.data;
   }
-  const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, items } = orderInput;
+  const { customerId, companyId, customerName, customerPhone, customerEmail, deliveryNote, deliveryPaidByRecipient, items } = orderInput;
 
   let deferred = false;
   // Отчёты → Бонусы: the client company's manager, else whoever makes it.
@@ -115,6 +115,7 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
           customerPhone,
           customerEmail: customerEmail || null,
           deliveryNote: deliveryNote || null,
+          deliveryPaidByRecipient,
           totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
           userId: customerUserId || null,
           buyerCompanyId,

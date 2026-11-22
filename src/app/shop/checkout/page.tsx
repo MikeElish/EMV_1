@@ -39,6 +39,7 @@ type SavedCheckoutInfo = {
   customerName: string;
   phoneDigits: string;
   customerEmail: string;
+  deliveryPaidByRecipient: boolean;
 };
 
 // Maps the account's stored Prisma DeliveryMethod enum (uppercase) to this
@@ -71,6 +72,8 @@ export default function CheckoutPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
+  // Delivery is paid by the recipient by default; unchecking adds a sender-paid logistics service.
+  const [deliveryPaidByRecipient, setDeliveryPaidByRecipient] = useState(true);
   // What the lines «Под заказ» add (small order / minimum margin), per cart line.
   const [surcharges, setSurcharges] = useState<number[]>([]);
   // Off until ticked: an advertising consent can't be pre-checked.
@@ -94,7 +97,13 @@ export default function CheckoutPage() {
   const [authStep, setAuthStep] = useState<"password" | "code">("password");
 
   const surchargeTotal = surcharges.reduce((sum, x, n) => sum + x * (items[n]?.quantity ?? 0), 0);
-  const orderTotal = totalAmount + surchargeTotal;
+  const deliveryFee =
+    !deliveryPaidByRecipient && (deliveryMethod === "address" || deliveryMethod === "terminal")
+      ? deliveryMethod === "terminal"
+        ? 2500_00
+        : 5000_00
+      : 0;
+  const orderTotal = totalAmount + surchargeTotal + deliveryFee;
   // «в т.ч.»: the VAT inside the prices, not on top of them.
   const ndsAmount = Math.round((orderTotal * 22) / 122);
   const privateCustomer = !companyName;
@@ -133,6 +142,7 @@ export default function CheckoutPage() {
       setPhoneTouched(true);
     }
     if (saved.customerEmail) setCustomerEmail(saved.customerEmail);
+    if (saved.deliveryPaidByRecipient !== undefined) setDeliveryPaidByRecipient(saved.deliveryPaidByRecipient);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     // A signed-in customer's saved delivery defaults (from "Настройки") take
@@ -193,6 +203,7 @@ export default function CheckoutPage() {
 
   async function submitOrder() {
     const deliveryNoteLines = [`Способ доставки: ${DELIVERY_LABELS[deliveryMethod!]}`];
+    deliveryNoteLines.push(`Доставка за счёт грузополучателя: ${deliveryPaidByRecipient ? "Да" : "Нет"}`);
     if (deliveryMethod === "address") {
       if (settlement.trim()) deliveryNoteLines.push(`Населённый пункт: ${settlement.trim()}`);
       if (street.trim()) deliveryNoteLines.push(`Улица: ${street.trim()}`);
@@ -210,6 +221,7 @@ export default function CheckoutPage() {
       customerEmail,
       deliveryNote: deliveryNoteLines.join("\n"),
       termsAccepted,
+      deliveryPaidByRecipient,
       items: items.map((i) => ({
         productId: i.productId,
         offerId: i.offerId,
@@ -238,6 +250,7 @@ export default function CheckoutPage() {
         customerName,
         phoneDigits,
         customerEmail,
+        deliveryPaidByRecipient,
       };
       localStorage.setItem(CHECKOUT_INFO_KEY, JSON.stringify(toSave));
     } catch {
@@ -363,6 +376,17 @@ export default function CheckoutPage() {
                 <span>{formatRub(surchargeTotal)}</span>
               </div>
             )}
+            {deliveryFee > 0 && (
+              <div className="flex justify-between pt-1">
+                <span className="text-sm">Услуга по организации доставки (экспедированию) малогабаритного груза</span>
+                <span className="text-sm font-medium">{formatRub(deliveryFee)}</span>
+              </div>
+            )}
+            {deliveryFee > 0 && (
+              <p className="pt-1 text-xs text-foreground/60">
+                ВНИМАНИЕ! Финальная стоимость заказа может отличаться в зависимости от доставки.
+              </p>
+            )}
             <div className="mt-2 flex justify-between border-t border-foreground/10 pt-2 font-semibold">
               <span>Итого</span>
               <span>{formatRub(orderTotal)}</span>
@@ -458,6 +482,18 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {(deliveryMethod === "address" || deliveryMethod === "terminal") && (
+              <label className="mt-4 flex items-start gap-2 border-t border-foreground/10 pt-4 text-sm text-foreground/70">
+                <input
+                  type="checkbox"
+                  checked={deliveryPaidByRecipient}
+                  onChange={(e) => setDeliveryPaidByRecipient(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>Доставка за счёт грузополучателя</span>
+              </label>
             )}
           </div>
 

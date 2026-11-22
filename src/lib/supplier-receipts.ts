@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { OneCError } from "@/lib/onec";
 import { createOneCReceipt } from "@/lib/onec-purchase";
 import { afterWrite } from "@/lib/onec-stock-docs";
-import { setLineStatuses } from "@/lib/order-status";
+import { refreshOrder, setLineStatuses } from "@/lib/order-status";
 import { uploadOrderDocumentFile } from "@/lib/order-document-storage";
 import { settleHandedOver } from "@/lib/cash-receipts";
 import type { HandoverKind } from "@/lib/validators/receipts";
@@ -109,25 +109,122 @@ export async function handOverOrder(input: {
   kind: HandoverKind;
   note: string;
   file: { name: string; content: Buffer } | null;
+  quantities?: Record<string, number>;
+  documentCategory?: "UPD" | "WAYBILL";
 }) {
-  const items = await prisma.orderItem.findMany({ where: { orderId: input.orderId, status: "READY_TO_SHIP" }, select: { id: true, paid: true } });
+  const items = await prisma.orderItem.findMany({
+    where: { orderId: input.orderId, status: "READY_TO_SHIP" },
+    include: {
+      product: { select: { stock: true } },
+      supplierOrderLines: { select: { id: true } },
+      offer: { select: { supplierId: true, price: true, quotedPrice: true, currency: true, exchangeRate: true } },
+    },
+  });
   if (!items.length) throw new Error("В заказе нет позиций «Готов к отгрузке»");
+
+  const qtyMap = input.quantities ?? {};
+  const toShip: { itemId: string; qty: number }[] = [];
+  const toCreate: {
+    item: (typeof items)[number];
+    remainingQty: number;
+    nextStatus: OrderStatus;
+  }[] = [];
+
+  for (const item of items) {
+    const orderedQty = item.quantity;
+    const shipQty = Math.max(0, Math.min(orderedQty, Number(qtyMap[item.id] ?? orderedQty)));
+    if (shipQty === 0) continue;
+    toShip.push({ itemId: item.id, qty: shipQty });
+    if (shipQty < orderedQty) {
+      const remainingQty = orderedQty - shipQty;
+      const stockAfter = Math.max(0, item.product.stock - shipQty);
+      const nextStatus: OrderStatus = stockAfter >= remainingQty ? "READY_TO_SHIP" : "AWAITING_SUPPLY";
+      toCreate.push({ item, remainingQty, nextStatus });
+    }
+  }
+
+  if (!toShip.length) throw new Error("Не выбрано позиций для отгрузки");
+
+  // Reduce the quantities of the lines that will actually ship now.
+  await prisma.$transaction(
+    toShip.map(({ itemId, qty }) => prisma.orderItem.update({ where: { id: itemId }, data: { quantity: qty } }))
+  );
+
   await setLineStatuses(
     input.orderId,
-    items.map((i) => ({ itemId: i.id, status: (i.paid ? "DONE" : "SHIPPED_AWAITING_PAYMENT") as OrderStatus })),
+    toShip.map(({ itemId }) => {
+      const item = items.find((i) => i.id === itemId)!;
+      return { itemId, status: (item.paid ? "DONE" : "SHIPPED_AWAITING_PAYMENT") as OrderStatus };
+    }),
     { notify: true }
   );
   // "" -- waits for its УПД (src/lib/order-upd.ts).
-  await prisma.orderItem.updateMany({ where: { id: { in: items.map((i) => i.id) } }, data: { saleRef: "" } });
+  await prisma.orderItem.updateMany({ where: { id: { in: toShip.map((s) => s.itemId) } }, data: { saleRef: "" } });
+
+  // Split off the unshipped remainder into new line(s).
+  if (toCreate.length) {
+    await prisma.$transaction(async (tx) => {
+      for (const { item, remainingQty, nextStatus } of toCreate) {
+        const { supplierOrderLines, offer, product: _product, ...base } = item;
+        const newItem = await tx.orderItem.create({
+          data: {
+            orderId: base.orderId,
+            productId: base.productId,
+            nameSnapshot: base.nameSnapshot,
+            priceSnapshot: base.priceSnapshot,
+            quantity: remainingQty,
+            status: nextStatus,
+            paid: base.paid,
+            deferred: base.deferred,
+            offerId: base.offerId,
+            surcharge: base.surcharge,
+            bonus: base.bonus,
+            deliveryMethod: base.deliveryMethod,
+            deliveryDays: base.deliveryDays,
+            deliveryDate: base.deliveryDate,
+          },
+        });
+
+        if (nextStatus === "AWAITING_SUPPLY" && supplierOrderLines.length === 0 && offer?.supplierId) {
+          const purchase = await tx.supplierPurchase.create({
+            data: { supplierId: offer.supplierId, orderId: base.orderId },
+          });
+          await tx.supplierOrderLine.create({
+            data: {
+              productId: base.productId,
+              supplierId: offer.supplierId,
+              offerId: base.offerId,
+              price: offer.price,
+              quotedPrice: offer.quotedPrice ?? offer.price,
+              currency: offer.currency ?? "RUB",
+              exchangeRate: offer.exchangeRate ?? 1,
+              quantity: remainingQty,
+              orderItemId: newItem.id,
+              purchaseId: purchase.id,
+            },
+          });
+        }
+      }
+    });
+  }
+
   await prisma.order.update({
     where: { id: input.orderId },
     data: { handover: input.kind, handoverAt: new Date(), handoverNote: input.note || null },
   });
+
   if (input.file) {
-    const fileUrl = await uploadOrderDocumentFile(input.orderId, "WAYBILL", input.file.content, input.file.name);
-    await prisma.orderDocument.create({ data: { orderId: input.orderId, category: "WAYBILL", fileName: input.file.name, fileUrl } });
+    const category = input.documentCategory ?? "WAYBILL";
+    const fileUrl = await uploadOrderDocumentFile(input.orderId, category, input.file.content, input.file.name);
+    await prisma.orderDocument.create({ data: { orderId: input.orderId, category, fileName: input.file.name, fileUrl } });
   }
+
   // Paid in advance online: the receipt «Полный расчёт».
-  await settleHandedOver(input.orderId, items.map((i) => i.id)).catch((e) => console.error("[receipts] handover", e));
-  return items.length;
+  await settleHandedOver(
+    input.orderId,
+    toShip.map((s) => s.itemId)
+  ).catch((e) => console.error("[receipts] handover", e));
+
+  await refreshOrder(prisma, input.orderId);
+  return toShip.length;
 }

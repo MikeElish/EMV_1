@@ -38,6 +38,12 @@ type Tab = "items" | "delivery";
 const inputClassName =
   "w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50";
 
+const DELIVERY_SERVICE_SKU = "SERVICE-DELIVERY-SMALL";
+const DELIVERY_SERVICE_PRICE: Record<Exclude<DeliveryMethod, "pickup">, number> = {
+  terminal: 2500,
+  address: 5000,
+};
+
 const kopecksToRub = (kopecks: number) => (kopecks / 100).toFixed(2).replace(/\.00$/, "");
 
 function parseRub(value: string): number | null {
@@ -193,6 +199,7 @@ export function NewOrderModal({
   const [house, setHouse] = useState("");
   const [apartment, setApartment] = useState("");
   const [terminal, setTerminal] = useState("");
+  const [deliveryPaidByRecipient, setDeliveryPaidByRecipient] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -224,6 +231,36 @@ export function NewOrderModal({
   }, [mode]);
 
   const productById = useMemo(() => new Map((data?.products ?? []).map((p) => [p.id, p])), [data]);
+  const deliveryServiceProduct = useMemo(
+    () => data?.products.find((p) => p.sku === DELIVERY_SERVICE_SKU) ?? null,
+    [data]
+  );
+
+  // Keep the delivery-service line in sync with the checkbox / delivery method.
+  useEffect(() => {
+    if (!deliveryServiceProduct) return;
+    const needsService = deliveryPaidByRecipient === false && (deliveryMethod === "address" || deliveryMethod === "terminal");
+    const servicePrice =
+      deliveryMethod === "address" || deliveryMethod === "terminal" ? DELIVERY_SERVICE_PRICE[deliveryMethod] : 0;
+    const serviceLineIndex = lines.findIndex((l) => l.productId === deliveryServiceProduct.id);
+
+    setLines((prev) => {
+      if (!needsService) {
+        if (serviceLineIndex === -1) return prev;
+        return prev.filter((_, i) => i !== serviceLineIndex);
+      }
+      if (serviceLineIndex !== -1) {
+        const existing = prev[serviceLineIndex];
+        const priceRub = kopecksToRub(servicePrice * 100);
+        if (existing.priceRub === priceRub && existing.quantity === "1") return prev;
+        const next = [...prev];
+        next[serviceLineIndex] = { ...existing, priceRub, quantity: "1" };
+        return next;
+      }
+      return [...prev, { key: nextKey++, productId: deliveryServiceProduct.id, offerId: "", quantity: "1", priceRub: kopecksToRub(servicePrice * 100) }];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryPaidByRecipient, deliveryMethod, deliveryServiceProduct]);
   const buyers = useMemo<Buyer[]>(
     () => [
       ...(data?.customers ?? []).map((c) => ({ id: `u:${c.id}`, customer: c })),
@@ -321,6 +358,7 @@ export function NewOrderModal({
       customerPhone,
       customerEmail,
       deliveryNote: buildDeliveryNote(),
+      deliveryPaidByRecipient,
       priceType,
       items: filled.map((l) => ({
         productId: l.productId,
@@ -648,6 +686,25 @@ export function NewOrderModal({
                 </>
               )}
             </div>
+          )}
+
+          {deliveryMethod && deliveryMethod !== "pickup" && (
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={deliveryPaidByRecipient}
+                onChange={(e) => {
+                  setHasChanges(true);
+                  setDeliveryPaidByRecipient(e.target.checked);
+                }}
+              />
+              Доставка за счёт грузополучателя
+            </label>
+          )}
+          {deliveryMethod && deliveryMethod !== "pickup" && !deliveryPaidByRecipient && (
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              ВНИМАНИЕ! Финальная стоимость заказа может отличаться в зависимости от доставки.
+            </p>
           )}
 
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}

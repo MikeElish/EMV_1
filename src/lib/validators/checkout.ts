@@ -5,6 +5,7 @@ export const checkoutSchema = z.object({
   customerPhone: z.string().trim().min(5, "Укажите телефон").max(30),
   customerEmail: z.string().trim().email("Укажите корректный e-mail"),
   deliveryNote: z.string().trim().max(500).optional(),
+  deliveryPaidByRecipient: z.boolean().default(true),
   // «Согласие с условиями поставки» -- required of a private customer.
   termsAccepted: z.boolean().optional(),
   items: z

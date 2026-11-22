@@ -117,7 +117,21 @@ export async function handOver(formData: FormData): Promise<ReceiptResult> {
     const orderId = String(formData.get("orderId") ?? "");
     const assignmentDenied = await assignedOrderDenied(orderId);
     if (assignmentDenied) return assignmentDenied;
-    const n = await handOverOrder({ orderId, kind, note: String(formData.get("note") ?? "").trim().slice(0, 300), file: await fileOf(formData) });
+    let quantities: Record<string, number> = {};
+    try {
+      quantities = JSON.parse(String(formData.get("quantities") ?? "{}"));
+    } catch {
+      quantities = {};
+    }
+    const documentCategory = String(formData.get("documentCategory") ?? "WAYBILL");
+    const n = await handOverOrder({
+      orderId,
+      kind,
+      note: String(formData.get("note") ?? "").trim().slice(0, 300),
+      file: await fileOf(formData),
+      quantities,
+      documentCategory: documentCategory === "UPD" ? "UPD" : "WAYBILL",
+    });
     revalidate();
     // The УПД follows; if 1С fails, «Сформировать УПД» in the row repeats it.
     try {

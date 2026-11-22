@@ -20,7 +20,7 @@ export default async function HandoverPage() {
     orderBy: { createdAt: "asc" },
     include: {
       items: {
-        select: { status: true, quantity: true, priceSnapshot: true, bonus: true, paid: true, deferred: true, saleRef: true, product: { select: { brand: true, name: true, sku: true } } },
+        select: { id: true, productId: true, status: true, quantity: true, priceSnapshot: true, bonus: true, paid: true, deferred: true, saleRef: true, product: { select: { brand: true, name: true, sku: true, stock: true } } },
       },
       documents: { where: { category: { in: ["WAYBILL", "UPD"] } }, select: { id: true, category: true, fileName: true, fileUrl: true } },
       buyerCompany: { select: { name: true } },
@@ -42,7 +42,15 @@ export default async function HandoverPage() {
             phone: o.customerPhone,
             delivery: o.deliveryNote,
             buyerCompanyId: o.buyerCompanyId,
-            ready: ready.map((i) => ({ name: [i.product.brand, i.product.name, i.product.sku].filter(Boolean).join(" "), quantity: i.quantity })),
+            ready: ready.map((i) => ({
+              itemId: i.id,
+              productId: i.productId,
+              name: [i.product.brand, i.product.name, i.product.sku].filter(Boolean).join(" "),
+              sku: i.product.sku ?? "",
+              brand: i.product.brand ?? "",
+              quantity: i.quantity,
+              stock: i.product.stock,
+            })),
             readySum: ready.reduce((s, i) => s + orderLineTotal(i), 0),
             linesTotal: o.items.filter((i) => i.status !== "CANCELLED").length,
             payment: ready.every((i) => i.paid) ? "Оплачено" : ready.every((i) => i.paid || i.deferred) ? "Отсрочка" : "Не оплачено",
