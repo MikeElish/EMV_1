@@ -7,7 +7,7 @@ async function main() {
       isActive: true,
       partnerStock: { gt: 0 },
       price: 0,
-      supplierOffers: {
+      offers: {
         some: {
           selected: true,
           noOffer: false,
