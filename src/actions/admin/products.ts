@@ -10,6 +10,8 @@ import { orderMissingFromSuppliers, releaseAwaitingSupply } from "@/lib/order-st
 import { selectOffer } from "@/lib/supplier-offers";
 import { productSchema, type ProductInput } from "@/lib/validators/product";
 import { buildProductSlug } from "@/lib/slug";
+import { applyMarkup } from "@/lib/pricing";
+import { getMarkups } from "@/lib/price-settings";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -48,11 +50,13 @@ function firstOffer(data: ProductInput) {
   };
 }
 
-function toPricingData(data: ProductInput) {
+async function toPricingData(data: ProductInput) {
+  const { tenderMarkup } = await getMarkups();
   return {
     purchasePrice: data.purchasePrice,
     retailPrice: data.retailPrice,
     dealerPrice: data.dealerPrice,
+    tenderPrice: data.purchasePrice > 0 ? applyMarkup(data.purchasePrice, tenderMarkup) : 0,
     supplierId: data.supplierId || null,
   };
 }
@@ -89,7 +93,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
   await prisma.product.create({
     data: {
       ...toProductData(parsed.data),
-      pricing: { create: toPricingData(parsed.data) },
+      pricing: { create: await toPricingData(parsed.data) },
       offers: { create: firstOffer(parsed.data) },
     },
   });
@@ -173,7 +177,7 @@ export async function updateProduct(
       pendingRegistration: false,
       ...(restocked ? { newArrivalAt: new Date() } : {}),
       pricing: {
-        upsert: { create: toPricingData(parsed.data), update: toPricingData(parsed.data) },
+        upsert: { create: await toPricingData(parsed.data), update: await toPricingData(parsed.data) },
       },
     },
   });

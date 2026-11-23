@@ -32,7 +32,7 @@ export const PRICE_TIER_LABELS: Record<PriceTier["type"], string> = {
  * a type the product has no price for falls back to the shop price.
  */
 export function tierPrice(
-  product: { price: number; pricing: { purchasePrice: number; retailPrice: number; dealerPrice: number } | null },
+  product: { price: number; pricing: { purchasePrice: number; retailPrice: number; dealerPrice: number; tenderPrice: number } | null },
   tier: PriceTier | null
 ): number {
   if (!tier || product.price <= 0) return product.price;
@@ -43,7 +43,8 @@ export function tierPrice(
     case "DEALER":
       return p && p.dealerPrice > 0 ? p.dealerPrice : product.price;
     case "TENDER":
-      return p && p.purchasePrice > 0 && tier.markup !== null ? applyMarkup(p.purchasePrice, tier.markup) : product.price;
+      if (p && p.purchasePrice > 0 && tier.markup !== null) return applyMarkup(p.purchasePrice, tier.markup);
+      return p && p.tenderPrice > 0 ? p.tenderPrice : product.price;
     case "INDIVIDUAL":
       return p && p.purchasePrice > 0 && tier.markup !== null ? applyMarkup(p.purchasePrice, tier.markup) : product.price;
     default:
@@ -56,5 +57,6 @@ export function salePrices(purchase: number, markups: Markups) {
     retailPrice: applyMarkup(purchase, markups.retailMarkup),
     wholesalePrice: applyMarkup(purchase, markups.wholesaleMarkup),
     dealerPrice: applyMarkup(purchase, markups.dealerMarkup),
+    tenderPrice: applyMarkup(purchase, markups.tenderMarkup),
   };
 }

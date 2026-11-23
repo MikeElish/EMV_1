@@ -7,7 +7,7 @@ import { forwardRef } from "react";
 
 /** Root of a CRM table page: takes the rest of the window. */
 export function CrmPage({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
+  return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>;
 }
 
 /** The scrolling frame around a table (both directions). */

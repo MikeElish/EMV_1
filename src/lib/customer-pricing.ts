@@ -36,7 +36,7 @@ export async function customerPrices(productIds: string[], tier: PriceTier): Pro
   const [products, offers] = await Promise.all([
     prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, price: true, pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } },
+      select: { id: true, price: true, pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } } },
     }),
     getShopOffers(productIds, tier),
   ]);

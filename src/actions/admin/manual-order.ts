@@ -80,7 +80,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
         isActive: true,
         pendingRegistration: true,
         price: true,
-        pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } },
+        pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } },
       },
       orderBy: { name: "asc" },
     }),
@@ -158,6 +158,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
         retail: p.pricing?.retailPrice ?? p.price,
         wholesale: p.price,
         dealer: p.pricing?.dealerPrice ?? p.price,
+        tender: p.pricing?.tenderPrice ?? p.price,
       },
       supplierOffers: offersByProduct.get(p.id) ?? [],
     })),
@@ -215,7 +216,7 @@ export async function registerPendingProduct(rawSku: string): Promise<PendingPro
         isActive: true,
         pendingRegistration: true,
         price: true,
-        pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } },
+        pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } },
       },
     });
     const result = {
@@ -231,6 +232,7 @@ export async function registerPendingProduct(rawSku: string): Promise<PendingPro
         retail: product.pricing?.retailPrice ?? product.price,
         wholesale: product.price,
         dealer: product.pricing?.dealerPrice ?? product.price,
+        tender: product.pricing?.tenderPrice ?? product.price,
       },
       supplierOffers: [],
     };

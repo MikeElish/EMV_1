@@ -156,7 +156,10 @@ const filterProduct = (p: Product, q: string) => matches(q, p.sku, p.name, p.bra
 
 /** The product's price for the order's price type. */
 function priceOf(p: Product, type: PriceType, markup: number | null, tenderMarkup: number): number {
-  if (type === "tender") return p.purchase > 0 ? applyMarkup(p.purchase, tenderMarkup) : p.prices.wholesale;
+  if (type === "tender") {
+    if (p.purchase > 0) return applyMarkup(p.purchase, tenderMarkup);
+    return p.prices.tender > 0 ? p.prices.tender : p.prices.wholesale;
+  }
   if (type === "individual") return p.purchase > 0 && markup !== null && p.prices.wholesale > 0 ? applyMarkup(p.purchase, markup) : p.prices.wholesale;
   return p.prices[type];
 }

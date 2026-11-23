@@ -60,14 +60,15 @@ export async function recalculateAllPrices(): Promise<ActionResult> {
   const denied = await accessDenied("settings.prices");
   if (denied) return denied;
 
-  const { retailMarkup, wholesaleMarkup, dealerMarkup } = await getMarkups();
+  const { retailMarkup, wholesaleMarkup, dealerMarkup, tenderMarkup } = await getMarkups();
   const factor = (pct: number) => 1 + pct / 100;
 
   const [, updated] = await prisma.$transaction([
     prisma.$executeRaw`
       UPDATE "ProductPricing"
       SET "retailPrice" = CEIL("purchasePrice" * ${factor(retailMarkup)}::numeric)::int,
-          "dealerPrice" = CEIL("purchasePrice" * ${factor(dealerMarkup)}::numeric)::int`,
+          "dealerPrice" = CEIL("purchasePrice" * ${factor(dealerMarkup)}::numeric)::int,
+          "tenderPrice" = CEIL("purchasePrice" * ${factor(tenderMarkup)}::numeric)::int`,
     prisma.$executeRaw`
       UPDATE "Product" p
       SET "price" = CEIL(pp."purchasePrice" * ${factor(wholesaleMarkup)}::numeric)::int

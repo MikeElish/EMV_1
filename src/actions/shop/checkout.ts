@@ -25,7 +25,7 @@ async function priceCart(items: CheckoutInput["items"]): Promise<{ ok: true; lin
   const productIds = items.map((i) => i.productId);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, isActive: true },
-    include: { pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } },
+    include: { pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } } },
   });
   // A client company's «Тип цен» (Розница / Дилер / Индивидуальный) is charged here, never taken from the browser.
   const tier = await sessionPriceTier();

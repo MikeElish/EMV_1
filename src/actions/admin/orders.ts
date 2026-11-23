@@ -514,7 +514,7 @@ export async function updateOrderPriceTier(
           priceSnapshot: true,
           productId: true,
           offerId: true,
-          product: { select: { price: true, pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } } },
+          product: { select: { price: true, pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } } } },
         },
       },
     },

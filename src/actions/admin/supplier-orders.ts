@@ -220,7 +220,7 @@ export async function changeSupplierOrderOffer(lineId: string, offerId: string):
       const tier = await companyTier(company);
       const product = await prisma.product.findUnique({
         where: { id: line.productId },
-        include: { pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } },
+        include: { pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } } },
       });
       if (product) {
         const sitePrice = tierPrice(product, tier);

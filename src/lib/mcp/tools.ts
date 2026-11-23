@@ -58,17 +58,18 @@ const productSelect = {
   isActive: true,
   price: true,
   category: { select: { name: true } },
-  pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } },
+  pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true } },
 } satisfies Prisma.ProductSelect;
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 /** Same as the «Новый заказ» window: «Индивидуальный» = purchase + the company's markup. */
 async function priceFor(p: ProductRow, type: PriceType, markup: number | null): Promise<number> {
-  const prices = { retail: p.pricing?.retailPrice ?? p.price, wholesale: p.price, dealer: p.pricing?.dealerPrice ?? p.price };
+  const prices = { retail: p.pricing?.retailPrice ?? p.price, wholesale: p.price, dealer: p.pricing?.dealerPrice ?? p.price, tender: p.pricing?.tenderPrice ?? p.price };
   if (type === "tender") {
     const { tenderMarkup } = await getMarkups();
     const purchase = p.pricing?.purchasePrice ?? 0;
-    return purchase > 0 ? applyMarkup(purchase, tenderMarkup) : prices.wholesale;
+    if (purchase > 0) return applyMarkup(purchase, tenderMarkup);
+    return prices.tender > 0 ? prices.tender : prices.wholesale;
   }
   if (type === "individual") {
     const purchase = p.pricing?.purchasePrice ?? 0;

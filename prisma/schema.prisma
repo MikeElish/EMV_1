@@ -105,6 +105,7 @@ model ProductPricing {
   purchasePrice Int
   retailPrice   Int
   dealerPrice   Int
+  tenderPrice   Int      @default(0)
   supplierId    String?
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   supplier      Company? @relation(fields: [supplierId], references: [id])

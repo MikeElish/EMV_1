@@ -224,7 +224,7 @@ export async function getShopOffers(productIds: string[], tier: PriceTier | null
     }),
     prisma.productPricing.findMany({
       where: { productId: { in: productIds } },
-      select: { productId: true, purchasePrice: true, retailPrice: true, dealerPrice: true },
+      select: { productId: true, purchasePrice: true, retailPrice: true, dealerPrice: true, tenderPrice: true },
     }),
     prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } }),
     getMarkups(),
