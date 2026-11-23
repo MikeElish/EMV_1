@@ -16,6 +16,7 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
   const [orderId, setOrderId] = useState(orders[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [productId, setProductId] = useState("");
+  const [offerId, setOfferId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [priceRub, setPriceRub] = useState("");
   const [saving, setSaving] = useState(false);
@@ -42,7 +43,7 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
     const price = rublesToKopecksRoundedUp(parseFloat(priceRub.replace(",", ".")));
     if (!Number.isFinite(price) || price <= 0) return setError("Цена");
     setSaving(true);
-    const result = await addOrderItem(orderId, productId, qty, price);
+    const result = await addOrderItem(orderId, productId, qty, price, offerId || undefined);
     setSaving(false);
     if (!result.ok) return setError(result.error);
     router.refresh();
@@ -73,6 +74,8 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
                 type="button"
                 onClick={() => {
                   setProductId(p.id);
+                  const mainOffer = p.supplierOffers.find((o) => o.selected) ?? p.supplierOffers[0];
+                  setOfferId(mainOffer?.id ?? "");
                   setQuery(`${p.sku} — ${p.name}`);
                   setPriceRub((p.prices.wholesale / 100).toFixed(2).replace(/\.00$/, ""));
                 }}
@@ -93,6 +96,22 @@ export function AddOrderItemModal({ orders, onClose }: { orders: Order[]; onClos
             <input value={priceRub} onChange={(e) => setPriceRub(e.target.value)} className="mt-1 w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2" />
           </div>
         </div>
+        {selected && selected.supplierOffers.length > 0 && (
+          <div>
+            <label className="text-sm text-foreground/60">Предложение поставщика</label>
+            <SearchSelect
+              value={offerId}
+              onChange={setOfferId}
+              options={selected.supplierOffers.map((offer) => ({
+                value: offer.id,
+                label: `${offer.supplier?.name ?? offer.supplier?.city ?? "Поставщик"} · ${formatAdminPrice(offer.price)}`,
+                hint: offer.deliveryDays === null ? "срок не указан" : `${offer.deliveryDays} дн.`,
+              }))}
+              emptyLabel="— не выбрано —"
+              className="mt-1"
+            />
+          </div>
+        )}
         {selected && (
           <p className="text-xs text-foreground/50">
             Розница {formatAdminPrice(selected.prices.retail)}, опт {formatAdminPrice(selected.prices.wholesale)}

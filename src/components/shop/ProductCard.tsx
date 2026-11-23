@@ -26,13 +26,22 @@ function ProductListRow({ product }: { product: Product }) {
       setShowQtyInput(true);
       return;
     }
+    const mainOffer = offers?.find((o) => o.main) ?? offers?.[0];
     addItem(
       {
         productId: product.id,
         slug: product.slug,
         sku: product.sku,
         name: product.name,
-        price: product.price,
+        price: mainOffer?.price ?? product.price,
+        ...(mainOffer
+          ? {
+              offerId: mainOffer.id,
+              offerLabel: [mainOffer.quality, mainOffer.deliveryDays !== null ? `${mainOffer.deliveryDays} дн.` : null]
+                .filter(Boolean)
+                .join(", "),
+            }
+          : {}),
       },
       quantity
     );

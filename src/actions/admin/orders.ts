@@ -164,7 +164,8 @@ export async function addOrderItem(
   orderId: string,
   productId: string,
   quantity: number,
-  price: number
+  price: number,
+  offerId?: string
 ): Promise<ActionResult> {
   const denied = await accessDenied("crm.orders");
   if (denied) return denied;
@@ -174,12 +175,19 @@ export async function addOrderItem(
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return { ok: false, error: "Укажите количество" };
   if (!Number.isInteger(price) || price <= 0 || price > 1_000_000_000) return { ok: false, error: "Укажите цену" };
 
-  const [order, product] = await Promise.all([
+  const [order, product, offer] = await Promise.all([
     prisma.order.findUnique({ where: { id: orderId }, select: { deferred: true, items: { select: { deliveryMethod: true }, take: 1 } } }),
     prisma.product.findUnique({ where: { id: productId }, select: { name: true } }),
+    offerId
+      ? prisma.supplierOffer.findFirst({
+          where: { id: offerId, productId, noOffer: false, price: { gt: 0 }, supplierId: { not: null } },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
   ]);
   if (!order) return { ok: false, error: "Заказ не найден" };
   if (!product) return { ok: false, error: "Товар не найден" };
+  if (offerId && !offer) return { ok: false, error: "Выбранное предложение поставщика недоступно" };
 
   const { initialLineStatuses } = await import("@/lib/order-status");
   const [status] = await initialLineStatuses([{ productId, quantity }], order.deferred);
@@ -189,6 +197,7 @@ export async function addOrderItem(
     data: {
       orderId,
       productId,
+      offerId: offer?.id ?? null,
       nameSnapshot: product.name,
       priceSnapshot: price,
       quantity,

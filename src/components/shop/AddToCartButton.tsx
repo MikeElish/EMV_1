@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCart } from "@/components/shop/CartProvider";
+import { useProductOffers } from "@/components/shop/ShopOffers";
 
 export function AddToCartButton({
   product,
@@ -17,6 +18,7 @@ export function AddToCartButton({
   };
 }) {
   const { addItem } = useCart();
+  const offers = useProductOffers(product.id);
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -26,13 +28,22 @@ export function AddToCartButton({
     product.stock > 0 ? product.stock : partnerStock > 0 ? partnerStock : 999;
 
   function handleAdd() {
+    const mainOffer = offers?.find((o) => o.main) ?? offers?.[0];
     addItem(
       {
         productId: product.id,
         slug: product.slug,
         sku: product.sku,
         name: product.name,
-        price: product.price,
+        price: mainOffer?.price ?? product.price,
+        ...(mainOffer
+          ? {
+              offerId: mainOffer.id,
+              offerLabel: [mainOffer.quality, mainOffer.deliveryDays !== null ? `${mainOffer.deliveryDays} дн.` : null]
+                .filter(Boolean)
+                .join(", "),
+            }
+          : {}),
       },
       quantity
     );

@@ -122,7 +122,7 @@ function OffersTable({
   onSelect: (offer: OfferRow) => void;
 }) {
   const role = useRole();
-  const choosable = offers.filter((offer) => !offer.noOffer).length > 1;
+  const choosable = offers.filter((offer) => !offer.noOffer).length >= 1;
   return (
     <div>
       <p className="text-sm text-foreground/60">Предложения поставщиков</p>

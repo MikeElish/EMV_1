@@ -237,7 +237,7 @@ export async function getShopOffers(productIds: string[], tier: PriceTier | null
 
   const result: Record<string, ShopOffer[]> = {};
   for (const [productId, list] of byProduct) {
-    if (list.length < 2) continue;
+    if (list.length < 1) continue;
     const sitePrice = priceOf.get(productId) ?? 0;
     const purchase = purchaseOf.get(productId) ?? 0;
     const markup = purchase > 0 && sitePrice > 0 ? markupOf(purchase, sitePrice) : defaults.wholesaleMarkup;
@@ -251,7 +251,7 @@ export async function getShopOffers(productIds: string[], tier: PriceTier | null
       }))
       .filter((o) => o.price > 0)
       .sort((a, b) => a.price - b.price);
-    if (result[productId].length < 2) delete result[productId];
+    if (result[productId].length < 1) delete result[productId];
   }
   return result;
 }

@@ -25,10 +25,10 @@ export function ShopOffersProvider({
   return <OffersContext.Provider value={offers}>{children}</OffersContext.Provider>;
 }
 
-/** The product's offers when it has more than one, else null. */
+/** The product's offers when it has at least one, else null. */
 export function useProductOffers(productId: string): ShopOffer[] | null {
   const offers = useContext(OffersContext)[productId];
-  return offers && offers.length > 1 ? offers : null;
+  return offers && offers.length > 0 ? offers : null;
 }
 
 /** The offers at the signed-in client's own prices (its company's «Тип цен»), the shop's otherwise. */

@@ -31,7 +31,7 @@ export function RowOrderButton({ product, offer }: { product: Product; offer?: S
         sku: product.sku,
         name: product.name,
         price: offer?.price ?? product.price,
-        ...(offer && !offer.main
+        ...(offer
           ? {
               offerId: offer.id,
               offerLabel: [offer.quality, offer.deliveryDays !== null ? `${offer.deliveryDays} дн.` : null]
