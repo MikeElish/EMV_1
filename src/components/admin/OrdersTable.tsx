@@ -422,6 +422,19 @@ export function OrdersTable({
             <input type="checkbox" checked={unfinished} onChange={(e) => toggleUnfinished(e.target.checked)} />
             Не завершённые
           </label>
+          {manual && (
+            <button
+              type="button"
+              onClick={() => setAddingProduct(true)}
+              className="rounded-md border border-foreground/20 px-3 py-1 text-sm font-medium transition-colors hover:bg-foreground/5"
+            >
+              + Товар в заказ
+            </button>
+          )}
+          <SheetExportButton
+            count={filtered.length}
+            run={() => exportOrders(filtered.map(({ item }) => item.id))}
+          />
           {returnTo && !grouped && (
             <button
               type="button"
@@ -436,25 +449,11 @@ export function OrdersTable({
           <button
             type="button"
             onClick={() => setFilters(EMPTY_FILTERS)}
-            className="ml-auto text-sm text-foreground/50 hover:text-foreground"
+            className="text-sm text-foreground/50 hover:text-foreground"
           >
             Сбросить фильтры
           </button>
         )}
-        {manual && (
-          <button
-            type="button"
-            onClick={() => setAddingProduct(true)}
-            className="ml-2 rounded-md border border-foreground/20 px-2 py-1 text-sm hover:bg-foreground/5"
-          >
-            + Товар в заказ
-          </button>
-        )}
-        <SheetExportButton
-          count={filtered.length}
-          run={() => exportOrders(filtered.map(({ item }) => item.id))}
-          className="ml-2"
-        />
       </div>
 
       {creating && <NewOrderModal onClose={() => setCreating(false)} />}

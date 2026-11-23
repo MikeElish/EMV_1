@@ -17,14 +17,14 @@ export function DocumentsTabs() {
   return (
     <CrmPage>
       <h1 className="text-2xl font-bold">Документооборот</h1>
-      <div className="mt-4 flex flex-wrap gap-2 border-b border-foreground/10 pb-2">
+      <div className="mt-4 flex gap-4 border-b border-foreground/10">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              tab === t.key ? "bg-foreground/10 text-foreground" : "text-foreground/60 hover:text-foreground"
+            className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${
+              tab === t.key ? "border-foreground text-foreground" : "border-transparent text-foreground/50 hover:text-foreground"
             }`}
           >
             {t.label}

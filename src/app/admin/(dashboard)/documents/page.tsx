@@ -1,5 +1,5 @@
-import { SectionStub } from "@/components/admin/SectionStub";
+import { DocumentsTabs } from "@/components/admin/DocumentsTabs";
 
 export default function DocumentsPage() {
-  return <SectionStub title="Документооборот" />;
+  return <DocumentsTabs />;
 }
