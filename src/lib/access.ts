@@ -116,7 +116,9 @@ export type AccessMap = Record<string, AccessLevel>;
 
 /** Before anything is set: Почта for every employee, the rest closed (as it was). */
 export function defaultLevel(key: string): AccessLevel {
-  return key === "mail" ? "edit" : "hide";
+  if (key === "mail") return "edit";
+  if (key === "tasks") return "view";
+  return "hide";
 }
 
 const isLevel = (v: unknown): v is AccessLevel => v === "edit" || v === "view" || v === "hide";
