@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { SupplierOrderStatus } from "@prisma/client";
+import { OrderStatus, SupplierOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, assignedManagerDenied, getMyAccess, ownerOnly, requireSection } from "@/lib/access-server";
 import { applyPaymentTerms, setLineStatuses } from "@/lib/order-status";
@@ -247,27 +247,59 @@ export async function changeSupplierOrderOffer(lineId: string, offerId: string):
  * Status of a supplier order line; the customer order line it covers moves to
  * the matching status in CRM → Заказы (unless cancelled or already shipped).
  */
-export async function updateSupplierOrderStatus(id: string, status: SupplierOrderStatus): Promise<ActionResult> {
+export async function updateSupplierOrderStatus(
+  id: string,
+  status: SupplierOrderStatus,
+  scope: "item" | "order" = "item"
+): Promise<ActionResult> {
   const denied = await accessDenied("crm.supplier-orders");
   if (denied) return denied;
-  const assignmentDenied = await supplierLinesAssignmentDenied(id);
-  if (assignmentDenied) return assignmentDenied;
   if (!Object.values(SupplierOrderStatus).includes(status)) return { ok: false, error: "Некорректный статус" };
+
   const line = await prisma.supplierOrderLine.findUnique({
     where: { id },
-    include: { orderItem: { select: { id: true, orderId: true, status: true } } },
+    select: { purchaseId: true },
   });
   if (!line) return { ok: false, error: "Позиция не найдена" };
 
-  await prisma.supplierOrderLine.update({ where: { id }, data: { status } });
-  const item = line.orderItem;
-  const next = ORDER_STATUS_OF_SUPPLIER[status];
-  if (item && item.status !== next && item.status !== "CANCELLED" && !SHIPPED_STATUSES.includes(item.status)) {
-    await setLineStatuses(item.orderId, [{ itemId: item.id, status: next }], { notify: true });
-    // Проверено on a line already paid (or on deferral) goes straight on to
-    // «Ожидание поставки» -- and this line to «Заказать».
-    if (next === "AWAITING_PAYMENT") await applyPaymentTerms(item.orderId);
+  let ids: string[] = [id];
+  if (scope === "order" && line.purchaseId) {
+    const related = await prisma.supplierOrderLine.findMany({
+      where: { purchaseId: line.purchaseId },
+      select: { id: true },
+    });
+    ids = related.map((r) => r.id);
   }
+
+  const assignmentDenied = await supplierLinesAssignmentDenied(ids);
+  if (assignmentDenied) return assignmentDenied;
+
+  await prisma.supplierOrderLine.updateMany({ where: { id: { in: ids } }, data: { status } });
+
+  // Sync the linked customer-order lines.
+  const items = await prisma.supplierOrderLine.findMany({
+    where: { id: { in: ids } },
+    select: {
+      orderItemId: true,
+      orderItem: { select: { id: true, orderId: true, status: true } },
+    },
+  });
+  const byOrder = new Map<string, { itemId: string; status: OrderStatus }[]>();
+  for (const s of items) {
+    if (!s.orderItemId || !s.orderItem) continue;
+    const next = ORDER_STATUS_OF_SUPPLIER[status];
+    if (!next) continue;
+    const item = s.orderItem;
+    if (item.status === next || item.status === "CANCELLED" || SHIPPED_STATUSES.includes(item.status)) continue;
+    const list = byOrder.get(item.orderId) ?? [];
+    list.push({ itemId: item.id, status: next });
+    byOrder.set(item.orderId, list);
+  }
+  for (const [orderId, changes] of byOrder) {
+    await setLineStatuses(orderId, changes, { notify: true });
+    if (status === "CHECKED") await applyPaymentTerms(orderId);
+  }
+
   revalidatePath("/admin/crm/supplier-orders");
   revalidatePath("/admin/crm/price-check");
   revalidatePath("/admin/crm/orders");
