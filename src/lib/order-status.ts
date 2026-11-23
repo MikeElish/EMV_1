@@ -7,6 +7,7 @@ import {
 } from "@/lib/validators/orders";
 import { noticeLineStatusChanges } from "@/lib/order-notifications";
 import { supplierStatusFor } from "@/lib/validators/supplier-orders";
+import { createPaymentTask } from "@/lib/task-automation";
 import { priceWithSupplierLogistics } from "@/lib/supplier-pricing";
 import { parseSupplierCurrency } from "@/lib/supplier-currency";
 
@@ -157,6 +158,8 @@ export async function refreshOrder(db: Db, orderId: string) {
   const after = await db.order.findUnique({ where: { id: orderId }, select: { paid: true } });
   if (!before?.paid && after?.paid) {
     await ensureDeliveryExtraCost(orderId).catch((e) => console.error("[delivery-extra-cost]", e));
+    const total = lines.reduce((s, l) => s + l.priceSnapshot * l.quantity + l.bonus, 0);
+    await createPaymentTask(orderId, total).catch((e) => console.error("[payment-task]", e));
   }
 }
 

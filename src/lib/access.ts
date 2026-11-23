@@ -32,6 +32,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "crm.supplier-orders", label: "Заказ поставщику", path: "/admin/crm/supplier-orders" },
       { key: "crm.extra-costs", label: "Доп.расходы", path: "/admin/crm/extra-costs" },
       { key: "crm.claims", label: "Рекламации", path: "/admin/crm/claims" },
+      { key: "crm.tasks", label: "Задачи", path: "/admin/crm/tasks" },
       { key: "crm.newsletter", label: "Рассылка", path: "/admin/crm/newsletter" },
     ],
   },

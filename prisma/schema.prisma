@@ -247,6 +247,70 @@ enum LogisticsRequestStatus {
   CANCELLED
 }
 
+enum TaskType {
+  INCOMING
+  OUTGOING
+}
+
+enum TaskBasis {
+  INTERNAL
+  CUSTOMER_ORDER
+  BUYER_COMPANY
+  DOCUMENT_FLOW
+}
+
+enum TaskKind {
+  LOGISTICS
+  INTERNAL_LOGISTICS
+  PROCESSING
+  SEND_EMAIL
+  CALL
+  APPROVE
+  REVIEW
+  DOCUMENTS
+  PAY
+  MEETING
+}
+
+enum TaskStatus {
+  PLANNED
+  IN_PROGRESS
+  OVERDUE
+  DONE
+  CANCELLED
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  start        DateTime
+  end          DateTime
+  type         TaskType
+  basis        TaskBasis
+  kind         TaskKind
+  status       TaskStatus @default(PLANNED)
+  description  String
+  response     String?
+  creatorId    String
+  assigneeId   String
+  parentId     String?
+  sourceType   String? // ORDER, etc.
+  sourceId     String?
+  sourceNumber String?
+  creator      User       @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee     User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  parent       Task?      @relation("TaskChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Task[]     @relation("TaskChildren")
+
+  @@index([assigneeId])
+  @@index([status])
+  @@index([start])
+  @@index([end])
+  @@index([parentId])
+  @@index([sourceType, sourceId])
+}
+
 model LogisticsRequest {
   id                String                 @id @default(cuid())
   number            Int                    @unique @default(autoincrement())
@@ -533,6 +597,8 @@ model User {
   PaymentRequest        PaymentRequest[]
   payrollRows           PayrollRow[]
   logisticsRequests     LogisticsRequest[] @relation("LogisticsRequestExecutor")
+  tasksCreated          Task[]             @relation("TaskCreator")
+  tasksAssigned         Task[]             @relation("TaskAssignee")
   company               Company?          @relation("CompanyUsers", fields: [companyId], references: [id])
   invitation            UserInvitation?
 

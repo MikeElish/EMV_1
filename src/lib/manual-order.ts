@@ -6,6 +6,7 @@ import { generateOrderNumber } from "@/lib/order-number-db";
 import { aggregateOrderStatus, initialLineStatuses, orderMissingFromSuppliers } from "@/lib/order-status";
 import { deliveryMethodFromNote } from "@/lib/delivery";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
+import { createOrderTask } from "@/lib/task-automation";
 import {
   manualOrderSchema,
   ownCompanyManualOrderSchema,
@@ -139,6 +140,7 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
 
       await orderMissingFromSuppliers(created.id);
       await applyOrderSurcharges(created.id);
+      await createOrderTask(created.id);
       revalidatePath("/admin/crm/orders");
       revalidatePath("/admin/warehouse/replenishment");
       revalidatePath("/admin/crm/supplier-orders");

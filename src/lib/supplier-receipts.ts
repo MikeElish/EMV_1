@@ -8,6 +8,7 @@ import { createOneCReceipt } from "@/lib/onec-purchase";
 import { afterWrite } from "@/lib/onec-stock-docs";
 import { refreshOrder, setLineStatuses } from "@/lib/order-status";
 import { uploadOrderDocumentFile } from "@/lib/order-document-storage";
+import { createSupplyTask } from "@/lib/task-automation";
 import { settleHandedOver } from "@/lib/cash-receipts";
 import type { HandoverKind } from "@/lib/validators/receipts";
 
@@ -98,6 +99,20 @@ export async function receiveGoods(input: ReceiveInput) {
   }
   for (const [orderId, ids] of byOrder) {
     await setLineStatuses(orderId, ids.map((itemId) => ({ itemId, status: "READY_TO_SHIP" as OrderStatus })), { notify: true });
+  }
+  // Spawn tasks for the managers of the customer orders that received goods.
+  const orderLines = new Map<string, typeof lines>();
+  for (const l of lines) {
+    const orderId = l.orderItem?.orderId;
+    if (!orderId) continue;
+    const list = orderLines.get(orderId) ?? [];
+    list.push(l);
+    orderLines.set(orderId, list);
+  }
+  const supplierOrderNumbers = purchases.length ? purchases.join(", ") : doc.number;
+  for (const [orderId, list] of orderLines) {
+    const itemsText = list.map((l) => `· ${l.product.name} — ${l.quantity} шт.`).join("\n");
+    await createSupplyTask(orderId, supplierOrderNumbers, itemsText).catch((e) => console.error("[supply-task]", e));
   }
   await afterWrite();
   return { receipt, oneCNumber: doc.number, orders: byOrder.size };

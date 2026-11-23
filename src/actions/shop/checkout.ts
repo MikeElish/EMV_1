@@ -12,6 +12,7 @@ import { deliveryMethodFromNote } from "@/lib/delivery";
 import { sessionPriceTier } from "@/lib/customer-pricing";
 import { tierPrice } from "@/lib/pricing";
 import { applyOrderSurcharges, quoteSurcharges } from "@/lib/order-surcharge";
+import { createOrderTask } from "@/lib/task-automation";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string }
@@ -174,6 +175,7 @@ export async function createOrder(
 
       await orderMissingFromSuppliers(order.id);
       await applyOrderSurcharges(order.id);
+      await createOrderTask(order.id);
       return { ok: true, orderNumber: order.orderNumber };
     } catch (error) {
       if (
