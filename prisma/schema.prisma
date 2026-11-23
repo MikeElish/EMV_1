@@ -39,6 +39,7 @@ model Product {
   newArrivalAt        DateTime            @default(now())
   oneCNoMatch         Boolean             @default(false)
   pendingRegistration Boolean             @default(false)
+  noOffer             Boolean             @default(false)
   extraCostLines      ExtraCostLine[]
   oneCLinks           OneCProductLink[]
   orderItems          OrderItem[]

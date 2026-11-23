@@ -71,7 +71,7 @@ function pctToString(pct: number): string {
 
 export function initialPrices(
   markups: Markups,
-  existing?: { supplierId: string | null; purchase: number; retail: number; wholesale: number; dealer: number },
+  existing?: { supplierId: string | null; purchase: number; retail: number; wholesale: number; dealer: number; noOffer?: boolean },
   offers: OfferRow[] = [],
 ): PricesState {
   const availableOffers = offers.filter((offer) => !offer.noOffer);
@@ -79,7 +79,7 @@ export function initialPrices(
     deliveryDays: "",
     quality: "",
     selectedOfferId: (availableOffers.find((o) => o.selected) ?? availableOffers[0])?.id ?? "",
-    noOffer: offers.length > 0 && availableOffers.length === 0,
+    noOffer: existing?.noOffer ?? (offers.length > 0 && availableOffers.length === 0),
   };
   if (!existing) {
     const empty = (kind: SaleKind): PriceField => ({ pct: pctToString(markups[MARKUP_KEY[kind]]), rub: "" });

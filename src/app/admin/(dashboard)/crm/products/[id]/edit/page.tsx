@@ -57,6 +57,7 @@ export default async function EditProductPage({
             retail: product.pricing.retailPrice,
             wholesale: product.price,
             dealer: product.pricing.dealerPrice,
+            noOffer: product.noOffer,
           } : undefined
         }
         offers={product.offers.map((o) => ({

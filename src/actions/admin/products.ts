@@ -35,6 +35,7 @@ function toProductData(data: ProductInput) {
     brand: data.brand || null,
     images: data.images,
     isActive: data.isActive,
+    noOffer: data.noOffer,
     attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
   };
 }
