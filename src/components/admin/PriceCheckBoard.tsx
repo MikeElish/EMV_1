@@ -23,6 +23,7 @@ import {
 } from "@/actions/admin/price-check";
 import { CrmTableScroll, STICKY_THEAD } from "@/components/admin/CrmTableFrame";
 import { QUALITY_SUGGESTIONS } from "@/components/admin/ProductPricesPanel";
+import { SearchSelect } from "@/components/SearchSelect";
 import { PriceRequestsModal } from "@/components/admin/PriceRequestsModal";
 import { Modal } from "@/components/Modal";
 import { exportPriceCheck } from "@/actions/admin/supplier-orders";
@@ -84,6 +85,7 @@ function OfferModal({
   const [quotedPrice, setQuotedPrice] = useState(offer ? String(offer.quotedPrice / 100).replace(".", ",") : "");
   const [inStock, setInStock] = useState(offer?.inStock ?? false);
   const [stockQuantity, setStockQuantity] = useState(offer?.stockQuantity === null ? "" : String(offer?.stockQuantity ?? ""));
+  const [supplierId, setSupplierId] = useState(offer?.supplierId ?? "");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,15 +118,19 @@ function OfferModal({
           <label htmlFor="offer-supplier" className="text-sm text-foreground/60">
             Поставщик *
           </label>
-          <select id="offer-supplier" name="supplierId" required defaultValue={offer?.supplierId ?? ""} className={inputClass}>
-            <option value="">— выберите —</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.inn ? ` (ИНН ${s.inn})` : ""}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            id="offer-supplier"
+            name="supplierId"
+            value={supplierId}
+            onChange={setSupplierId}
+            options={suppliers.map((s) => ({
+              value: s.id,
+              label: s.name,
+              hint: s.inn ? `ИНН ${s.inn}` : undefined,
+            }))}
+            emptyLabel="— выберите —"
+            className={inputClass}
+          />
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
@@ -495,21 +501,19 @@ function ImportModal({
             <label htmlFor="import-supplier" className="text-sm text-foreground/60">
               Поставщик *
             </label>
-            <select
+            <SearchSelect
               id="import-supplier"
               name="supplierId"
-              required
               value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
+              onChange={setSupplierId}
+              options={suppliers.map((s) => ({
+                value: s.id,
+                label: s.name,
+                hint: s.inn ? `ИНН ${s.inn}` : undefined,
+              }))}
+              emptyLabel="— выберите —"
               className={inputClass}
-            >
-              <option value="">— выберите —</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           {desktopFile ? (
             <p className="text-sm">
