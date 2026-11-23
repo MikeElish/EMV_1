@@ -14,6 +14,7 @@ import { issueOrderInvoice } from "@/lib/order-invoice";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
 import { ownerManualInputEnabled } from "@/lib/manual-input";
 import { tierPrice, type PriceTier } from "@/lib/pricing";
+import { customerOrderSheetBase64, orderSheetFileName, type SheetResult } from "@/lib/order-sheet";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -560,4 +561,61 @@ export async function updateOrderPriceTier(
   await refreshOrder(prisma, orderId);
   revalidateOrders();
   return { ok: true };
+}
+
+const MAX_SHEET_ROWS = 20000;
+
+/** «Выгрузка» in Заказы: the listed order lines as an Excel file. */
+export async function exportOrders(itemIds: string[]): Promise<SheetResult> {
+  const denied = await accessDenied("crm.orders", "view");
+  if (denied) return denied;
+  if (!itemIds.length) return { ok: false, error: "Нет позиций для выгрузки" };
+  if (itemIds.length > MAX_SHEET_ROWS) return { ok: false, error: "Слишком много позиций" };
+
+  const items = await prisma.orderItem.findMany({
+    where: { id: { in: itemIds } },
+    include: {
+      product: { select: { brand: true, name: true, sku: true } },
+      order: { select: { deliveryDate: true } },
+      supplierOrderLines: {
+        select: { price: true, quantity: true, deliveryDays: true, purchase: { select: { sentAt: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  const selectedOffers = await prisma.supplierOffer.findMany({
+    where: { productId: { in: items.map((i) => i.productId).filter(Boolean) as string[] }, selected: true },
+    select: { productId: true, quality: true },
+  });
+  const qualityOf = new Map(selectedOffers.map((o) => [o.productId, o.quality]));
+
+  const byId = new Map(items.map((i) => [i.id, i]));
+  let no = 0;
+  const rows = itemIds.flatMap((id) => {
+    const item = byId.get(id);
+    if (!item) return [];
+    no++;
+    const sol = item.supplierOrderLines[0];
+    let deliveryDate = item.order.deliveryDate;
+    if (sol && sol.deliveryDays != null) {
+      const base = sol.purchase?.sentAt ?? new Date();
+      deliveryDate = new Date(base.getTime() + sol.deliveryDays * 24 * 60 * 60 * 1000);
+    }
+    return [{
+      no,
+      brand: item.product?.brand ?? null,
+      name: item.nameSnapshot,
+      sku: item.product?.sku ?? null,
+      quantity: item.quantity,
+      price: item.priceSnapshot,
+      total: item.priceSnapshot * item.quantity,
+      deliveryDate,
+      quality: qualityOf.get(item.productId ?? "") ?? null,
+    }];
+  });
+
+  return { ok: true, base64: customerOrderSheetBase64(rows), fileName: orderSheetFileName("Заказы") };
 }

@@ -108,7 +108,7 @@ export async function sendInvites(list: { email: string; name: string | null }[]
       .join("; "),
   };
 }
-import type { SheetResult } from "@/actions/admin/supplier-orders";
+import type { SheetResult } from "@/lib/order-sheet";
 
 /**
  * Выгрузка for the mailing service: only confirmed, not unsubscribed

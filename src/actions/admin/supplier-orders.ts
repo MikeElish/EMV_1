@@ -7,7 +7,7 @@ import { accessDenied, assignedManagerDenied, getMyAccess, ownerOnly, requireSec
 import { setLineStatuses } from "@/lib/order-status";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 import { ORDER_STATUS_OF_SUPPLIER } from "@/lib/validators/supplier-orders";
-import { orderSheetBase64, orderSheetFileName } from "@/lib/order-sheet";
+import { orderSheetBase64, orderSheetFileName, type SheetResult } from "@/lib/order-sheet";
 import { addPurchaseFile } from "@/lib/supplier-purchases";
 import { ownerManualInputEnabled } from "@/lib/manual-input";
 import { priceWithSupplierLogistics } from "@/lib/supplier-pricing";
@@ -19,7 +19,6 @@ import { applyMarkup, markupOf, tierPrice } from "@/lib/pricing";
 import { getMarkups } from "@/lib/price-settings";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
-export type SheetResult = { ok: true; base64: string; fileName: string } | { ok: false; error: string };
 type PurchaseResult = { ok: true; message: string } | { ok: false; error: string };
 
 const MAX_SHEET_ROWS = 20000;

@@ -21,8 +21,9 @@ import { LogisticsRequestModal, type LogisticsSource, type LogisticsLine } from 
 import { DELIVERY_METHOD_LABELS, DELIVERY_METHODS } from "@/lib/delivery";
 import type { DeliveryMethod, Order, OrderItem, OrderStatus } from "@prisma/client";
 import type { PaymentState } from "@/actions/admin/orders";
-import { clearLineSurcharge } from "@/actions/admin/orders";
+import { clearLineSurcharge, exportOrders } from "@/actions/admin/orders";
 import { useRememberedState } from "@/components/admin/AdminPlaces";
+import { SheetExportButton } from "@/components/admin/SheetExportButton";
 import { OrderManagerSelect, type Employee } from "@/components/admin/OrderManagerSelect";
 import { formatOrderLineUnitPrice, orderLineTotal, orderLineUnitPrice } from "@/lib/order-pricing";
 
@@ -449,6 +450,11 @@ export function OrdersTable({
             + Товар в заказ
           </button>
         )}
+        <SheetExportButton
+          count={filtered.length}
+          run={() => exportOrders(filtered.map(({ item }) => item.id))}
+          className="ml-2"
+        />
       </div>
 
       {creating && <NewOrderModal onClose={() => setCreating(false)} />}
