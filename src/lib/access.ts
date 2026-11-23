@@ -17,11 +17,7 @@ export type AccessGroup = { label: string; path: string; sections: AccessSection
 
 export const ACCESS_GROUPS: AccessGroup[] = [
   { label: "Дашборд", path: "/admin", sections: [{ key: "dashboard", label: "Дашборд", path: "/admin" }] },
-  {
-    label: "Задачи",
-    path: "/admin/tasks",
-    sections: [{ key: "tasks", label: "Задачи", path: "/admin/tasks" }],
-  },
+  { label: "Задачи", path: "/admin/tasks", sections: [{ key: "tasks", label: "Задачи", path: "/admin/tasks" }] },
   {
     label: "CRM",
     path: "/admin/crm",
@@ -38,6 +34,7 @@ export const ACCESS_GROUPS: AccessGroup[] = [
       { key: "crm.extra-costs", label: "Доп.расходы", path: "/admin/crm/extra-costs" },
       { key: "crm.claims", label: "Рекламации", path: "/admin/crm/claims" },
       { key: "crm.newsletter", label: "Рассылка", path: "/admin/crm/newsletter" },
+      { key: "crm.employees", label: "Сотрудники", path: "/admin/crm/employees" },
     ],
   },
   {
