@@ -1,11 +1,18 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { formatAdminPrice } from "@/lib/money";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 import { DELIVERY_METHOD_LABELS } from "@/lib/delivery";
 import { orderLineTotal, formatOrderLineUnitPrice } from "@/lib/order-pricing";
+import { PRICE_TIER_LABELS } from "@/lib/pricing";
+import { updateOrderPriceTier } from "@/actions/admin/orders";
 import type { OrderRow } from "@/components/admin/OrdersTable";
+import type { CompanyPriceType } from "@prisma/client";
+
+const PRICE_TYPES: CompanyPriceType[] = ["RETAIL", "WHOLESALE", "DEALER", "TENDER", "INDIVIDUAL"];
 
 function customerOf(order: OrderRow): string {
   if (order.buyerCompany) return order.buyerCompany.name;
@@ -28,7 +35,27 @@ export function OrderCardModal({
   managerName: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const customer = customerOf(order);
+  const currentType = order.buyerCompany?.priceType ?? "WHOLESALE";
+  const currentMarkup = order.buyerCompany?.individualMarkup ?? 0;
+  const [priceType, setPriceType] = useState<CompanyPriceType>(currentType);
+  const [markup, setMarkup] = useState<number>(currentMarkup);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function confirm() {
+    start(async () => {
+      setError(null);
+      const result = await updateOrderPriceTier(order.id, priceType, priceType === "INDIVIDUAL" ? markup : undefined);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+      onClose();
+    });
+  }
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-4xl" title={`Заказ № ${order.orderNumber}`}>
@@ -74,6 +101,47 @@ export function OrderCardModal({
             <span className="font-semibold">{formatAdminPrice(order.totalAmount)}</span>
           </div>
         </div>
+
+        {order.canEdit && order.buyerCompany && (
+          <div className="flex flex-wrap items-end gap-3 rounded-lg border border-foreground/10 p-3">
+            <div>
+              <label className="block text-xs text-foreground/60">Тип цен</label>
+              <select
+                value={priceType}
+                onChange={(e) => setPriceType(e.target.value as CompanyPriceType)}
+                className="mt-1 rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-sm outline-none"
+              >
+                {PRICE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {PRICE_TIER_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {priceType === "INDIVIDUAL" && (
+              <div>
+                <label className="block text-xs text-foreground/60">Наценка, %</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={markup}
+                  onChange={(e) => setMarkup(parseFloat(e.target.value) || 0)}
+                  className="mt-1 w-28 rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-sm outline-none"
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={pending || (priceType === currentType && (priceType !== "INDIVIDUAL" || markup === currentMarkup))}
+              onClick={confirm}
+              className="rounded-md bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              OK
+            </button>
+            {error && <span className="text-sm text-red-600">{error}</span>}
+          </div>
+        )}
 
         <h3 className="border-b border-foreground/10 pb-1 pt-2 text-sm font-semibold">Позиции</h3>
         <table className="w-full text-sm">

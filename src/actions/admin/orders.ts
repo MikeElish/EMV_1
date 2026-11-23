@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, assignedOrderDenied, ownerOnly, requireSection } from "@/lib/access-server";
-import { Prisma, OrderStatus, OrderDocumentCategory, DeliveryMethod } from "@prisma/client";
+import { Prisma, OrderStatus, OrderDocumentCategory, DeliveryMethod, CompanyPriceType } from "@prisma/client";
 import {
   uploadOrderDocumentFile,
   deleteOrderDocumentFile,
@@ -13,6 +13,7 @@ import { sendDeliveryChangeLetter } from "@/lib/order-notifications";
 import { issueOrderInvoice } from "@/lib/order-invoice";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
 import { ownerManualInputEnabled } from "@/lib/manual-input";
+import { tierPrice, type PriceTier } from "@/lib/pricing";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -482,5 +483,81 @@ export async function updateOrderManager(orderId: string, managerId: string | nu
   await prisma.order.update({ where: { id: orderId }, data: { managerId } });
   revalidatePath("/admin/crm/orders");
   revalidatePath("/admin/reports/bonuses");
+  return { ok: true };
+}
+
+const PRICE_TYPES: CompanyPriceType[] = ["RETAIL", "WHOLESALE", "DEALER", "TENDER", "INDIVIDUAL"];
+
+export async function updateOrderPriceTier(
+  orderId: string,
+  priceType: CompanyPriceType,
+  individualMarkup?: number
+): Promise<ActionResult> {
+  const denied = await accessDenied("crm.orders");
+  if (denied) return denied;
+  const assignmentDenied = await assignedOrderDenied(orderId);
+  if (assignmentDenied) return assignmentDenied;
+  if (!PRICE_TYPES.includes(priceType)) return { ok: false, error: "Некорректный тип цен" };
+  if (priceType === "INDIVIDUAL" && (individualMarkup === undefined || individualMarkup < 0)) {
+    return { ok: false, error: "Укажите наценку для индивидуального типа цен" };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      buyerCompanyId: true,
+      userId: true,
+      items: {
+        where: { status: { not: "CANCELLED" }, paid: false },
+        select: {
+          id: true,
+          priceSnapshot: true,
+          productId: true,
+          offerId: true,
+          product: { select: { price: true, pricing: { select: { purchasePrice: true, retailPrice: true, dealerPrice: true } } } },
+        },
+      },
+    },
+  });
+  if (!order) return { ok: false, error: "Заказ не найден" };
+
+  let companyId = order.buyerCompanyId;
+  if (!companyId && order.userId) {
+    const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { companyId: true } });
+    companyId = user?.companyId ?? null;
+  }
+  if (!companyId) return { ok: false, error: "Заказ не привязан к компании" };
+
+  let markup: number | null = null;
+  if (priceType === "INDIVIDUAL") {
+    markup = individualMarkup!;
+  } else if (priceType === "TENDER") {
+    const settings = await prisma.priceSettings.findUnique({ where: { id: 1 }, select: { tenderMarkup: true } });
+    markup = settings?.tenderMarkup ?? 50;
+  }
+  const tier: PriceTier = { type: priceType, markup };
+
+  const updates: { id: string; priceSnapshot: number }[] = [];
+  for (const item of order.items) {
+    if (!item.product) continue;
+    const newPrice = tierPrice(item.product, tier);
+    if (newPrice !== item.priceSnapshot) {
+      updates.push({ id: item.id, priceSnapshot: newPrice });
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.company.update({
+      where: { id: companyId! },
+      data: { priceType, ...(priceType === "INDIVIDUAL" ? { individualMarkup: markup } : { individualMarkup: null }) },
+    });
+    for (const u of updates) {
+      await tx.orderItem.update({ where: { id: u.id }, data: { priceSnapshot: u.priceSnapshot } });
+    }
+  });
+
+  await applyOrderSurcharges(orderId);
+  await refreshOrder(prisma, orderId);
+  revalidateOrders();
   return { ok: true };
 }

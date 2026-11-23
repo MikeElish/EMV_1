@@ -35,7 +35,7 @@ export default async function CrmOrdersPage({
           company: { select: { name: true } },
         },
       },
-      buyerCompany: { select: { name: true, contract: true } },
+      buyerCompany: { select: { name: true, contract: true, priceType: true, individualMarkup: true } },
     },
     orderBy: { createdAt: "desc" },
   });

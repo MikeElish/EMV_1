@@ -42,7 +42,7 @@ export type OrderRow = Order & {
     login: string;
     company: { name: string } | null;
   } | null;
-  buyerCompany: { name: string; contract: string | null } | null;
+  buyerCompany: { name: string; contract: string | null; priceType: import("@prisma/client").CompanyPriceType; individualMarkup: number | null } | null;
 };
 
 type Row = {
