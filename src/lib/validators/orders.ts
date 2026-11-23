@@ -4,6 +4,7 @@ import type { OrderStatus, OrderDocumentCategory } from "@prisma/client";
 // order of the status dropdowns.
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   CHECKING: "Проверка заказа",
+  READY_FOR_PROPOSAL: "Готово к КП",
   AWAITING_PAYMENT: "Требуется оплата",
   AWAITING_SUPPLY: "Ожидание поставки",
   IN_PROGRESS: "В работе",
@@ -16,6 +17,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 /** Least to most advanced; an order with mixed lines shows the least advanced one. */
 export const ORDER_STATUS_PROGRESS: OrderStatus[] = [
   "CHECKING",
+  "READY_FOR_PROPOSAL",
   "AWAITING_PAYMENT",
   "AWAITING_SUPPLY",
   "IN_PROGRESS",
@@ -34,7 +36,7 @@ export const STOCK_HOLDING_STATUSES: OrderStatus[] = ["IN_PROGRESS", "READY_TO_S
 export const SHIPPED_STATUSES: OrderStatus[] = ["SHIPPED_AWAITING_PAYMENT", "DONE"];
 
 /** A customer may still cancel these lines themselves. */
-export const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = ["CHECKING", "AWAITING_PAYMENT"];
+export const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = ["CHECKING", "READY_FOR_PROPOSAL", "AWAITING_PAYMENT"];
 
 export const ORDER_DOCUMENT_CATEGORY_LABELS: Record<OrderDocumentCategory, string> = {
   INVOICE: "Счёт на оплату",

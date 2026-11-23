@@ -1230,6 +1230,7 @@ enum OrderStatus {
   CHECKING
   READY_TO_SHIP
   AWAITING_SUPPLY
+  READY_FOR_PROPOSAL
 }
 
 enum OrderDocumentCategory {

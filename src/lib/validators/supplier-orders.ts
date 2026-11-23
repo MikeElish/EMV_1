@@ -15,7 +15,7 @@ export const SUPPLIER_ORDER_STATUS_LABELS: Record<SupplierOrderStatus, string> =
 export const ORDER_STATUS_OF_SUPPLIER: Record<SupplierOrderStatus, OrderStatus> = {
   TO_CHECK: "CHECKING",
   REQUESTED: "CHECKING",
-  CHECKED: "AWAITING_PAYMENT",
+  CHECKED: "READY_FOR_PROPOSAL",
   TO_ORDER: "AWAITING_SUPPLY",
   AWAITING_PAYMENT: "AWAITING_SUPPLY",
   ORDERED: "AWAITING_SUPPLY",
@@ -32,6 +32,8 @@ export function supplierStatusFor(orderStatus: OrderStatus, current: SupplierOrd
   switch (orderStatus) {
     case "CHECKING":
       return "TO_CHECK";
+    case "READY_FOR_PROPOSAL":
+      return "CHECKED";
     case "AWAITING_PAYMENT":
       return "CHECKED";
     case "AWAITING_SUPPLY":

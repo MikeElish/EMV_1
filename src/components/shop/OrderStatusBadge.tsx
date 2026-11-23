@@ -5,6 +5,7 @@ import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 // fades out and back, see .status-blink); finished ones are static.
 const STYLES: Record<OrderStatus, { color: string; border: string; blink: boolean }> = {
   CHECKING: { color: "text-orange-600 dark:text-orange-400", border: "border-orange-500", blink: true },
+  READY_FOR_PROPOSAL: { color: "text-orange-600 dark:text-orange-400", border: "border-orange-500", blink: true },
   AWAITING_PAYMENT: { color: "text-yellow-600 dark:text-yellow-500", border: "border-yellow-500", blink: true },
   AWAITING_SUPPLY: { color: "text-violet-600 dark:text-violet-400", border: "border-violet-500", blink: true },
   IN_PROGRESS: { color: "text-green-600 dark:text-green-500", border: "border-green-500", blink: true },
@@ -12,6 +13,12 @@ const STYLES: Record<OrderStatus, { color: string; border: string; blink: boolea
   SHIPPED_AWAITING_PAYMENT: { color: "text-blue-600 dark:text-blue-500", border: "border-blue-500", blink: true },
   CANCELLED: { color: "text-red-600 dark:text-red-500", border: "border-red-500", blink: false },
   DONE: { color: "text-green-600 dark:text-green-500", border: "border-green-500", blink: false },
+};
+
+/** Customer-facing labels: statuses that are part of the "checking" phase
+ *  are shown to the buyer as "На проверке". */
+const CUSTOMER_LABELS: Partial<Record<OrderStatus, string>> = {
+  READY_FOR_PROPOSAL: "На проверке",
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
@@ -22,7 +29,7 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
         style.blink ? "status-blink" : ""
       }`}
     >
-      {ORDER_STATUS_LABELS[status]}
+      {CUSTOMER_LABELS[status] ?? ORDER_STATUS_LABELS[status]}
     </span>
   );
 }

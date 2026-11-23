@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { OrderStatus, SupplierOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, assignedManagerDenied, getMyAccess, ownerOnly, requireSection } from "@/lib/access-server";
-import { applyPaymentTerms, setLineStatuses } from "@/lib/order-status";
+import { setLineStatuses } from "@/lib/order-status";
 import { SHIPPED_STATUSES } from "@/lib/validators/orders";
 import { ORDER_STATUS_OF_SUPPLIER } from "@/lib/validators/supplier-orders";
 import { orderSheetBase64, orderSheetFileName } from "@/lib/order-sheet";
@@ -297,7 +297,6 @@ export async function updateSupplierOrderStatus(
   }
   for (const [orderId, changes] of byOrder) {
     await setLineStatuses(orderId, changes, { notify: true });
-    if (status === "CHECKED") await applyPaymentTerms(orderId);
   }
 
   revalidatePath("/admin/crm/supplier-orders");
