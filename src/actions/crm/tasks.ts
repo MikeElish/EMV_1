@@ -123,7 +123,7 @@ export async function createTask(input: unknown): Promise<{ ok: true; id: string
       status: "PLANNED",
     },
   });
-  revalidatePath("/admin/crm/tasks");
+  revalidatePath("/admin/tasks");
   return { ok: true, id: task.id };
 }
 
@@ -150,7 +150,7 @@ export async function updateTaskStatus(
     await spawnManagerTaskAfterAssignment(task.sourceId);
   }
 
-  revalidatePath("/admin/crm/tasks");
+  revalidatePath("/admin/tasks");
   return { ok: true };
 }
 
@@ -174,7 +174,7 @@ export async function respondToTask(
   }
 
   await prisma.task.update({ where: { id }, data: { response } });
-  revalidatePath("/admin/crm/tasks");
+  revalidatePath("/admin/tasks");
   return { ok: true };
 }
 

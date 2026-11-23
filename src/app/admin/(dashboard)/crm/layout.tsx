@@ -12,7 +12,6 @@ const TABS = [
   { href: "/admin/crm/supplier-orders", label: "Заказ поставщику" },
   { href: "/admin/crm/extra-costs", label: "Доп.расходы" },
   { href: "/admin/crm/claims", label: "Рекламации" },
-  { href: "/admin/crm/tasks", label: "Задачи" },
   { href: "/admin/crm/newsletter", label: "Рассылка" },
 ];
 
