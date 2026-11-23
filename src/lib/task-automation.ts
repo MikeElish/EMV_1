@@ -11,6 +11,16 @@ async function emvUserId(): Promise<string | null> {
   return owner?.id ?? null;
 }
 
+async function ownerId(): Promise<string | null> {
+  const owner = await prisma.user.findFirst({ where: { role: "OWNER" }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  return owner?.id ?? null;
+}
+
+async function resolveAssignee(managerId: string | null): Promise<string | null> {
+  if (managerId) return managerId;
+  return ownerId();
+}
+
 function endOfDayFrom(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
@@ -104,10 +114,12 @@ export async function createPaymentTask(orderId: string, amount: number) {
     where: { id: orderId },
     select: { orderNumber: true, managerId: true },
   });
-  if (!order?.managerId) return;
+  if (!order) return;
+  const assigneeId = await resolveAssignee(order.managerId);
+  if (!assigneeId) return;
   await ensureEmvTask(
     {
-      assigneeId: order.managerId,
+      assigneeId,
       basis: "CUSTOMER_ORDER",
       kind: "PROCESSING",
       description: `По заказу ${order.orderNumber} поступила оплата в размере ${(amount / 100).toLocaleString("ru-RU")} ₽. Создайте Заказ поставщику или отгрузите товар.`,
@@ -115,7 +127,7 @@ export async function createPaymentTask(orderId: string, amount: number) {
       sourceId: orderId,
       sourceNumber: order.orderNumber,
     },
-    { sourceType: "ORDER", sourceId: orderId, kind: "PROCESSING", assigneeId: order.managerId }
+    { sourceType: "ORDER", sourceId: orderId, kind: "PROCESSING", assigneeId }
   );
 }
 
@@ -124,10 +136,12 @@ export async function createSupplyTask(orderId: string, supplierOrderNumber: str
     where: { id: orderId },
     select: { orderNumber: true, managerId: true },
   });
-  if (!order?.managerId) return;
+  if (!order) return;
+  const assigneeId = await resolveAssignee(order.managerId);
+  if (!assigneeId) return;
   await ensureEmvTask(
     {
-      assigneeId: order.managerId,
+      assigneeId,
       basis: "CUSTOMER_ORDER",
       kind: "PROCESSING",
       description: `По заказу поставщику ${supplierOrderNumber} поступил товар:\n${itemsText}\nОтгрузите товар.`,
@@ -135,7 +149,7 @@ export async function createSupplyTask(orderId: string, supplierOrderNumber: str
       sourceId: orderId,
       sourceNumber: order.orderNumber,
     },
-    { sourceType: "ORDER", sourceId: orderId, kind: "PROCESSING", assigneeId: order.managerId }
+    { sourceType: "ORDER", sourceId: orderId, kind: "PROCESSING", assigneeId }
   );
 }
 
@@ -179,7 +193,9 @@ export async function createOverduePaymentTasks(): Promise<number> {
   let created = 0;
 
   for (const order of orders) {
-    if (!order.shippedAt || !order.managerId) continue;
+    if (!order.shippedAt) continue;
+    const assigneeId = await resolveAssignee(order.managerId);
+    if (!assigneeId) continue;
     const deferralDays = order.user?.company?.paymentDeferralDays ?? 0;
     const dueDate = new Date(order.shippedAt);
     dueDate.setDate(dueDate.getDate() + deferralDays);
@@ -195,7 +211,7 @@ export async function createOverduePaymentTasks(): Promise<number> {
       where: {
         sourceType: "ORDER",
         sourceId: order.id,
-        assigneeId: order.managerId,
+        assigneeId,
         kind: "PROCESSING",
         start: { gte: start, lt: end },
       },
@@ -205,7 +221,7 @@ export async function createOverduePaymentTasks(): Promise<number> {
     await prisma.task.create({
       data: {
         creatorId,
-        assigneeId: order.managerId,
+        assigneeId,
         basis: "CUSTOMER_ORDER",
         kind: "PROCESSING",
         type: "INCOMING",
