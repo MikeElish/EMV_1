@@ -38,7 +38,6 @@ type Tab = "items" | "delivery";
 const inputClassName =
   "w-full rounded-md border border-foreground/20 bg-transparent px-3 py-2 outline-none focus:border-foreground/50";
 
-const DELIVERY_SERVICE_SKU = "SERVICE-DELIVERY-SMALL";
 const DELIVERY_SERVICE_PRICE: Record<Exclude<DeliveryMethod, "pickup">, number> = {
   terminal: 2500,
   address: 5000,
@@ -231,36 +230,12 @@ export function NewOrderModal({
   }, [mode]);
 
   const productById = useMemo(() => new Map((data?.products ?? []).map((p) => [p.id, p])), [data]);
-  const deliveryServiceProduct = useMemo(
-    () => data?.products.find((p) => p.sku === DELIVERY_SERVICE_SKU) ?? null,
-    [data]
-  );
 
-  // Keep the delivery-service line in sync with the checkbox / delivery method.
-  useEffect(() => {
-    if (!deliveryServiceProduct) return;
-    const needsService = deliveryPaidByRecipient === false && (deliveryMethod === "address" || deliveryMethod === "terminal");
-    const servicePrice =
-      deliveryMethod === "address" || deliveryMethod === "terminal" ? DELIVERY_SERVICE_PRICE[deliveryMethod] : 0;
-    const serviceLineIndex = lines.findIndex((l) => l.productId === deliveryServiceProduct.id);
+  const deliveryFee =
+    !deliveryPaidByRecipient && (deliveryMethod === "address" || deliveryMethod === "terminal")
+      ? DELIVERY_SERVICE_PRICE[deliveryMethod] * 100
+      : 0;
 
-    setLines((prev) => {
-      if (!needsService) {
-        if (serviceLineIndex === -1) return prev;
-        return prev.filter((_, i) => i !== serviceLineIndex);
-      }
-      if (serviceLineIndex !== -1) {
-        const existing = prev[serviceLineIndex];
-        const priceRub = kopecksToRub(servicePrice * 100);
-        if (existing.priceRub === priceRub && existing.quantity === "1") return prev;
-        const next = [...prev];
-        next[serviceLineIndex] = { ...existing, priceRub, quantity: "1" };
-        return next;
-      }
-      return [...prev, { key: nextKey++, productId: deliveryServiceProduct.id, offerId: "", quantity: "1", priceRub: kopecksToRub(servicePrice * 100) }];
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deliveryPaidByRecipient, deliveryMethod, deliveryServiceProduct]);
   const buyers = useMemo<Buyer[]>(
     () => [
       ...(data?.customers ?? []).map((c) => ({ id: `u:${c.id}`, customer: c })),
@@ -311,7 +286,7 @@ export function NewOrderModal({
     const qty = parseInt(l.quantity, 10);
     return price !== null && qty > 0 ? price * qty : 0;
   });
-  const total = lineTotals.reduce((a, b) => a + b, 0);
+  const total = lineTotals.reduce((a, b) => a + b, 0) + deliveryFee;
 
   async function addUnknownSku(rawSku: string, lineKey: number) {
     setError(null);

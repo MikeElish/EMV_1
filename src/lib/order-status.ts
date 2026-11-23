@@ -78,13 +78,13 @@ type SummaryLine = {
  * active line paid), deferred (every unpaid active line on deferral) and the
  * delivery date (the latest one planned).
  */
-function orderSummary(lines: SummaryLine[]) {
+function orderSummary(lines: SummaryLine[], deliveryFee: number = 0) {
   const active = lines.filter((l) => l.status !== "CANCELLED");
   const unpaid = active.filter((l) => !l.paid);
   const dates = active.map((l) => l.deliveryDate?.getTime()).filter((t): t is number => t !== undefined);
   return {
     status: aggregateOrderStatus(lines.map((l) => l.status)),
-    totalAmount: active.reduce((sum, l) => sum + l.priceSnapshot * l.quantity + l.bonus, 0),
+    totalAmount: active.reduce((sum, l) => sum + l.priceSnapshot * l.quantity + l.bonus, 0) + deliveryFee,
     paid: active.length > 0 && unpaid.length === 0,
     deferred: unpaid.length > 0 && unpaid.every((l) => l.deferred),
     deliveryDate: dates.length ? new Date(Math.max(...dates)) : null,
@@ -92,7 +92,7 @@ function orderSummary(lines: SummaryLine[]) {
 }
 
 const DELIVERY_SERVICE_PRODUCT_SKU = "SERVICE-DELIVERY-SMALL";
-const DELIVERY_SERVICE_ID = "cmutfgqwk00009rs5aoc3g1xz";
+export const DELIVERY_SERVICE_ID = "cmutfgqwk00009rs5aoc3g1xz";
 
 async function ensureDeliveryExtraCost(orderId: string) {
   const order = await prisma.order.findUnique({
@@ -100,27 +100,17 @@ async function ensureDeliveryExtraCost(orderId: string) {
     select: {
       paid: true,
       deliveryPaidByRecipient: true,
+      deliveryFee: true,
       managerId: true,
-      items: {
-        select: {
-          productId: true,
-          priceSnapshot: true,
-          quantity: true,
-          product: { select: { sku: true } },
-        },
-      },
     },
   });
-  if (!order?.paid || order.deliveryPaidByRecipient !== false) return;
-  const deliveryLine = order.items.find((i) => i.product.sku === DELIVERY_SERVICE_PRODUCT_SKU);
-  if (!deliveryLine) return;
+  if (!order?.paid || order.deliveryPaidByRecipient !== false || order.deliveryFee <= 0) return;
 
   const existing = await prisma.extraCost.findFirst({
     where: { orderId, serviceId: DELIVERY_SERVICE_ID },
   });
   if (existing) return;
 
-  const amount = deliveryLine.priceSnapshot * deliveryLine.quantity;
   const nearestDate = await prisma.orderItem.findFirst({
     where: { orderId, deliveryDate: { not: null } },
     orderBy: { deliveryDate: "asc" },
@@ -131,7 +121,7 @@ async function ensureDeliveryExtraCost(orderId: string) {
     data: {
       orderId,
       serviceId: DELIVERY_SERVICE_ID,
-      amount,
+      amount: order.deliveryFee,
       kind: "Логистика",
       status: "Запланировано",
       employeeId: order.managerId,
@@ -141,9 +131,9 @@ async function ensureDeliveryExtraCost(orderId: string) {
           kind: "SERVICE",
           serviceId: DELIVERY_SERVICE_ID,
           name: "Услуга по организации доставки (экспедированию) малогабаритного груза",
-          quantity: deliveryLine.quantity,
-          price: deliveryLine.priceSnapshot,
-          sum: amount,
+          quantity: 1,
+          price: order.deliveryFee,
+          sum: order.deliveryFee,
         },
       },
     },
@@ -152,14 +142,19 @@ async function ensureDeliveryExtraCost(orderId: string) {
 
 /** Recomputes the order-level fields after lines changed outside setLineStatuses. */
 export async function refreshOrder(db: Db, orderId: string) {
-  const before = await db.order.findUnique({ where: { id: orderId }, select: { paid: true } });
+  const before = await db.order.findUnique({
+    where: { id: orderId },
+    select: { paid: true, deliveryFee: true },
+  });
   const lines = await db.orderItem.findMany({ where: { orderId } });
-  await db.order.update({ where: { id: orderId }, data: orderSummary(lines) });
-  const after = await db.order.findUnique({ where: { id: orderId }, select: { paid: true } });
+  await db.order.update({
+    where: { id: orderId },
+    data: orderSummary(lines, before?.deliveryFee ?? 0),
+  });
+  const after = await db.order.findUnique({ where: { id: orderId }, select: { paid: true, totalAmount: true } });
   if (!before?.paid && after?.paid) {
     await ensureDeliveryExtraCost(orderId).catch((e) => console.error("[delivery-extra-cost]", e));
-    const total = lines.reduce((s, l) => s + l.priceSnapshot * l.quantity + l.bonus, 0);
-    await createPaymentTask(orderId, total).catch((e) => console.error("[payment-task]", e));
+    await createPaymentTask(orderId, after.totalAmount).catch((e) => console.error("[payment-task]", e));
   }
 }
 
@@ -262,8 +257,10 @@ export async function setLineStatuses(
   const result = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: {
+      select: {
         items: true,
+        deliveryFee: true,
+        shippedAt: true,
         user: { select: { company: { select: { paymentType: true, paymentDeferralDays: true } } } },
       },
     });
@@ -296,7 +293,7 @@ export async function setLineStatuses(
     }
     if (!changed.length) return { changed };
 
-    const data: Prisma.OrderUpdateInput = orderSummary(lines);
+    const data: Prisma.OrderUpdateInput = orderSummary(lines, order.deliveryFee ?? 0);
     // Stamped only the first time something ships -- a later re-entry (after
     // a correction) doesn't push the date forward.
     if (shippedNow && !order.shippedAt) {

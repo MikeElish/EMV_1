@@ -88,19 +88,9 @@ export async function createOrder(
   let totalAmount = orderItemsData.reduce((s, l) => s + l.priceSnapshot * l.quantity, 0);
 
   const deliveryMethod = deliveryMethodFromNote(deliveryNote);
+  let deliveryFee = 0;
   if (!deliveryPaidByRecipient && (deliveryMethod === "ADDRESS" || deliveryMethod === "TERMINAL")) {
-    const serviceProduct = await prisma.product.findFirst({
-      where: { sku: "SERVICE-DELIVERY-SMALL", isActive: true },
-      select: { id: true, name: true },
-    });
-    if (!serviceProduct) {
-      return { ok: false, error: "Сервис доставки не настроен — обратитесь к администратору" };
-    }
-    const deliveryFee = deliveryMethod === "TERMINAL" ? 2500_00 : 5000_00;
-    orderItemsData = [
-      ...orderItemsData,
-      { productId: serviceProduct.id, nameSnapshot: serviceProduct.name, priceSnapshot: deliveryFee, quantity: 1 },
-    ];
+    deliveryFee = deliveryMethod === "TERMINAL" ? 2500_00 : 5000_00;
     totalAmount += deliveryFee;
   }
 
@@ -156,6 +146,7 @@ export async function createOrder(
           customerEmail,
           deliveryNote,
           totalAmount,
+          deliveryFee,
           deliveryPaidByRecipient,
           userId,
           deferred,

@@ -189,8 +189,14 @@ const ACTIVE_LINE = { cancelled: false } as const;
 
 /** What the order still waits to be paid, kopecks. */
 async function unpaidOf(orderId: string) {
-  const lines = await prisma.orderItem.findMany({ where: { orderId, ...ACTIVE_LINE, paid: false } });
-  return lines.reduce((s, l) => s + orderLineTotal(l), 0);
+  const [order, lines] = await Promise.all([
+    prisma.order.findUnique({ where: { id: orderId }, select: { deliveryFee: true, paid: true } }),
+    prisma.orderItem.findMany({ where: { orderId, ...ACTIVE_LINE, paid: false } }),
+  ]);
+  if (!order) return 0;
+  const itemsDue = lines.reduce((s, l) => s + orderLineTotal(l), 0);
+  // Delivery fee is part of the order total; treat it as due until the order is fully paid.
+  return itemsDue + (order.paid ? 0 : order.deliveryFee);
 }
 
 /** Matches an incoming payment; a full one marks the order's lines paid. Returns the note. */

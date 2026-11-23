@@ -47,11 +47,16 @@ export async function setupSbp(bankAccountId: string) {
 export async function payableLines(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { user: { select: { company: { select: { id: true } } } }, items: { where: { status: "AWAITING_PAYMENT", paid: false, cancelled: false, priceSnapshot: { gt: 0 } }, orderBy: { id: "asc" } } },
+    select: {
+      user: { select: { company: { select: { id: true } } } },
+      deliveryFee: true,
+      items: { where: { status: "AWAITING_PAYMENT", paid: false, cancelled: false, priceSnapshot: { gt: 0 } }, orderBy: { id: "asc" } },
+    },
   });
   if (!order || order.user?.company) return null;
-  if (!order.items.length) return null;
-  return { lineIds: order.items.map((i) => i.id), amount: order.items.reduce((s, i) => s + orderLineTotal(i), 0) };
+  if (!order.items.length && order.deliveryFee <= 0) return null;
+  const itemsAmount = order.items.reduce((s, i) => s + orderLineTotal(i), 0);
+  return { lineIds: order.items.map((i) => i.id), amount: itemsAmount + order.deliveryFee };
 }
 
 /** Whether the shop offers СБП now. */

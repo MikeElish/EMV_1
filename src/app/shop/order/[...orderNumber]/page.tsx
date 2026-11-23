@@ -49,6 +49,12 @@ export default async function OrderConfirmationPage({
             </span>
           </div>
         ))}
+        {order.deliveryFee > 0 && (
+          <div className="flex justify-between py-1">
+            <span>Услуга по организации доставки (экспедированию) малогабаритного груза</span>
+            <span>{formatRub(order.deliveryFee)}</span>
+          </div>
+        )}
         <div className="mt-2 flex justify-between border-t border-foreground/10 pt-2 font-semibold">
           <span>Итого</span>
           <span>{formatRub(order.totalAmount)}</span>

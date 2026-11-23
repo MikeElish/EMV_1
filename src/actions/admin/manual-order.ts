@@ -70,6 +70,7 @@ export async function getManualOrderFormData(mode: ManualOrderFormMode = "crm") 
       orderBy: { name: "asc" },
     }),
     prisma.product.findMany({
+      where: { isActive: true },
       select: {
         id: true,
         sku: true,

@@ -104,7 +104,9 @@ export async function itemRef(product: { id: string; sku: string; name: string }
   return created.Ref_Key;
 }
 
-export type OneCInvoiceLine = { product: { id: string; sku: string; name: string }; quantity: number; /** kopecks */ price: number };
+export type OneCInvoiceLine =
+  | { product: { id: string; sku: string; name: string }; quantity: number; /** kopecks */ price: number }
+  | { service: { oneCRef: string; name: string }; quantity: number; /** kopecks */ price: number };
 export type OneCInvoice = { ref: string; number: string; date: Date; vatRate: number | null; vat: number };
 
 function nextInvoiceNumber(number: string): string {
@@ -141,9 +143,12 @@ export async function saveOneCInvoice(input: {
     const sum = l.price * l.quantity;
     const lineVat = percent ? Math.round((sum * percent) / (100 + percent)) : 0;
     vat += lineVat;
+    const номенклатура = "product" in l
+      ? await itemRef(l.product, t.Товары[0].Номенклатура)
+      : l.service.oneCRef;
     lines.push({
       LineNumber: String(i + 1),
-      Номенклатура: await itemRef(l.product, t.Товары[0].Номенклатура),
+      Номенклатура: номенклатура,
       Номенклатура_Type: ITEM_TYPE,
       Количество: l.quantity,
       Цена: l.price / 100,

@@ -8,6 +8,7 @@ import { deliveryMethodFromNote } from "@/lib/delivery";
 import { applyOrderSurcharges } from "@/lib/order-surcharge";
 import { termsText } from "@/lib/supply-terms";
 import { expandLineBonus, orderLineTotal } from "@/lib/order-pricing";
+import { DELIVERY_SERVICE_ID } from "@/lib/order-status";
 
 // «Счет на оплату» of an order: written to 1С (its number), printed from the
 // shop's template into a PDF and put into the order's «Счета». A new one for
@@ -37,7 +38,15 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
   await applyOrderSurcharges(orderId);
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: {
+    select: {
+      id: true,
+      orderNumber: true,
+      customerName: true,
+      deliveryNote: true,
+      deliveryFee: true,
+      invoiceRef: true,
+      invoiceNumber: true,
+      invoiceDate: true,
       items: {
         where: { cancelled: false },
         orderBy: { id: "asc" },
@@ -90,31 +99,58 @@ export async function issueOrderInvoice(orderId: string, number?: string): Promi
       bonus: item.bonus,
     })
   );
+
+  // Delivery service: included as a service line if the buyer pays for delivery.
+  const deliveryService = order.deliveryFee > 0
+    ? await prisma.service.findUnique({ where: { id: DELIVERY_SERVICE_ID }, select: { oneCRef: true, name: true } })
+    : null;
+  const oneCLines: Parameters<typeof saveOneCInvoice>[0]["lines"] = invoiceLines.map((line) => ({
+    product: line.product,
+    quantity: line.quantity,
+    price: line.price,
+  }));
+  if (order.deliveryFee > 0 && deliveryService?.oneCRef) {
+    oneCLines.push({ service: { oneCRef: deliveryService.oneCRef, name: deliveryService.name }, quantity: 1, price: order.deliveryFee });
+  }
+
   const saved = await saveOneCInvoice({
     ref: order.invoiceRef,
     number,
     buyer: await counterpartyRef(company),
     contractNumber,
-    lines: invoiceLines.map((line) => ({ product: line.product, quantity: line.quantity, price: line.price })),
+    lines: oneCLines,
     comment: `Заказ ${order.orderNumber} с сайта emv.one`,
   });
 
   const method = deliveryMethodFromNote(order.deliveryNote) ?? "PICKUP";
   const terminal = order.deliveryNote?.match(/Терминал: ([^\n]+)/)?.[1]?.trim() ?? "";
-  const total = order.items.reduce((s, i) => s + orderLineTotal(i), 0);
+  const itemsTotal = order.items.reduce((s, i) => s + orderLineTotal(i), 0);
+  const total = itemsTotal + order.deliveryFee;
   const data: InvoiceData = {
     number: saved.number,
     dateText: dateText(saved.date),
     buyer: [company.name, company.inn && `ИНН ${company.inn}`, company.kpp && `КПП ${company.kpp}`, company.address].filter(Boolean).join(",  "),
     basis: contractNumber ? `Договор: ${contractNumber}` : `Заказ № ${order.orderNumber}`,
-    lines: invoiceLines.map((line) => ({
-      sku: line.sku,
-      name: line.name,
-      quantity: line.quantity,
-      unit: "шт",
-      price: line.price,
-      sum: line.price * line.quantity,
-    })),
+    lines: [
+      ...invoiceLines.map((line) => ({
+        sku: line.sku,
+        name: line.name,
+        quantity: line.quantity,
+        unit: "шт",
+        price: line.price,
+        sum: line.price * line.quantity,
+      })),
+      ...(order.deliveryFee > 0
+        ? [{
+            sku: "",
+            name: "Услуга по организации доставки (экспедированию) малогабаритного груза",
+            quantity: 1,
+            unit: "шт",
+            price: order.deliveryFee,
+            sum: order.deliveryFee,
+          }]
+        : []),
+    ],
     vatRate: saved.vatRate,
     vat: saved.vat,
     total,

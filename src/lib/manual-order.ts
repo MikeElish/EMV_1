@@ -104,6 +104,12 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
   }
   const nameById = new Map(products.map((p) => [p.id, p.name]));
 
+  const deliveryMethod = deliveryMethodFromNote(deliveryNote);
+  let deliveryFee = 0;
+  if (!deliveryPaidByRecipient && (deliveryMethod === "ADDRESS" || deliveryMethod === "TERMINAL")) {
+    deliveryFee = deliveryMethod === "TERMINAL" ? 2500_00 : 5000_00;
+  }
+
   const statuses = await initialLineStatuses(items, deferred);
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -117,7 +123,8 @@ export async function createManualOrderRecord(input: ManualOrderRecordInput, cre
           customerEmail: customerEmail || null,
           deliveryNote: deliveryNote || null,
           deliveryPaidByRecipient,
-          totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+          totalAmount: items.reduce((sum, i) => sum + i.price * i.quantity, 0) + deliveryFee,
+          deliveryFee,
           userId: customerUserId || null,
           buyerCompanyId,
           managerId,
