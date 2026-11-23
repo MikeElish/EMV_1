@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { OrderStatus, SupplierOrderStatus } from "@prisma/client";
+import { Prisma, OrderStatus, SupplierOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { accessDenied, assignedManagerDenied, getMyAccess, ownerOnly, requireSection } from "@/lib/access-server";
 import { setLineStatuses } from "@/lib/order-status";
@@ -258,17 +258,49 @@ export async function updateSupplierOrderStatus(
 
   const line = await prisma.supplierOrderLine.findUnique({
     where: { id },
-    select: { purchaseId: true },
+    select: {
+      purchaseId: true,
+      supplierId: true,
+      orderItemId: true,
+      buyerOrderNumber: true,
+      forStock: true,
+    },
   });
   if (!line) return { ok: false, error: "Позиция не найдена" };
 
   let ids: string[] = [id];
-  if (scope === "order" && line.purchaseId) {
-    const related = await prisma.supplierOrderLine.findMany({
-      where: { purchaseId: line.purchaseId },
-      select: { id: true },
-    });
-    ids = related.map((r) => r.id);
+  if (scope === "order") {
+    if (line.purchaseId) {
+      const related = await prisma.supplierOrderLine.findMany({
+        where: { purchaseId: line.purchaseId },
+        select: { id: true },
+      });
+      ids = related.map((r) => r.id);
+    } else if (line.supplierId) {
+      let orderId: string | undefined;
+      if (line.orderItemId) {
+        const item = await prisma.orderItem.findUnique({
+          where: { id: line.orderItemId },
+          select: { orderId: true },
+        });
+        orderId = item?.orderId;
+      }
+      const where: Prisma.SupplierOrderLineWhereInput = {
+        supplierId: line.supplierId,
+        purchaseId: null,
+      };
+      if (orderId) {
+        where.orderItem = { orderId };
+      } else if (line.buyerOrderNumber) {
+        where.buyerOrderNumber = line.buyerOrderNumber;
+      } else if (line.forStock) {
+        where.forStock = true;
+        where.orderItem = null;
+        where.buyerOrderNumber = null;
+      }
+      const related = await prisma.supplierOrderLine.findMany({ where, select: { id: true } });
+      ids = related.map((r) => r.id);
+    }
   }
 
   const assignmentDenied = await supplierLinesAssignmentDenied(ids);

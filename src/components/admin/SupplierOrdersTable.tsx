@@ -263,10 +263,20 @@ export function SupplierOrdersTable({
     [rows]
   );
 
-  const purchaseLineCounts = useMemo(() => {
-    const map = new Map<string | null, number>();
+  function supplierOrderGroupKey(r: SupplierOrderRow) {
+    if (r.purchaseId) return `purchase:${r.purchaseId}`;
+    if (!r.supplierId) return `line:${r.id}`;
+    if (r.forStock) return `supplier:${r.supplierId}:stock`;
+    const orderKey = r.orderNumber ?? r.buyerOrderNumber;
+    if (orderKey) return `supplier:${r.supplierId}:order:${orderKey}`;
+    return `line:${r.id}`;
+  }
+
+  const lineGroupCounts = useMemo(() => {
+    const map = new Map<string, number>();
     for (const r of rows) {
-      map.set(r.purchaseId, (map.get(r.purchaseId) ?? 0) + 1);
+      const key = supplierOrderGroupKey(r);
+      map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
   }, [rows]);
@@ -518,7 +528,7 @@ export function SupplierOrdersTable({
                         id={r.id}
                         status={r.status}
                         canEdit={r.canEdit}
-                        activeLines={r.purchaseId ? purchaseLineCounts.get(r.purchaseId) ?? 1 : 1}
+                        activeLines={lineGroupCounts.get(supplierOrderGroupKey(r)) ?? 1}
                       />
                     </td>
                     <td className="py-2 pr-4">
