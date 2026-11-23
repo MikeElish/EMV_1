@@ -23,9 +23,18 @@ function escapeHtml(text: string) {
 async function recipientOf(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { orderNumber: true, customerEmail: true, user: { select: { email: true } } },
+    select: {
+      orderNumber: true,
+      customerEmail: true,
+      user: { select: { email: true } },
+      buyerCompanyId: true,
+      buyerCompany: { select: { users: { select: { id: true } } } },
+    },
   });
   if (!order) return null;
+  if (order.buyerCompanyId && order.buyerCompany && order.buyerCompany.users.length === 0) {
+    return null;
+  }
   const to = order.customerEmail || order.user?.email;
   return to ? { to, orderNumber: order.orderNumber } : null;
 }
