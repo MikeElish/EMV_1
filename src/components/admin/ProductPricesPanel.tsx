@@ -33,7 +33,7 @@ export type OfferRow = {
   updatedAt: Date;
 };
 
-export const QUALITY_SUGGESTIONS = ["Оригинал", "Аналог (OEM)", "Аналог", "Б/у", "TVH"];
+export const QUALITY_SUGGESTIONS = ["Оригинал", "Аналог (OEM)", "Аналог", "Б/у", "TVH", "SRP"];
 
 function supplierDisplayName(
   supplier: { name: string | null; city: string | null },
