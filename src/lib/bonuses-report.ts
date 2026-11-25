@@ -146,6 +146,7 @@ export async function bonusesReport(from: string, to: string): Promise<BonusRepo
         0;
       if (purchase <= 0) row.unknownCostLines++;
       row.cost += purchase * item.quantity;
+      row.bonus += item.bonus;
       if (item.deliveryDate) deliveryDates.push(isoDay(item.deliveryDate));
     }
     const orderedDates = [...new Set(deliveryDates)].sort();
@@ -170,7 +171,7 @@ export async function bonusesReport(from: string, to: string): Promise<BonusRepo
 
   for (const row of grouped.values()) {
     row.margin = row.sales - row.cost;
-    row.bonus = row.bonusOverride ?? Math.round(row.margin * 0.5);
+    row.bonus = row.bonusOverride ?? row.bonus;
   }
   return [...grouped.values()].sort((a, b) => a.company.localeCompare(b.company, "ru") || a.manager.localeCompare(b.manager, "ru"));
 }

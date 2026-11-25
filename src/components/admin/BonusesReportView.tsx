@@ -73,7 +73,7 @@ function BonusAmountCell({
         </button>
       </div>
       {row.bonusOverride !== null && <span className="text-[11px] text-foreground/50">изменён вручную · <button type="button" disabled={locked || pending} onClick={reset} className="underline disabled:opacity-50">по формуле</button></span>}
-      {row.bonusOverride === null && <span className="text-[11px] text-foreground/50">50% от наценки</span>}
+      {row.bonusOverride === null && <span className="text-[11px] text-foreground/50">сумма бонусов по заказам</span>}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
@@ -130,7 +130,7 @@ export function BonusesReportView({
         <PeriodPicker period={period} path="/admin/finance/bonuses" />
       </div>
       <p className="mt-1 text-xs text-foreground/50">
-        В начисление входят только оплаченные покупателем позиции по счетам выбранного периода. Бонус по умолчанию равен 50% наценки.
+        В начисление входят только оплаченные покупателем позиции по счетам выбранного периода. Бонус равен сумме бонусов, указанных в CRM → Заказы.
       </p>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[980px] text-sm">
