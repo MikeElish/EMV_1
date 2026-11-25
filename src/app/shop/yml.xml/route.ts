@@ -16,6 +16,13 @@ const xml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 
+/** Delivery time by stock: in-stock ships fast, order-on-demand ships on request. */
+function deliveryOptions(stock: number) {
+  return stock > 0
+    ? '<delivery-options><option cost="0" days="1-3"/></delivery-options>'
+    : '<delivery-options><option cost="0" days="3-14"/></delivery-options>';
+}
+
 /** Offer ids: Latin letters and digits, at most 20 — stable for a product. */
 const offerId = (productId: string) => BigInt(`0x${createHash("sha1").update(productId).digest("hex").slice(0, 24)}`).toString(36).slice(0, 20);
 
@@ -37,6 +44,7 @@ export async function GET() {
   const categoryNumber = new Map(categories.map((c, i) => [c.id, i + 1]));
 
   const offers = products.map((p) => {
+    const attrs = (p.attributes ?? {}) as { machineType?: string };
     const lines = [
       `<offer id="${offerId(p.id)}" available="${p.stock > 0}">`,
       `<name>${xml(productHeading(p))}</name>`,
@@ -49,6 +57,13 @@ export async function GET() {
       ...p.images.slice(0, 10).map((src) => `<picture>${xml(absoluteUrl(src))}</picture>`),
       p.description ? `<description>${xml(p.description.slice(0, 3000))}</description>` : "",
       `<count>${Math.max(p.stock, 0)}</count>`,
+      "<delivery>true</delivery>",
+      "<pickup>false</pickup>",
+      "<cpa>0</cpa>",
+      deliveryOptions(p.stock),
+      p.brand ? `<param name="Бренд">${xml(p.brand)}</param>` : "",
+      `<param name="Артикул">${xml(p.sku)}</param>`,
+      attrs.machineType ? `<param name="Тип техники">${xml(attrs.machineType)}</param>` : "",
       `</offer>`,
     ];
     return lines.filter(Boolean).join("");

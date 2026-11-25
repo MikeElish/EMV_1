@@ -81,12 +81,26 @@ export default async function ProductPage({ params }: PageProps<"/shop/product/[
     },
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Каталог", item: absoluteUrl("/shop") },
+      { "@type": "ListItem", position: 2, name: product.category.name, item: absoluteUrl(`/shop/categories/${product.category.slug}`) },
+      { "@type": "ListItem", position: 3, name: productHeading(product), item: absoluteUrl(`/shop/product/${product.slug}`) },
+    ],
+  };
+
   return (
     <ShopOffersProvider offers={offers}>
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
         />
         <nav className="text-sm text-foreground/50">
           <Link href="/shop" className="hover:underline">

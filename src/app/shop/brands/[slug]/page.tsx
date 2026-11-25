@@ -8,7 +8,7 @@ import { ShopLink } from "@/components/shop/ShopLink";
 import { ShopOffersProvider } from "@/components/shop/ShopOffers";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { brandNamesForSlug } from "@/lib/shop-seo";
-import { positions, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
+import { absoluteUrl, positions, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 
 // One query for the page and its <head>.
 const getBrand = cache(async (slug: string) => {
@@ -61,9 +61,23 @@ export default async function BrandPage({ params }: PageProps<"/shop/brands/[slu
   const { products } = brand;
   const offers = await getShopOffers(products.map((p) => p.id));
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Каталог", item: absoluteUrl("/shop") },
+      { "@type": "ListItem", position: 2, name: "Бренды", item: absoluteUrl("/shop/brands") },
+      { "@type": "ListItem", position: 3, name: brand.name, item: absoluteUrl(`/shop/brands/${slug}`) },
+    ],
+  };
+
   return (
     <ShopOffersProvider offers={offers}>
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
+        />
         <nav className="text-sm text-foreground/50">
           <Link href="/shop" className="hover:underline">
             Каталог

@@ -3,7 +3,8 @@ import { Inter } from "next/font/google";
 import Script from "next/script";
 import { Suspense } from "react";
 import { MetrikaPageViews } from "@/components/MetrikaPageViews";
-import { METRIKA_ID, SITE_URL } from "@/lib/site";
+import { METRIKA_ID, SITE_URL, SHOP_NAME } from "@/lib/site";
+import { companyInfo } from "@/content/company";
 import { EmailVerificationGate } from "@/components/EmailVerificationGate";
 import { PersonalDataConsentGate } from "@/components/PersonalDataConsentGate";
 import { WindowMinimizationProvider } from "@/components/WindowMinimizationProvider";
@@ -27,9 +28,31 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  const organizationLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SHOP_NAME,
+    legalName: companyInfo.legalName,
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.svg`,
+    telephone: companyInfo.phoneHref,
+    email: companyInfo.email,
+    address: {
+      "@type": "PostalAddress",
+      postalCode: "196105",
+      addressLocality: "Санкт-Петербург",
+      streetAddress: "ул. Кузнецовская, д. 52, к12, 2 этаж, каб. 1-Н №24",
+      addressCountry: "RU",
+    },
+  };
+
   return (
     <html lang="ru" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd).replace(/</g, "\\u003c") }}
+        />
         <Script id="yandex-metrika" strategy="afterInteractive">
           {`(function(m,e,t,r,i,k,a){
               m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};

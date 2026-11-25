@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { positions, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
+import { absoluteUrl, positions, SHOP_CITY_IN, SHOP_NAME } from "@/lib/site";
 import { ShopOffersProvider } from "@/components/shop/ShopOffers";
 import { getShopOffers } from "@/lib/supplier-offers";
 import { prisma } from "@/lib/prisma";
@@ -75,9 +75,22 @@ export default async function CategoryPage({
 
   const offers = await getShopOffers(products.map((p) => p.id));
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Каталог", item: absoluteUrl("/shop") },
+      { "@type": "ListItem", position: 2, name: category.name, item: absoluteUrl(`/shop/categories/${category.slug}`) },
+    ],
+  };
+
   return (
     <ShopOffersProvider offers={offers}>
       <section className="mx-auto max-w-6xl px-4 sm:px-6 py-16">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
+        />
         <h1 className="text-3xl font-bold">{category.name}</h1>
 
         <div className="mt-6 flex flex-wrap gap-6 text-sm">
