@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
-import { createBonusPaymentRequest, saveBonusOverride } from "@/actions/admin/bonuses";
+import { createBonusPaymentRequest, saveIssueAmount } from "@/actions/admin/bonuses";
 import { Modal } from "@/components/Modal";
 import { PeriodPicker } from "@/components/admin/PeriodPicker";
 import { formatAdminPrice, rublesToKopecksRoundedUp } from "@/lib/money";
@@ -12,7 +12,23 @@ import type { Period } from "@/lib/period";
 import type { BonusReportRow } from "@/lib/bonuses-report";
 import { ORDER_STATUS_LABELS } from "@/lib/validators/orders";
 
-function BonusAmountCell({
+function parseRubles(value: string): number {
+  return parseFloat(value.replace(/\s/g, "").replace(",", "."));
+}
+
+function formatRubles(kopecks: number): string {
+  return String(kopecks / 100).replace(".", ",");
+}
+
+function parsePercent(value: string): number {
+  return parseFloat(value.replace(/\s/g, "").replace(",", "."));
+}
+
+function formatPercent(percent: number): string {
+  return percent.toFixed(2).replace(".", ",");
+}
+
+function IssueAmountCell({
   row,
   period,
   editable,
@@ -22,59 +38,100 @@ function BonusAmountCell({
   editable: boolean;
 }) {
   const router = useRouter();
-  const [value, setValue] = useState(String(row.bonus / 100).replace(".", ","));
+  const [amountStr, setAmountStr] = useState(formatRubles(row.issueAmount));
+  const [percentStr, setPercentStr] = useState(formatPercent(row.issuePercent));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const locked = !editable || !row.managerId || row.requestNumber !== null;
 
-  function save() {
-    const rubles = parseFloat(value.replace(/\s/g, "").replace(",", "."));
-    if (!Number.isFinite(rubles) || rubles < 0) return setError("Укажите сумму от нуля");
+  useEffect(() => {
+    setAmountStr(formatRubles(row.issueAmount));
+    setPercentStr(formatPercent(row.issuePercent));
+  }, [row.issueAmount, row.issuePercent]);
+
+  function save(nextAmountKopecks: number) {
+    if (!Number.isFinite(nextAmountKopecks) || nextAmountKopecks < 0) {
+      return setError("Укажите сумму от нуля");
+    }
+    setError(null);
     startTransition(async () => {
-      const result = await saveBonusOverride(
+      const result = await saveIssueAmount(
         row.companyId,
         row.managerId!,
         period.from,
         period.to,
-        rublesToKopecksRoundedUp(rubles)
+        nextAmountKopecks
       );
-      if (!result.ok) setError(result.error);
-      else {
-        setError(null);
-        router.refresh();
-      }
-    });
-  }
-
-  function reset() {
-    if (!row.managerId) return;
-    startTransition(async () => {
-      const result = await saveBonusOverride(row.companyId, row.managerId!, period.from, period.to, null);
       if (!result.ok) setError(result.error);
       else router.refresh();
     });
   }
 
-  if (!editable) return <span>{formatAdminPrice(row.bonus)}</span>;
+  function handleAmountChange(value: string) {
+    setAmountStr(value);
+    const rub = parseRubles(value);
+    const kopecks = Number.isFinite(rub) ? rublesToKopecksRoundedUp(rub) : NaN;
+    const percent = row.bonus > 0 && Number.isFinite(kopecks) ? (kopecks / row.bonus) * 100 : 0;
+    setPercentStr(formatPercent(percent));
+  }
+
+  function handlePercentChange(value: string) {
+    setPercentStr(value);
+    const percent = parsePercent(value);
+    const kopecks = Number.isFinite(percent) && row.bonus > 0 ? Math.round((row.bonus * percent) / 100) : NaN;
+    setAmountStr(formatRubles(kopecks));
+  }
+
+  function commitAmount() {
+    const rub = parseRubles(amountStr);
+    if (!Number.isFinite(rub)) return setError("Некорректная сумма");
+    save(rublesToKopecksRoundedUp(rub));
+  }
+
+  function commitPercent() {
+    const percent = parsePercent(percentStr);
+    if (!Number.isFinite(percent)) return setError("Некорректный процент");
+    const kopecks = row.bonus > 0 ? Math.round((row.bonus * percent) / 100) : 0;
+    save(kopecks);
+  }
+
+  if (!editable) {
+    return (
+      <div className="flex justify-end gap-3">
+        <span>{formatPercent(row.issuePercent)}%</span>
+        <span>{formatAdminPrice(row.issueAmount)}</span>
+      </div>
+    );
+  }
+
   return (
     <div onClick={(event) => event.stopPropagation()}>
-      <div className="flex items-center justify-end gap-1">
+      <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center gap-1">
+          <input
+            aria-label={`Процент к выдаче ${row.company}`}
+            value={percentStr}
+            onChange={(event) => handlePercentChange(event.target.value)}
+            onBlur={commitPercent}
+            onKeyDown={(event) => event.key === "Enter" && commitPercent()}
+            disabled={locked || pending}
+            inputMode="decimal"
+            className="w-16 rounded border border-foreground/20 bg-transparent px-2 py-1 text-right text-sm disabled:opacity-50"
+          />
+          <span className="text-xs text-foreground/50">%</span>
+        </div>
         <input
-          aria-label={`Бонус компании ${row.company}`}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && save()}
+          aria-label={`Сумма к выдаче ${row.company}`}
+          value={amountStr}
+          onChange={(event) => handleAmountChange(event.target.value)}
+          onBlur={commitAmount}
+          onKeyDown={(event) => event.key === "Enter" && commitAmount()}
           disabled={locked || pending}
           inputMode="decimal"
           className="w-28 rounded border border-foreground/20 bg-transparent px-2 py-1 text-right text-sm disabled:opacity-50"
         />
-        <button type="button" onClick={save} disabled={locked || pending} className="rounded border border-foreground/20 px-2 py-1 text-xs disabled:opacity-40">
-          OK
-        </button>
       </div>
-      {row.bonusOverride !== null && <span className="text-[11px] text-foreground/50">изменён вручную · <button type="button" disabled={locked || pending} onClick={reset} className="underline disabled:opacity-50">по формуле</button></span>}
-      {row.bonusOverride === null && <span className="text-[11px] text-foreground/50">сумма бонусов по заказам</span>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-right text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -96,7 +153,7 @@ function BonusRequestAction({ row, period }: { row: BonusReportRow; period: Peri
     <div onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        disabled={pending || row.bonus <= 0}
+        disabled={pending || row.issueAmount <= 0}
         onClick={() =>
           startTransition(async () => {
             const result = await createBonusPaymentRequest(row.companyId, row.managerId!, period.from, period.to);
@@ -142,13 +199,15 @@ export function BonusesReportView({
               <th className="py-2 pr-3 text-right font-normal">Себестоимость</th>
               <th className="py-2 pr-3 text-right font-normal">Наценка</th>
               <th className="py-2 pr-3 text-right font-normal">Бонус</th>
+              <th className="py-2 pr-3 text-right font-normal">% к выдаче</th>
+              <th className="py-2 pr-3 text-right font-normal">К выдаче</th>
               <th className="py-2 pr-3 text-right font-normal">Выдано</th>
               <th className="py-2 font-normal">Действия</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="py-6 text-center text-foreground/40">За период нет оплаченных покупателем позиций по выставленным счетам.</td></tr>
+              <tr><td colSpan={10} className="py-6 text-center text-foreground/40">За период нет оплаченных покупателем позиций по выставленным счетам.</td></tr>
             ) : rows.map((row) => (
               <tr key={row.key} onClick={() => setSelected(row)} className="cursor-pointer border-b border-foreground/10 hover:bg-foreground/5">
                 <td className="py-2 pr-3">
@@ -162,7 +221,10 @@ export function BonusesReportView({
                   {row.unknownCostLines > 0 && <span className="ml-1 text-xs text-amber-600" title={`Нет закупочной цены у ${row.unknownCostLines} поз.`}>*</span>}
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.margin)}</td>
-                <td className="py-2 pr-3 text-right"><BonusAmountCell key={`${row.key}:${period.from}:${period.to}:${row.bonus}`} row={row} period={period} editable={canEditBonus} /></td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.bonus)}</td>
+                <td className="py-2 pr-3 text-right" colSpan={2}>
+                  <IssueAmountCell key={`${row.key}:${period.from}:${period.to}:${row.issueAmount}`} row={row} period={period} editable={canEditBonus} />
+                </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right">{formatAdminPrice(row.issued)}</td>
                 <td className="py-2"><BonusRequestAction row={row} period={period} /></td>
               </tr>

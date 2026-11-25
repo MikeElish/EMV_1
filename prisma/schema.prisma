@@ -1208,6 +1208,7 @@ model BonusSettlement {
   periodFrom     DateTime
   periodTo       DateTime
   bonusOverride  Int?
+  issueAmount    Int?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)

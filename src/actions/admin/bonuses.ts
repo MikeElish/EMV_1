@@ -50,6 +50,48 @@ export async function saveBonusOverride(
   return { ok: true };
 }
 
+export async function saveIssueAmount(
+  companyId: string,
+  managerId: string,
+  from: string,
+  to: string,
+  amount: number | null
+): Promise<BonusActionResult> {
+  const denied = await accessDenied("finance.bonuses");
+  if (denied) return denied;
+  if (!(await ownerManualInputEnabled())) return { ok: false, error: "Ручной ввод выключен в настройках сайта" };
+  if (!companyId || !managerId || !validPeriod(from, to)) return { ok: false, error: "Некорректная компания, менеджер или период" };
+  if (amount !== null && (!Number.isInteger(amount) || amount < 0 || amount > 1_000_000_000_000)) {
+    return { ok: false, error: "Сумма к выдаче должна быть неотрицательной суммой в копейках" };
+  }
+
+  const { periodFrom, periodTo } = bonusPeriodDates(from, to);
+  const where = { managerId_companyId_periodFrom_periodTo: { managerId, companyId, periodFrom, periodTo } };
+  const existing = await prisma.bonusSettlement.findUnique({
+    where,
+    select: { id: true, paymentRequest: { select: { id: true } } },
+  });
+  if (existing?.paymentRequest) return { ok: false, error: "Бонус уже включён в заявку на оплату; сначала отмените её" };
+
+  if (amount !== null) {
+    const row = (await bonusesReport(from, to)).find(
+      (item) => item.companyId === companyId && item.managerId === managerId
+    );
+    if (!row) return { ok: false, error: "За этот период нет поставленных заказов компании" };
+    if (amount > row.bonus) return { ok: false, error: "Сумма к выдаче не может превышать бонус" };
+  }
+
+  if (amount === null && !existing) return { ok: true };
+
+  await prisma.bonusSettlement.upsert({
+    where,
+    create: { managerId, companyId, periodFrom, periodTo, issueAmount: amount },
+    update: { issueAmount: amount },
+  });
+  revalidatePath("/admin/finance/bonuses");
+  return { ok: true };
+}
+
 export async function createBonusPaymentRequest(
   companyId: string,
   managerId: string,
@@ -67,6 +109,7 @@ export async function createBonusPaymentRequest(
   if (!row) return { ok: false, error: "За этот период нет поставленных заказов компании" };
   if (row.requestNumber) return { ok: true, number: row.requestNumber };
   if (row.bonus <= 0) return { ok: false, error: "Сумма бонуса должна быть больше нуля" };
+  if (row.issueAmount <= 0) return { ok: false, error: "Сумма к выдаче должна быть больше нуля" };
 
   const { periodFrom, periodTo } = bonusPeriodDates(from, to);
   const settlement = await prisma.bonusSettlement.upsert({
@@ -77,7 +120,7 @@ export async function createBonusPaymentRequest(
   const request = await prisma.paymentRequest.upsert({
     where: { bonusSettlementId: settlement.id },
     create: {
-      amount: row.bonus,
+      amount: row.issueAmount,
       purpose: `Выплата бонуса менеджеру ${row.manager} · ${row.company} · ${from} — ${to}`,
       purposeCategory: "BONUSES",
       fund: "SALARY",

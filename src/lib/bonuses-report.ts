@@ -27,6 +27,8 @@ export type BonusReportRow = {
   margin: number;
   bonus: number;
   bonusOverride: number | null;
+  issuePercent: number;
+  issueAmount: number;
   issued: number;
   requestNumber: number | null;
   requestStatus: string | null;
@@ -122,6 +124,8 @@ export async function bonusesReport(from: string, to: string): Promise<BonusRepo
         margin: 0,
         bonus: 0,
         bonusOverride: settlement?.bonusOverride ?? null,
+        issuePercent: 0,
+        issueAmount: 0,
         issued: settlement?.paymentRequest?.status === "Оплачено" ? settlement.paymentRequest.amount : 0,
         requestNumber: settlement?.paymentRequest?.number ?? null,
         requestStatus: settlement?.paymentRequest?.status ?? null,
@@ -172,6 +176,11 @@ export async function bonusesReport(from: string, to: string): Promise<BonusRepo
   for (const row of grouped.values()) {
     row.margin = row.sales - row.cost;
     row.bonus = row.bonusOverride ?? row.bonus;
+    const settlement = settlementByKey.get(`${row.companyId}:${row.managerId ?? ""}`);
+    const defaultIssueAmount = row.bonus > 0 ? Math.round(row.bonus * 0.5) : 0;
+    const issueAmount = settlement?.issueAmount ?? defaultIssueAmount;
+    row.issueAmount = row.bonus > 0 ? Math.min(issueAmount, row.bonus) : 0;
+    row.issuePercent = row.bonus > 0 ? (row.issueAmount / row.bonus) * 100 : 0;
   }
   return [...grouped.values()].sort((a, b) => a.company.localeCompare(b.company, "ru") || a.manager.localeCompare(b.manager, "ru"));
 }
