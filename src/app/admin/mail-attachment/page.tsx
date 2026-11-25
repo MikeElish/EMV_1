@@ -4,7 +4,7 @@ import { verifyStaffSession } from "@/lib/staff-dal";
 import { getMailAccount } from "@/lib/mail/account";
 import { getAttachment } from "@/lib/mail/messages";
 import { MailError } from "@/lib/mail/imap";
-import { decodeText, detectPreview } from "@/lib/mail/preview";
+import { decodeText, detectPreview, extractDocText } from "@/lib/mail/preview";
 import { formatSize } from "@/components/mail/format";
 
 // Opened in a new tab from a letter: the attachment itself (image, PDF, text,
@@ -53,6 +53,7 @@ export default async function MailAttachmentPage({ searchParams }: { searchParam
   }
 
   const preview = file ? detectPreview(file.filename, file.contentType, file.content) : null;
+  const docText = preview?.kind === "doc" && file ? await extractDocText(file.content) : null;
 
   let body: React.ReactNode;
   if (!file) {
@@ -112,6 +113,19 @@ export default async function MailAttachmentPage({ searchParams }: { searchParam
       </div>
     ) : (
       <p className="p-8 text-center text-sm text-foreground/60">Не удалось прочитать таблицу — скачайте файл.</p>
+    );
+  } else if (preview?.kind === "doc") {
+    body = docText ? (
+      <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-6 font-mono text-sm">
+        {docText.length > MAX_TEXT_CHARS ? `${docText.slice(0, MAX_TEXT_CHARS)}\n\n… файл обрезан, скачайте его целиком` : docText}
+      </pre>
+    ) : (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-sm text-foreground/60">Не удалось извлечь текст из документа — скачайте файл.</p>
+        <a href={fileUrl} download className="rounded-md bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90">
+          Скачать файл
+        </a>
+      </div>
     );
   } else {
     body = (

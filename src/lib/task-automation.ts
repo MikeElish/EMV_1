@@ -32,7 +32,7 @@ async function ensureEmvTask(
   input: {
     assigneeId: string;
     basis: "INTERNAL" | "CUSTOMER_ORDER" | "BUYER_COMPANY" | "DOCUMENT_FLOW";
-    kind: "PROCESSING" | "LOGISTICS" | "PAY" | "DOCUMENTS";
+    kind: import("@prisma/client").TaskKind;
     description: string;
     sourceType?: string;
     sourceId?: string;
@@ -121,13 +121,13 @@ export async function createPaymentTask(orderId: string, amount: number) {
     {
       assigneeId,
       basis: "CUSTOMER_ORDER",
-      kind: "PROCESSING",
+      kind: "PAY",
       description: `По заказу ${order.orderNumber} поступила оплата в размере ${(amount / 100).toLocaleString("ru-RU")} ₽. Создайте Заказ поставщику или отгрузите товар.`,
       sourceType: "ORDER",
       sourceId: orderId,
       sourceNumber: order.orderNumber,
     },
-    { sourceType: "ORDER", sourceId: orderId, kind: "PROCESSING", assigneeId }
+    { sourceType: "ORDER", sourceId: orderId, kind: "PAY", assigneeId }
   );
 }
 
@@ -143,13 +143,13 @@ export async function createSupplyTask(orderId: string, supplierOrderNumber: str
     {
       assigneeId,
       basis: "CUSTOMER_ORDER",
-      kind: "PROCESSING",
+      kind: "INTERNAL_LOGISTICS",
       description: `По заказу поставщику ${supplierOrderNumber} поступил товар:\n${itemsText}\nОтгрузите товар.`,
       sourceType: "ORDER",
       sourceId: orderId,
       sourceNumber: order.orderNumber,
     },
-    { sourceType: "ORDER", sourceId: orderId, kind: "PROCESSING", assigneeId }
+    { sourceType: "ORDER", sourceId: orderId, kind: "INTERNAL_LOGISTICS", assigneeId }
   );
 }
 

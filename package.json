@@ -25,6 +25,7 @@
     "react-dom": "19.2.8",
     "sanitize-html": "^2.18.0",
     "sharp": "^0.35.4",
+    "word-extractor": "^1.0.4",
     "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
     "zod": "^4.5.4"
   },
