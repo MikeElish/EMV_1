@@ -69,16 +69,18 @@ function IssueAmountCell({
 
   function handleAmountChange(value: string) {
     setAmountStr(value);
+    if (row.bonus <= 0) return setPercentStr(formatPercent(0));
     const rub = parseRubles(value);
     const kopecks = Number.isFinite(rub) ? rublesToKopecksRoundedUp(rub) : NaN;
-    const percent = row.bonus > 0 && Number.isFinite(kopecks) ? (kopecks / row.bonus) * 100 : 0;
+    const percent = Number.isFinite(kopecks) ? (kopecks / row.bonus) * 100 : 0;
     setPercentStr(formatPercent(percent));
   }
 
   function handlePercentChange(value: string) {
     setPercentStr(value);
+    if (row.bonus <= 0) return setAmountStr(formatRubles(0));
     const percent = parsePercent(value);
-    const kopecks = Number.isFinite(percent) && row.bonus > 0 ? Math.round((row.bonus * percent) / 100) : NaN;
+    const kopecks = Number.isFinite(percent) ? Math.round((row.bonus * percent) / 100) : NaN;
     setAmountStr(formatRubles(kopecks));
   }
 
