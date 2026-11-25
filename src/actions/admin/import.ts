@@ -280,7 +280,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
           },
         });
         if (restocked) restockedIds.push(existing.id);
-        await recordOffer(prisma, existing.id, { supplierId: pricing.supplierId ?? null, price: pricing.purchasePrice });
+        await recordOffer(prisma, existing.id, { supplierId: pricing.supplierId, price: pricing.purchasePrice });
         updated++;
       } else {
         await prisma.product.create({
@@ -289,7 +289,7 @@ export async function commitImportRows(rows: AnalyzedRow[]): Promise<ImportSumma
             newArrivalAt: importedAt,
             ...data,
             pricing: { create: pricing },
-            offers: { create: { supplierId: pricing.supplierId ?? null, price: pricing.purchasePrice, selected: true } },
+            offers: { create: { supplierId: pricing.supplierId, price: pricing.purchasePrice, selected: true } },
           },
         });
         created++;

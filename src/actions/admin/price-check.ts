@@ -264,6 +264,7 @@ export async function orderFromOffer(offerId: string, quantity: number): Promise
     include: { supplier: { select: { supplierProfile: { select: { logisticsMarkupPercent: true } } } } },
   });
   if (!offer || offer.noOffer || offer.price <= 0 || !offer.quotedPrice) return { ok: false, error: "У поставщика нет цены в рублях. Проверьте курс валюты в предложении" };
+  if (!offer.supplierId) return { ok: false, error: "У предложения не указан поставщик" };
   const currency = parseSupplierCurrency(offer.currency) ?? "RUB";
   const quotedPrice = offer.quotedPrice ?? offer.price;
   const price = currency === "RUB"

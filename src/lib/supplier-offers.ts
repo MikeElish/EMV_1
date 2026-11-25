@@ -36,8 +36,9 @@ export async function selectOffer(db: Db, productId: string, offerId: string) {
 export async function recordOffer(
   db: Db,
   productId: string,
-  offer: { supplierId: string | null; price: number; deliveryDays?: number | null; quality?: string | null; warehouse?: string | null } & OfferPricing
+  offer: { supplierId: string; price: number; deliveryDays?: number | null; quality?: string | null; warehouse?: string | null } & OfferPricing
 ) {
+  if (!offer.supplierId) throw new Error("Предложение должно иметь поставщика");
   const saved = await upsertSupplierOffer(db, productId, {
     ...offer,
     currency: offer.currency ?? "RUB",
@@ -57,9 +58,10 @@ export async function recordOffer(
 export async function upsertSupplierOffer(
   db: Db,
   productId: string,
-  offer: { supplierId: string | null; price: number; deliveryDays?: number | null; quality?: string | null; warehouse?: string | null } & OfferPricing,
+  offer: { supplierId: string; price: number; deliveryDays?: number | null; quality?: string | null; warehouse?: string | null } & OfferPricing,
   { selectIfNone = true }: { selectIfNone?: boolean } = {}
 ) {
+  if (!offer.supplierId) throw new Error("Предложение должно иметь поставщика");
   const existing = await db.supplierOffer.findFirst({
     where: { productId, supplierId: offer.supplierId },
     orderBy: { priceUpdatedAt: "desc" },
