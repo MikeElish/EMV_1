@@ -11,12 +11,12 @@ async function main() {
 
   // Old template picked for "Барабаны тормозные" before products were moved.
   const oldTemplate =
-    "Безопасность техники начинается с тормозов. Барабан отличного качества сохраняет геометрию под нагрузкой и служит долго даже при интенсивной работе. Прямые поставки без посредников позволяют держать ц";
+    "Безопасность техники начинается с тормозов. Барабан отличного качества сохраняет геометрию под нагрузкой и служит долго даже при интенсивной работе. Прямые поставки без посредников позволяют держать цены на разумном уровне.";
 
   const movedProducts = await prisma.product.findMany({
     where: {
       categoryId: { not: sourceCategory.id },
-      description: { startsWith: oldTemplate },
+      description: oldTemplate,
     },
     select: { id: true, sku: true, name: true, categoryId: true, description: true },
   });
