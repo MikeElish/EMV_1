@@ -15,8 +15,16 @@ function pickTemplate(descriptions: string[]): string | null {
     .map((d) => d.trim())
     .filter((d) => d.length > 0 && !d.startsWith("для техники") && !d.startsWith("Заказать можно"));
   if (clean.length === 0) return null;
-  const counts = countOccurrences(clean);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+  // Prefer informative descriptions: among texts longer than 80 chars pick the most common one.
+  const informative = clean.filter((d) => d.length >= 80);
+  if (informative.length > 0) {
+    const counts = countOccurrences(informative);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  // Fallback: the longest description if only short boilerplate texts exist.
+  return clean.sort((a, b) => b.length - a.length)[0];
 }
 
 async function main() {
