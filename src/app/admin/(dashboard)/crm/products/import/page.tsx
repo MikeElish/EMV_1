@@ -1,5 +1,6 @@
 import { utils, write } from "xlsx";
 import { CsvUploader } from "@/components/admin/CsvUploader";
+import { ImportBackButton } from "@/components/admin/ImportBackButton";
 import { CSV_TEMPLATE_HEADER, CSV_TEMPLATE_EXAMPLE } from "@/lib/validators/csv";
 
 function buildXlsxTemplateHref() {
@@ -20,7 +21,10 @@ export default function ImportProductsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Импорт товаров из CSV или Excel</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold">Импорт товаров из CSV или Excel</h1>
+        <ImportBackButton />
+      </div>
       <p className="mt-2 max-w-xl text-sm text-foreground/60">
         Столбцы считываются по порядку слева направо — названия в первой
         строке файла можно менять, главное не менять порядок:{" "}
