@@ -2,12 +2,12 @@
 
 import { useEscape } from "@/lib/use-escape";
 import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
-import type { Product } from "@prisma/client";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
 import { OfferPrice, OffersDropdown, useProductOffers } from "@/components/shop/ShopOffers";
 import { StockBadge } from "@/components/shop/StockBadge";
 import { BRANDS } from "@/content/brands";
+import type { ShopCatalogProduct } from "@/lib/shop-types";
 
 export type BrowserCategory = {
   id: string;
@@ -29,7 +29,7 @@ type SortOption = "default" | "price_asc" | "price_desc" | "name_asc" | "name_de
 
 const SORT_COMPARATORS: Record<
   Exclude<SortOption, "default">,
-  (a: Product, b: Product) => number
+  (a: ShopCatalogProduct, b: ShopCatalogProduct) => number
 > = {
   price_asc: (a, b) => a.price - b.price,
   price_desc: (a, b) => b.price - a.price,
@@ -53,7 +53,7 @@ export function CategoryBrowser({
   products,
 }: {
   categories: BrowserCategory[];
-  products: Product[];
+  products: ShopCatalogProduct[];
 }) {
   const [scrollIndex, setScrollIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export function CategoryBrowser({
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
-  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [quickViewProduct, setQuickViewProduct] = useState<ShopCatalogProduct | null>(null);
 
   const [brand, setBrand] = useState<string | null>(null);
   const [brandQuery, setBrandQuery] = useState("");
@@ -407,7 +407,7 @@ export function CategoryBrowser({
  * One product line: the name / article open the product card; with several
  * supplier offers the price reads «от …» and a click on it drops them down.
  */
-function BrowserRow({ product, onQuickView }: { product: Product; onQuickView: () => void }) {
+function BrowserRow({ product, onQuickView }: { product: ShopCatalogProduct; onQuickView: () => void }) {
   const offers = useProductOffers(product.id);
   const [open, setOpen] = useState(false);
   return (

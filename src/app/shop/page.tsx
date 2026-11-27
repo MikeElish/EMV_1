@@ -6,10 +6,24 @@ import { HeroMessageCarousel } from "@/components/shop/HeroMessageCarousel";
 import { CategoryBrowser } from "@/components/shop/CategoryBrowser";
 import { NewArrivalsRotator } from "@/components/shop/NewArrivalsRotator";
 import { rotatorDirections } from "@/lib/shop-rotator";
+import type { ShopCatalogProduct } from "@/lib/shop-types";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/shop" },
 };
+
+const CATALOG_SELECT = {
+  id: true,
+  sku: true,
+  name: true,
+  slug: true,
+  price: true,
+  stock: true,
+  partnerStock: true,
+  brand: true,
+  categoryId: true,
+  newArrivalAt: true,
+} satisfies Record<keyof ShopCatalogProduct, true>;
 
 export default async function ShopHomePage() {
   const [categories, allActiveProducts] = await Promise.all([
@@ -18,11 +32,10 @@ export default async function ShopHomePage() {
       orderBy: { name: "asc" },
       include: { _count: { select: { products: { where: { isActive: true } } } } },
     }),
-    // Full rows (not a narrow select) so the same records can be handed
-    // straight to ProductQuickViewModal for the category browser's and the
-    // "Новое поступление" rotator's popups.
     prisma.product.findMany({
       where: { isActive: true },
+      select: CATALOG_SELECT,
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -33,7 +46,10 @@ export default async function ShopHomePage() {
     count: c._count.products,
   }));
 
-  const offers = await getShopOffers(allActiveProducts.map((p) => p.id));
+  const catalogProducts = allActiveProducts as unknown as ShopCatalogProduct[];
+  const rotatorProducts = catalogProducts.slice(0, 200);
+
+  const offers = await getShopOffers(catalogProducts.map((p) => p.id));
 
   return (
     <ShopOffersProvider offers={offers}>
@@ -55,11 +71,11 @@ export default async function ShopHomePage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pt-2 sm:px-6">
-          <CategoryBrowser categories={browserCategories} products={allActiveProducts} />
+          <CategoryBrowser categories={browserCategories} products={catalogProducts} />
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-16 pt-4 sm:px-6">
-          <NewArrivalsRotator directions={rotatorDirections(allActiveProducts)} />
+          <NewArrivalsRotator directions={rotatorDirections(rotatorProducts, { maxItems: 50 })} />
         </section>
       </>
     </ShopOffersProvider>

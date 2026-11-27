@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { Product } from "@prisma/client";
 import { useCart } from "@/components/shop/CartProvider";
 import type { ShopOffer } from "@/lib/shop-offer";
+import type { ShopCatalogProduct } from "@/lib/shop-types";
 
 /** «Заказать» for a product -- or for one of its supplier offers. */
-export function RowOrderButton({ product, offer }: { product: Product; offer?: ShopOffer }) {
+export function RowOrderButton({ product, offer }: { product: ShopCatalogProduct; offer?: ShopOffer }) {
   const { addItem } = useCart();
   const [ordering, setOrdering] = useState(false);
   const [quantity, setQuantity] = useState(1);

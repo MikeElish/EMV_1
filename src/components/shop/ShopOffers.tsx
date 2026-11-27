@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useMemo } from "react";
 import { useCustomerEntry } from "@/components/shop/CustomerPrices";
-import type { Product } from "@prisma/client";
 import { formatRub, formatShopPrice, PRICE_ON_REQUEST } from "@/lib/money";
 import type { ShopOffer } from "@/lib/shop-offer";
+import type { ShopCatalogProduct } from "@/lib/shop-types";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
 
 // Products with several supplier offers (Проценка): the shop shows «от …»
@@ -42,7 +42,7 @@ export const offerDays =(o: ShopOffer) => (o.deliveryDays === null ? "—" : `${
 export const offerLabel = (o: ShopOffer) => [o.quality, o.deliveryDays !== null ? `${o.deliveryDays} дн.` : null].filter(Boolean).join(", ");
 
 /** «от 1 200 ₽» for a product with several offers, its own price otherwise; «По запросу» without one. */
-export function OfferPrice({ product }: { product: Product }) {
+export function OfferPrice({ product }: { product: ShopCatalogProduct }) {
   const offers = usePricedOffers(product.id);
   const own = useCustomerEntry(product.id)?.price ?? product.price;
   const prices = [own, ...(offers ?? []).map((o) => o.price)].filter((p) => p > 0);
@@ -57,7 +57,7 @@ export function OfferPrice({ product }: { product: Product }) {
 }
 
 /** The list that drops down under a product: Качество, Цена, Срок поставки, Заказать. */
-export function OffersDropdown({ product, offers: shopOffers }: { product: Product; offers: ShopOffer[] }) {
+export function OffersDropdown({ product, offers: shopOffers }: { product: ShopCatalogProduct; offers: ShopOffer[] }) {
   const entry = useCustomerEntry(product.id);
   const offers = entry ? shopOffers.map((o) => ({ ...o, price: entry.offers[o.id] ?? o.price })) : shopOffers;
   return (
@@ -91,7 +91,7 @@ export function OffersDropdown({ product, offers: shopOffers }: { product: Produ
 }
 
 /** Product card / quick view: all offers under the price, each with «Заказать». */
-export function ProductOffersBlock({ product }: { product: Product }) {
+export function ProductOffersBlock({ product }: { product: ShopCatalogProduct }) {
   const offers = useProductOffers(product.id);
   if (!offers) return null;
   return (

@@ -14,6 +14,8 @@ export function ProtectedImage({
     <img
       src={src}
       alt={alt}
+      loading="lazy"
+      decoding="async"
       draggable={false}
       onContextMenu={(e) => e.preventDefault()}
       className={className}

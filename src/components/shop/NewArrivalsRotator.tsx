@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Product } from "@prisma/client";
 import { ProductQuickViewModal } from "@/components/shop/ProductQuickViewModal";
 import { RowOrderButton } from "@/components/shop/RowOrderButton";
 import { OfferPrice } from "@/components/shop/ShopOffers";
 import { StockBadge } from "@/components/shop/StockBadge";
+import type { ShopCatalogProduct } from "@/lib/shop-types";
 
 export type RotatorDirection = {
   key: string;
   label: string;
-  items: Product[];
+  items: ShopCatalogProduct[];
 };
 
 const ROWS = 5;
@@ -22,7 +22,7 @@ const TRANSITION_MS = 500;
 const CYCLE_MS = 5000;
 
 // A slot is empty when the section has fewer than ROWS products.
-type Slot = Product | null;
+type Slot = ShopCatalogProduct | null;
 
 type RowState = {
   current: Slot;
@@ -42,7 +42,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /** n slots from the pool, each product once; empty slots when it is short. */
-function sampleN(pool: Product[], n: number, shuffled: boolean): Slot[] {
+function sampleN(pool: ShopCatalogProduct[], n: number, shuffled: boolean): Slot[] {
   const base: Slot[] = (shuffled ? shuffle(pool) : pool).slice(0, n);
   while (base.length < n) base.push(null);
   return base;
@@ -62,7 +62,7 @@ export function NewArrivalsRotator({ directions }: { directions: RotatorDirectio
       instant: false,
     }));
   });
-  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [quickViewProduct, setQuickViewProduct] = useState<ShopCatalogProduct | null>(null);
 
   // The section the rows show (or turn back to) -- refs, since the cycle runs
   // from timers set up by earlier renders.
